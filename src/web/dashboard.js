@@ -73,7 +73,11 @@ async function runSearchTest() {
             params.append('in_stock', 'true');
         }
 
-        const response = await fetch(`http://localhost:8000/api/v1/search?${params}`);
+        // Используем текущий хост для API
+        const apiUrl = window.location.hostname === 'localhost' 
+            ? 'http://localhost:8000'
+            : '';
+        const response = await fetch(`${apiUrl}/api/v1/search?${params}`);
         
         if (!response.ok) {
             throw new Error('Search failed');

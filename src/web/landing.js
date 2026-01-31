@@ -28,7 +28,11 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             demoResults.innerHTML = '<div style="padding: 1rem; color: #64748b;">Поиск...</div>';
             
-            const response = await fetch(`http://localhost:8000/api/v1/search?q=${encodeURIComponent(query)}&project_id=demo&limit=5`);
+            // Используем текущий хост для API
+            const apiUrl = window.location.hostname === 'localhost' 
+                ? 'http://localhost:8000'
+                : `/api/v1`;
+            const response = await fetch(`${apiUrl}/api/v1/search?q=${encodeURIComponent(query)}&project_id=demo&limit=5`);
             
             if (!response.ok) {
                 throw new Error('Search failed');
