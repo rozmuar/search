@@ -15,7 +15,7 @@ RUN pip install --no-cache-dir -r requirements-basic.txt
 
 # Копирование кода
 COPY src /app/src
-COPY config /app/config
+COPY scripts /app/scripts
 
 # Порт API
 EXPOSE 8000
