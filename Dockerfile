@@ -7,7 +7,15 @@ RUN apt-get update && apt-get install -y \
     gcc \
     nginx \
     supervisor \
+    openssl \
     && rm -rf /var/lib/apt/lists/*
+
+# Генерация self-signed SSL сертификата
+RUN mkdir -p /etc/nginx/ssl && \
+    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+    -keyout /etc/nginx/ssl/server.key \
+    -out /etc/nginx/ssl/server.crt \
+    -subj "/CN=searchpro/O=SearchPro/C=RU"
 
 # Копирование зависимостей
 COPY requirements-basic.txt .
@@ -44,8 +52,8 @@ autorestart=true\n\
 directory=/app\n\
 " > /etc/supervisor/conf.d/app.conf
 
-# Порт
-EXPOSE 80
+# Порты
+EXPOSE 80 443
 
 # Запуск через supervisor
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/supervisord.conf"]
