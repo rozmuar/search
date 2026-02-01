@@ -38,7 +38,9 @@ async def lifespan(app: FastAPI):
     global redis_client, search_engine, indexer, data_store, feed_manager, feed_scheduler
     
     # Подключение к Redis
-    redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379")
+    redis_host = os.environ.get("REDIS_HOST", "localhost")
+    redis_port = os.environ.get("REDIS_PORT", "6379")
+    redis_url = f"redis://{redis_host}:{redis_port}"
     redis_client = await redis.from_url(
         redis_url,
         encoding="utf-8",
