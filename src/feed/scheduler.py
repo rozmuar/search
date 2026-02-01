@@ -123,11 +123,13 @@ class SimpleFeedScheduler:
                 # Обновляем фид
                 print(f"[Scheduler] Auto-updating feed for {project_id}...")
                 
-                # Устанавливаем статус "updating"
+                # Устанавливаем статус "downloading"
                 await self.redis.hset(
                     f"project:{project_id}:feed",
                     mapping={
-                        "status": "updating",
+                        "status": "downloading",
+                        "progress": "0",
+                        "message": "Автообновление фида...",
                         "update_started": now.isoformat()
                     }
                 )
@@ -137,6 +139,16 @@ class SimpleFeedScheduler:
                     result = await self.feed_manager.load_feed(project_id, feed_url)
                     
                     if result["success"]:
+                        # Статус индексации
+                        await self.redis.hset(
+                            f"project:{project_id}:feed",
+                            mapping={
+                                "status": "indexing",
+                                "progress": "50",
+                                "message": f"Индексация {result['products_count']} товаров..."
+                            }
+                        )
+                        
                         # Сохраняем товары
                         await self.data_store.save_products(project_id, result["products"])
                         
@@ -169,9 +181,14 @@ class SimpleFeedScheduler:
                         await self.redis.hset(
                             f"project:{project_id}:feed",
                             mapping={
+                                "status": "success",
+                                "progress": "100",
+                                "message": f"Загружено {result['products_count']} товаров",
+                                "products_count": str(result["products_count"]),
+                                "categories_count": str(result["categories_count"]),
+                                "last_update": datetime.utcnow().isoformat(),
                                 "last_auto_update": datetime.utcnow().isoformat(),
-                                "auto_update_status": "success",
-                                "auto_update_products": str(result["products_count"])
+                                "auto_update_status": "success"
                             }
                         )
                         
@@ -182,9 +199,11 @@ class SimpleFeedScheduler:
                         await self.redis.hset(
                             f"project:{project_id}:feed",
                             mapping={
+                                "status": "error",
+                                "progress": "0",
+                                "message": result.get("error", "Ошибка загрузки"),
                                 "last_auto_update": datetime.utcnow().isoformat(),
-                                "auto_update_status": "error",
-                                "auto_update_error": result.get("error", "Unknown error")
+                                "auto_update_status": "error"
                             }
                         )
                         print(f"[Scheduler] ✗ Failed to update {project_id}: {result.get('error')}")
@@ -194,9 +213,10 @@ class SimpleFeedScheduler:
                         f"project:{project_id}:feed",
                         mapping={
                             "status": "error",
+                            "progress": "0",
+                            "message": str(e),
                             "last_auto_update": datetime.utcnow().isoformat(),
-                            "auto_update_status": "error", 
-                            "auto_update_error": str(e)
+                            "auto_update_status": "error"
                         }
                     )
                     print(f"[Scheduler] ✗ Error updating {project_id}: {e}")
