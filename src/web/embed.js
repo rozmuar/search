@@ -41,7 +41,7 @@
     
     results: {
       enabled: true,
-      limit: 50,
+      limit: 200,
       showFilters: true,
       showSorting: true,
       highlightMatches: true,
@@ -707,8 +707,9 @@
       this.suggestions.element.style.display = 'block';
       this.suggestions.visible = true;
       
-      // Сохраняем все результаты для popup
-      this.lastSearchResults = { items, total, query: this.state.query };
+      // Сохраняем запрос для popup
+      this.lastSearchQuery = this.state.query;
+      this.lastSearchTotal = total;
       
       // Привязываем событие на кнопку "Показать все"
       const showAllBtn = this.suggestions.element.querySelector('.search-widget-show-all-btn');
@@ -721,13 +722,14 @@
       }
     }
 
-    showAllResultsPopup() {
-      const { items, total, query } = this.lastSearchResults || {};
-      if (!items || items.length === 0) return;
+    async showAllResultsPopup() {
+      const query = this.lastSearchQuery;
+      const total = this.lastSearchTotal;
+      if (!query) return;
       
       this.suggestions.hide();
       
-      // Создаём popup
+      // Создаём popup с индикатором загрузки
       const popup = document.createElement('div');
       popup.className = 'search-widget-popup-overlay';
       popup.innerHTML = `
@@ -738,6 +740,7 @@
             <button class="search-widget-popup-close">&times;</button>
           </div>
           <div class="search-widget-popup-content">
+            <div class="search-widget-popup-loading">Загрузка всех товаров...</div>
             <div class="search-widget-popup-grid" id="search-popup-grid"></div>
           </div>
           <div class="search-widget-popup-pagination" id="search-popup-pagination"></div>
@@ -745,13 +748,6 @@
       `;
       
       document.body.appendChild(popup);
-      
-      // Пагинация
-      this.popupCurrentPage = 1;
-      this.popupItemsPerPage = 20;
-      this.popupItems = items;
-      
-      this.renderPopupPage();
       
       // Закрытие popup
       popup.querySelector('.search-widget-popup-close').addEventListener('click', () => {
@@ -772,6 +768,43 @@
         }
       };
       document.addEventListener('keydown', escHandler);
+      
+      // Загружаем ВСЕ товары с большим лимитом
+      try {
+        const data = await this.api.search(query, {
+          limit: 500, // Загружаем до 500 товаров
+        });
+        
+        let items = data.items || data.products || [];
+        
+        // Сортировка: сначала в наличии
+        items = [...items].sort((a, b) => {
+          const aInStock = a.in_stock !== false ? 1 : 0;
+          const bInStock = b.in_stock !== false ? 1 : 0;
+          return bInStock - aInStock;
+        });
+        
+        // Убираем индикатор загрузки
+        const loadingEl = popup.querySelector('.search-widget-popup-loading');
+        if (loadingEl) loadingEl.remove();
+        
+        // Обновляем счётчик
+        const countEl = popup.querySelector('.search-widget-popup-count');
+        if (countEl) countEl.textContent = `Найдено: ${data.total || items.length} товаров`;
+        
+        // Пагинация
+        this.popupCurrentPage = 1;
+        this.popupItemsPerPage = 20;
+        this.popupItems = items;
+        
+        this.renderPopupPage();
+        
+      } catch (error) {
+        console.error('[SearchWidget] Failed to load all results:', error);
+        const loadingEl = popup.querySelector('.search-widget-popup-loading');
+        if (loadingEl) loadingEl.textContent = 'Ошибка загрузки товаров';
+      }
+    }
     }
 
     renderPopupPage() {
@@ -1407,6 +1440,13 @@
           flex: 1;
           overflow-y: auto;
           padding: 20px;
+        }
+
+        .search-widget-popup-loading {
+          text-align: center;
+          padding: 40px;
+          color: #666;
+          font-size: 16px;
         }
 
         .search-widget-popup-grid {

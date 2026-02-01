@@ -399,7 +399,7 @@ async def search(
     q: str = Query(..., min_length=1, description="Поисковый запрос"),
     project_id: Optional[str] = Query(None, description="ID проекта"),
     api_key: Optional[str] = Query(None, description="API ключ"),
-    limit: int = Query(50, ge=1, le=100),
+    limit: int = Query(50, ge=1, le=500),
     min_price: Optional[float] = None,
     max_price: Optional[float] = None,
     in_stock: Optional[bool] = None,
