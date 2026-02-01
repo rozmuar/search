@@ -41,8 +41,8 @@ docker compose version
 
 ```bash
 cd /opt
-git clone https://github.com/YOUR_USERNAME/search.git searchpro
-cd searchpro
+git clone https://github.com/YOUR_USERNAME/search.git search
+cd search
 ```
 
 ## Шаг 5: Запуск
@@ -157,7 +157,7 @@ docker compose logs | grep -i error
 ## Структура проекта
 
 ```
-/opt/searchpro/
+/opt/search/
 ├── docker-compose.yml  # Конфигурация Docker
 ├── Dockerfile          # Образ приложения
 ├── nginx.conf          # Конфиг веб-сервера
