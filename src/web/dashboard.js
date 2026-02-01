@@ -376,11 +376,12 @@ async function loadProjectFeedStatus() {
     const loadBtn = document.getElementById('projectLoadFeedBtn');
     const refreshBtn = document.getElementById('projectRefreshFeedBtn');
     const resultContainer = document.getElementById('feedResultContainer');
+    const autoUpdateInfo = document.getElementById('autoUpdateInfo');
     
     try {
         const status = await fetchAPI(`/api/v1/projects/${currentProject.id}/feed/status`);
         
-        if (status.status === 'loaded' || status.products_count > 0) {
+        if (status.status === 'loaded' || status.status === 'success' || status.products_count > 0) {
             statusBadge.className = 'feed-status-badge success';
             statusBadge.innerHTML = '<span class="status-dot success"></span><span>Загружен</span>';
             
@@ -395,6 +396,33 @@ async function loadProjectFeedStatus() {
             const lastUpdate = status.last_update ? new Date(status.last_update).toLocaleString('ru') : '—';
             document.getElementById('feedResultTime').textContent = lastUpdate;
             document.getElementById('projectStatUpdated').textContent = lastUpdate.split(',')[0] || '—';
+            
+            // Show auto-update info
+            if (autoUpdateInfo) {
+                let autoUpdateHtml = '<div class="auto-update-status">';
+                autoUpdateHtml += '<span class="auto-update-icon">🔄</span>';
+                autoUpdateHtml += '<span>Автообновление: каждые 4 часа</span>';
+                
+                if (status.last_auto_update) {
+                    const lastAutoUpdate = new Date(status.last_auto_update).toLocaleString('ru');
+                    autoUpdateHtml += `<span class="auto-update-time">Последнее: ${lastAutoUpdate}</span>`;
+                    
+                    if (status.auto_update_status === 'success') {
+                        autoUpdateHtml += '<span class="auto-update-badge success">✓</span>';
+                    } else if (status.auto_update_status === 'error') {
+                        autoUpdateHtml += `<span class="auto-update-badge error" title="${status.auto_update_error || 'Ошибка'}">✗</span>`;
+                    }
+                }
+                
+                autoUpdateHtml += '</div>';
+                autoUpdateInfo.innerHTML = autoUpdateHtml;
+                autoUpdateInfo.style.display = 'block';
+            }
+        } else if (status.status === 'updating') {
+            statusBadge.className = 'feed-status-badge loading';
+            statusBadge.innerHTML = '<span class="status-dot"></span><span>Обновляется...</span>';
+            loadBtn.style.display = 'none';
+            refreshBtn.style.display = 'none';
         } else {
             statusBadge.className = 'feed-status-badge';
             statusBadge.innerHTML = '<span class="status-dot neutral"></span><span>Не загружен</span>';
@@ -402,6 +430,7 @@ async function loadProjectFeedStatus() {
             refreshBtn.style.display = 'none';
             resultContainer.style.display = 'none';
             document.getElementById('projectStatUpdated').textContent = '—';
+            if (autoUpdateInfo) autoUpdateInfo.style.display = 'none';
         }
     } catch (err) {
         console.error('Error loading feed status:', err);

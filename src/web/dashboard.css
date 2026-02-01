@@ -2083,6 +2083,54 @@ body {
     margin-top: 4px;
 }
 
+.auto-update-info {
+    margin-top: 20px;
+    padding: 16px;
+    background: var(--gray-50);
+    border-radius: var(--radius);
+    border-left: 4px solid var(--info);
+}
+
+.auto-update-status {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    font-size: 0.9375rem;
+    color: var(--gray-600);
+}
+
+.auto-update-icon {
+    font-size: 1.25rem;
+}
+
+.auto-update-time {
+    color: var(--gray-500);
+    font-size: 0.875rem;
+}
+
+.auto-update-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.auto-update-badge.success {
+    background: var(--success);
+    color: #fff;
+}
+
+.auto-update-badge.error {
+    background: var(--danger);
+    color: #fff;
+    cursor: help;
+}
+
 .api-key-row {
     display: flex;
     align-items: center;

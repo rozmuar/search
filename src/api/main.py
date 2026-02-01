@@ -19,6 +19,7 @@ from ..search.engine_simple import SimpleSearchEngine
 from .auth import decode_token, UserCreate, UserLogin, User
 from .storage import DataStore
 from ..feed.parser import FeedParser, FeedManager
+from ..feed.scheduler import start_feed_scheduler, stop_feed_scheduler
 from ..core.models import Product
 
 
@@ -28,12 +29,13 @@ search_engine = None
 indexer = None
 data_store = None
 feed_manager = None
+feed_scheduler = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Инициализация и очистка ресурсов"""
-    global redis_client, search_engine, indexer, data_store, feed_manager
+    global redis_client, search_engine, indexer, data_store, feed_manager, feed_scheduler
     
     # Подключение к Redis
     redis_client = await redis.from_url(
@@ -51,9 +53,15 @@ async def lifespan(app: FastAPI):
     data_store = DataStore(redis_client)
     feed_manager = FeedManager(redis_client)
     
+    # Запуск планировщика автообновления фидов
+    feed_scheduler = await start_feed_scheduler(redis_client, feed_manager, data_store, indexer)
+    
     print("✓ Search service initialized (full version)")
     
     yield
+    
+    # Остановка планировщика
+    await stop_feed_scheduler()
     
     # Закрытие соединений
     await redis_client.close()
