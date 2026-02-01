@@ -41,6 +41,33 @@ feed_manager = None
 feed_scheduler = None
 
 
+async def restore_products_from_backup(indexer_instance):
+    """Восстановление товаров из PostgreSQL если Redis пустой"""
+    try:
+        # Получаем все проекты
+        from .database import db
+        
+        async with db.pool.acquire() as conn:
+            projects = await conn.fetch("SELECT id FROM projects")
+        
+        for project in projects:
+            project_id = project['id']
+            
+            # Проверяем есть ли товары в Redis
+            product_keys = await redis_client.keys(f"products:{project_id}:*")
+            
+            if not product_keys:
+                # Redis пустой - восстанавливаем из PostgreSQL
+                count = await indexer_instance.restore_from_backup(project_id)
+                if count > 0:
+                    logger.info(f"Restored {count} products for project {project_id} from PostgreSQL")
+            else:
+                logger.info(f"Project {project_id} has {len(product_keys)} products in Redis - skip restore")
+                
+    except Exception as e:
+        logger.error(f"Failed to restore products from backup: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Инициализация и очистка ресурсов"""
@@ -65,9 +92,12 @@ async def lifespan(app: FastAPI):
     ngram_gen = NGramGenerator(n=3)
     
     search_engine = SimpleSearchEngine(redis_client, query_processor, ngram_gen)
-    indexer = SimpleIndexer(redis_client, query_processor, ngram_gen)
+    indexer = SimpleIndexer(redis_client, query_processor, ngram_gen, db)  # Передаем db для бэкапа
     data_store = DataStore(redis_client)
     feed_manager = FeedManager(redis_client)
+    
+    # Восстановление товаров из PostgreSQL если Redis пустой
+    await restore_products_from_backup(indexer)
     
     # Запуск планировщика автообновления фидов
     feed_scheduler = await start_feed_scheduler(redis_client, feed_manager, data_store, indexer)

@@ -2,10 +2,13 @@
 Упрощенный индексатор без ML
 """
 import json
+import logging
 from typing import List, Dict, Any, Set
 from collections import defaultdict
 
 from ..core.models import Product
+
+logger = logging.getLogger(__name__)
 
 
 class SimpleIndexer:
@@ -18,10 +21,11 @@ class SimpleIndexer:
     - Индекс подсказок (для автодополнения)
     """
     
-    def __init__(self, redis_client, query_processor, ngram_gen):
+    def __init__(self, redis_client, query_processor, ngram_gen, db=None):
         self.redis = redis_client
         self.query_processor = query_processor
         self.ngram_gen = ngram_gen
+        self.db = db  # PostgreSQL для бэкапа
     
     async def index_products(self, project_id: str, products: List[Product]) -> int:
         """Полная индексация товаров"""
@@ -111,6 +115,15 @@ class SimpleIndexer:
         
         await pipe.execute()
         
+        # Бэкап в PostgreSQL
+        if self.db:
+            try:
+                products_list = [json.loads(v) for v in products_data.values()]
+                await self.db.save_products_backup(project_id, products_list)
+                logger.info(f"[Indexer] Backed up {len(products_list)} products to PostgreSQL")
+            except Exception as e:
+                logger.error(f"[Indexer] Failed to backup to PostgreSQL: {e}")
+        
         return len(products)
     
     def _extract_tokens(self, product: Product) -> Dict[str, float]:
@@ -187,3 +200,54 @@ class SimpleIndexer:
         
         await self.redis.set(key, json.dumps(product_data))
         return True
+    
+    async def restore_from_backup(self, project_id: str) -> int:
+        """Восстановление индекса из PostgreSQL"""
+        if not self.db:
+            logger.warning("[Indexer] No database configured for restore")
+            return 0
+        
+        try:
+            # Получаем товары из PostgreSQL
+            products_data = await self.db.get_products_backup(project_id)
+            
+            if not products_data:
+                logger.info(f"[Indexer] No backup found for project {project_id}")
+                return 0
+            
+            logger.info(f"[Indexer] Restoring {len(products_data)} products from PostgreSQL")
+            
+            # Конвертируем обратно в Product объекты
+            products = []
+            for data in products_data:
+                product = Product(
+                    id=data.get('id', ''),
+                    name=data.get('name', ''),
+                    description=data.get('description', ''),
+                    url=data.get('url', ''),
+                    image=data.get('image', ''),
+                    price=data.get('price'),
+                    old_price=data.get('old_price'),
+                    in_stock=data.get('in_stock', True),
+                    category=data.get('category', ''),
+                    brand=data.get('brand', ''),
+                )
+                # Добавляем params отдельно
+                if data.get('params'):
+                    product.params = data['params']
+                if data.get('vendor_code'):
+                    product.vendor_code = data['vendor_code']
+                products.append(product)
+            
+            # Переиндексируем (без повторного бэкапа)
+            old_db = self.db
+            self.db = None  # Временно отключаем бэкап
+            result = await self.index_products(project_id, products)
+            self.db = old_db
+            
+            logger.info(f"[Indexer] Restored {result} products for project {project_id}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"[Indexer] Failed to restore from backup: {e}")
+            return 0

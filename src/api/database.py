@@ -89,6 +89,20 @@ class Database:
                     END IF;
                 END $$;
             ''')
+            
+            # Таблица для хранения товаров (бэкап из Redis)
+            await conn.execute('''
+                CREATE TABLE IF NOT EXISTS products (
+                    id SERIAL PRIMARY KEY,
+                    project_id VARCHAR(32) REFERENCES projects(id) ON DELETE CASCADE,
+                    product_id VARCHAR(255) NOT NULL,
+                    data JSONB NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(project_id, product_id)
+                );
+                
+                CREATE INDEX IF NOT EXISTS idx_products_project_id ON products(project_id);
+            ''')
     
     # ========== USERS ==========
     
@@ -292,6 +306,59 @@ class Database:
             await conn.execute('''
                 UPDATE projects SET products_count = $1 WHERE id = $2
             ''', count, project_id)
+    
+    # ========== PRODUCTS BACKUP ==========
+    
+    async def save_products_backup(self, project_id: str, products: List[Dict]) -> int:
+        """Сохранение товаров в PostgreSQL (бэкап)"""
+        if not products:
+            return 0
+        
+        async with self.pool.acquire() as conn:
+            async with conn.transaction():
+                # Удаляем старые товары проекта
+                await conn.execute('''
+                    DELETE FROM products WHERE project_id = $1
+                ''', project_id)
+                
+                # Вставляем новые товары батчами
+                batch_size = 1000
+                for i in range(0, len(products), batch_size):
+                    batch = products[i:i + batch_size]
+                    values = [(project_id, p.get('id', ''), json.dumps(p)) for p in batch]
+                    
+                    await conn.executemany('''
+                        INSERT INTO products (project_id, product_id, data)
+                        VALUES ($1, $2, $3)
+                        ON CONFLICT (project_id, product_id) DO UPDATE SET data = $3
+                    ''', values)
+        
+        return len(products)
+    
+    async def get_products_backup(self, project_id: str) -> List[Dict]:
+        """Получение товаров из PostgreSQL"""
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch('''
+                SELECT data FROM products WHERE project_id = $1
+            ''', project_id)
+            
+            products = []
+            for row in rows:
+                data = row['data']
+                if isinstance(data, str):
+                    products.append(json.loads(data))
+                else:
+                    products.append(data)
+            
+            return products
+    
+    async def get_products_count_backup(self, project_id: str) -> int:
+        """Количество товаров в PostgreSQL"""
+        async with self.pool.acquire() as conn:
+            result = await conn.fetchval('''
+                SELECT COUNT(*) FROM products WHERE project_id = $1
+            ''', project_id)
+            return result or 0
 
 
 # Глобальный экземпляр базы данных
