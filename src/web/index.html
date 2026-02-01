@@ -3,65 +3,139 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Search Service - Умный поиск для вашего магазина</title>
+    <title>SearchPro — Умный поиск для интернет-магазинов</title>
+    <meta name="description" content="Добавьте мощный поиск с автодополнением на ваш сайт за 5 минут. BM25, мгновенные подсказки, простая интеграция.">
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
     <!-- Header -->
     <header class="header">
         <div class="container">
             <div class="header-content">
-                <div class="logo">
-                    <span class="logo-icon">🔍</span>
-                    <span class="logo-text">Search Service</span>
-                </div>
+                <a href="/" class="logo">
+                    <div class="logo-icon">🔍</div>
+                    <span>SearchPro</span>
+                </a>
+                
                 <nav class="nav">
                     <a href="#features">Возможности</a>
+                    <a href="#how-it-works">Как это работает</a>
                     <a href="#pricing">Тарифы</a>
-                    <a href="#docs">Документация</a>
-                    <a href="auth.html" class="btn-secondary">Войти</a>
-                    <a href="auth.html?mode=register" class="btn-primary">Начать бесплатно</a>
+                    <a href="#cases">Кейсы</a>
+                    <div class="nav-buttons">
+                        <a href="/auth.html" class="btn btn-secondary">Войти</a>
+                        <a href="/auth.html?mode=register" class="btn btn-primary">Начать бесплатно</a>
+                    </div>
                 </nav>
+                
+                <button class="mobile-menu-btn" onclick="toggleMobileMenu()">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
             </div>
         </div>
     </header>
+    
+    <!-- Mobile Navigation -->
+    <nav class="mobile-nav" id="mobileNav">
+        <a href="#features" onclick="toggleMobileMenu()">Возможности</a>
+        <a href="#how-it-works" onclick="toggleMobileMenu()">Как это работает</a>
+        <a href="#pricing" onclick="toggleMobileMenu()">Тарифы</a>
+        <a href="#cases" onclick="toggleMobileMenu()">Кейсы</a>
+        <a href="/auth.html" class="btn btn-secondary">Войти</a>
+        <a href="/auth.html?mode=register" class="btn btn-primary">Начать бесплатно</a>
+    </nav>
 
     <!-- Hero Section -->
     <section class="hero">
         <div class="container">
-            <div class="hero-content">
-                <h1 class="hero-title">
-                    Мощный поиск для вашего<br>
-                    <span class="gradient-text">интернет-магазина</span>
-                </h1>
-                <p class="hero-subtitle">
-                    Добавьте умный поиск с подсказками и мгновенными результатами на ваш сайт за 5 минут.
-                    Без установки сложного ПО, без ML инфраструктуры.
-                </p>
-                <div class="hero-buttons">
-                    <a href="auth.html?mode=register" class="btn-large btn-primary">
-                        Попробовать бесплатно
-                        <span class="arrow">→</span>
-                    </a>
-                    <a href="#demo" class="btn-large btn-outline">
-                        Посмотреть демо
-                        <span class="play-icon">▶</span>
-                    </a>
+            <div class="hero-grid">
+                <div class="hero-content">
+                    <h1>
+                        Увеличьте <span class="highlight">конверсию</span> вашего магазина
+                    </h1>
+                    <p>
+                        Умный поиск с мгновенными подсказками и релевантными результатами. 
+                        Интеграция за 5 минут, без сложной настройки серверов.
+                    </p>
+                    <div class="hero-buttons">
+                        <a href="/auth.html?mode=register" class="btn btn-primary">
+                            Начать бесплатно
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M5 12h14M12 5l7 7-7 7"/>
+                            </svg>
+                        </a>
+                        <a href="#demo" class="btn btn-outline">
+                            Посмотреть демо
+                        </a>
+                    </div>
+                    
+                    <div class="hero-stats">
+                        <div class="stat-item">
+                            <div class="stat-number">10-30ms</div>
+                            <div class="stat-label">Скорость ответа</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-number">+35%</div>
+                            <div class="stat-label">К конверсии</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-number">99.9%</div>
+                            <div class="stat-label">Uptime</div>
+                        </div>
+                    </div>
                 </div>
-                <div class="hero-stats">
-                    <div class="stat">
-                        <div class="stat-number">10-30ms</div>
-                        <div class="stat-label">Скорость поиска</div>
-                    </div>
-                    <div class="stat">
-                        <div class="stat-number">500K+</div>
-                        <div class="stat-label">Товаров в индексе</div>
-                    </div>
-                    <div class="stat">
-                        <div class="stat-number">99.9%</div>
-                        <div class="stat-label">Uptime</div>
-                    </div>
+                
+                <div class="hero-image">
+                    <svg viewBox="0 0 500 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <!-- Browser Window -->
+                        <rect x="50" y="50" width="400" height="300" rx="12" fill="white" stroke="#E5E7EB" stroke-width="2"/>
+                        <rect x="50" y="50" width="400" height="40" rx="12" fill="#F8FAFC"/>
+                        <circle cx="75" cy="70" r="6" fill="#EF4444"/>
+                        <circle cx="95" cy="70" r="6" fill="#F59E0B"/>
+                        <circle cx="115" cy="70" r="6" fill="#10B981"/>
+                        
+                        <!-- Search Box -->
+                        <rect x="80" y="110" width="340" height="50" rx="8" fill="#F3F4F6" stroke="#E5E7EB"/>
+                        <text x="100" y="142" font-family="Inter" font-size="14" fill="#9CA3AF">🔍 Поиск товаров...</text>
+                        
+                        <!-- Suggestions Dropdown -->
+                        <rect x="80" y="165" width="340" height="160" rx="8" fill="white" stroke="#E5E7EB" filter="url(#shadow)"/>
+                        
+                        <!-- Suggestion Items -->
+                        <rect x="90" y="175" width="320" height="40" rx="6" fill="#EEF2FF"/>
+                        <text x="110" y="200" font-family="Inter" font-size="13" fill="#4F46E5">кроссовки nike</text>
+                        <text x="350" y="200" font-family="Inter" font-size="11" fill="#9CA3AF">2,450</text>
+                        
+                        <rect x="90" y="220" width="320" height="40" rx="6" fill="#F8FAFC"/>
+                        <text x="110" y="245" font-family="Inter" font-size="13" fill="#1F2937">кроссовки adidas</text>
+                        <text x="350" y="245" font-family="Inter" font-size="11" fill="#9CA3AF">1,890</text>
+                        
+                        <rect x="90" y="265" width="320" height="40" rx="6" fill="#F8FAFC"/>
+                        <text x="110" y="290" font-family="Inter" font-size="13" fill="#1F2937">кроссовки puma</text>
+                        <text x="350" y="290" font-family="Inter" font-size="11" fill="#9CA3AF">980</text>
+                        
+                        <!-- Decorations -->
+                        <circle cx="450" cy="100" r="40" fill="#EEF2FF"/>
+                        <circle cx="30" cy="300" r="25" fill="#DCFCE7"/>
+                        
+                        <!-- Person illustration -->
+                        <ellipse cx="420" cy="380" rx="60" ry="20" fill="#F3E8FF"/>
+                        <rect x="390" y="280" width="60" height="100" rx="8" fill="#8B5CF6"/>
+                        <circle cx="420" cy="255" r="25" fill="#FDE68A"/>
+                        <rect x="400" y="310" width="40" height="60" rx="4" fill="#60A5FA"/>
+                        
+                        <defs>
+                            <filter id="shadow" x="70" y="160" width="360" height="180" filterUnits="userSpaceOnUse">
+                                <feDropShadow dx="0" dy="4" stdDeviation="8" flood-opacity="0.1"/>
+                            </filter>
+                        </defs>
+                    </svg>
                 </div>
             </div>
         </div>
@@ -70,65 +144,247 @@
     <!-- Features Section -->
     <section id="features" class="features">
         <div class="container">
-            <h2 class="section-title">Всё необходимое из коробки</h2>
-            <p class="section-subtitle">
-                Готовое решение для поиска товаров на вашем сайте
-            </p>
+            <div class="text-center">
+                <span class="section-badge">Возможности</span>
+                <h2 class="section-title">Всё для идеального поиска</h2>
+                <p class="section-subtitle">
+                    Готовое решение, которое увеличит продажи вашего интернет-магазина
+                </p>
+            </div>
             
             <div class="features-grid">
                 <div class="feature-card">
-                    <div class="feature-icon">⚡</div>
+                    <div class="feature-icon blue">⚡</div>
                     <h3>Мгновенный поиск</h3>
-                    <p>Результаты поиска за 10-30 миллисекунд. BM25 алгоритм с оптимизацией под e-commerce.</p>
+                    <p>Результаты за 10-30 мс благодаря оптимизированному BM25 алгоритму и индексации в памяти.</p>
                 </div>
-
+                
                 <div class="feature-card">
-                    <div class="feature-icon">💡</div>
+                    <div class="feature-icon green">💡</div>
                     <h3>Умные подсказки</h3>
-                    <p>Автодополнение запросов в реальном времени с показом популярных товаров.</p>
+                    <p>Автодополнение в реальном времени с показом популярных товаров и категорий.</p>
                 </div>
-
+                
                 <div class="feature-card">
-                    <div class="feature-icon">🎯</div>
-                    <h3>N-gram поиск</h3>
-                    <p>Находит товары даже при опечатках и частичном совпадении слов.</p>
+                    <div class="feature-icon orange">🎯</div>
+                    <h3>Исправление опечаток</h3>
+                    <p>N-gram индексация находит товары даже при ошибках в написании запроса.</p>
                 </div>
-
+                
                 <div class="feature-card">
-                    <div class="feature-icon">🔧</div>
+                    <div class="feature-icon pink">📊</div>
+                    <h3>Аналитика поиска</h3>
+                    <p>Узнайте, что ищут ваши клиенты. Отслеживайте конверсию поисковых запросов.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon purple">🔌</div>
                     <h3>Простая интеграция</h3>
-                    <p>Всего 3 строчки кода на вашем сайте. REST API для любых платформ.</p>
+                    <p>Всего 3 строчки кода. REST API для любых платформ: Bitrix, WordPress, 1С.</p>
                 </div>
-
+                
                 <div class="feature-card">
-                    <div class="feature-icon">📊</div>
-                    <h3>Фильтры и фасеты</h3>
-                    <p>Фильтрация по цене, наличию, категориям. Агрегация для удобной навигации.</p>
-                </div>
-
-                <div class="feature-card">
-                    <div class="feature-icon">🚀</div>
-                    <h3>Без GPU и ML</h3>
-                    <p>Работает на любом сервере. Не требует дорогого железа и специальных знаний.</p>
+                    <div class="feature-icon cyan">🔄</div>
+                    <h3>Автообновление</h3>
+                    <p>Загрузите XML/YML фид — товары обновляются автоматически каждые 4 часа.</p>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Demo Section -->
-    <section id="demo" class="demo">
+    <!-- About/How it works Section -->
+    <section id="how-it-works" class="about">
         <div class="container">
-            <h2 class="section-title">Попробуйте прямо сейчас</h2>
-            <div class="demo-container">
-                <div class="search-demo">
-                    <input 
-                        type="text" 
-                        class="demo-search-input" 
-                        placeholder="Попробуйте: iphone, наушники, macbook..."
-                        id="demoSearch"
-                    >
-                    <div class="demo-results" id="demoResults">
-                        <!-- Results will be displayed here -->
+            <div class="about-grid">
+                <div class="about-image">
+                    <svg viewBox="0 0 450 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <!-- Dashboard -->
+                        <rect x="20" y="20" width="350" height="280" rx="16" fill="white" stroke="#E5E7EB" stroke-width="2"/>
+                        
+                        <!-- Charts -->
+                        <rect x="40" y="50" width="150" height="100" rx="8" fill="#F8FAFC"/>
+                        <path d="M60 120 L90 100 L120 110 L150 80 L170 95" stroke="#4F46E5" stroke-width="3" fill="none"/>
+                        <circle cx="60" cy="120" r="4" fill="#4F46E5"/>
+                        <circle cx="90" cy="100" r="4" fill="#4F46E5"/>
+                        <circle cx="120" cy="110" r="4" fill="#4F46E5"/>
+                        <circle cx="150" cy="80" r="4" fill="#4F46E5"/>
+                        <circle cx="170" cy="95" r="4" fill="#4F46E5"/>
+                        
+                        <rect x="200" y="50" width="150" height="100" rx="8" fill="#F8FAFC"/>
+                        <rect x="220" y="110" width="20" height="30" rx="4" fill="#10B981"/>
+                        <rect x="250" y="90" width="20" height="50" rx="4" fill="#10B981"/>
+                        <rect x="280" y="70" width="20" height="70" rx="4" fill="#10B981"/>
+                        <rect x="310" y="85" width="20" height="55" rx="4" fill="#10B981"/>
+                        
+                        <!-- Stats cards -->
+                        <rect x="40" y="170" width="100" height="60" rx="8" fill="#EEF2FF"/>
+                        <text x="55" y="195" font-family="Inter" font-size="18" font-weight="bold" fill="#4F46E5">2,450</text>
+                        <text x="55" y="215" font-family="Inter" font-size="10" fill="#6B7280">Запросов</text>
+                        
+                        <rect x="150" y="170" width="100" height="60" rx="8" fill="#DCFCE7"/>
+                        <text x="165" y="195" font-family="Inter" font-size="18" font-weight="bold" fill="#10B981">+24%</text>
+                        <text x="165" y="215" font-family="Inter" font-size="10" fill="#6B7280">Конверсия</text>
+                        
+                        <rect x="260" y="170" width="100" height="60" rx="8" fill="#FEF3C7"/>
+                        <text x="275" y="195" font-family="Inter" font-size="18" font-weight="bold" fill="#F59E0B">15ms</text>
+                        <text x="275" y="215" font-family="Inter" font-size="10" fill="#6B7280">Ответ</text>
+                        
+                        <!-- Decorative circles -->
+                        <circle cx="400" cy="80" r="50" fill="#EEF2FF"/>
+                        <circle cx="420" cy="320" r="35" fill="#DCFCE7"/>
+                        <circle cx="50" cy="350" r="40" fill="#FEF3C7"/>
+                        
+                        <!-- Magnifier -->
+                        <circle cx="400" cy="200" r="40" fill="#4F46E5"/>
+                        <circle cx="395" cy="195" r="18" stroke="white" stroke-width="4" fill="none"/>
+                        <line x1="408" y1="208" x2="420" y2="220" stroke="white" stroke-width="4" stroke-linecap="round"/>
+                    </svg>
+                </div>
+                
+                <div class="about-content">
+                    <span class="section-badge">Как это работает</span>
+                    <h2 class="section-title">
+                        Полный контроль над <span class="highlight">поиском</span>
+                    </h2>
+                    <p>
+                        Загрузите каталог товаров, настройте виджет под дизайн сайта и получите 
+                        мощный поиск с аналитикой в личном кабинете.
+                    </p>
+                    
+                    <div class="check-list">
+                        <div class="check-item">
+                            <div class="check-icon">✓</div>
+                            <div>
+                                <span>Быстрый старт</span>
+                                <small>Интеграция за 5 минут</small>
+                            </div>
+                        </div>
+                        <div class="check-item">
+                            <div class="check-icon">✓</div>
+                            <div>
+                                <span>XML/YML фиды</span>
+                                <small>Автозагрузка товаров</small>
+                            </div>
+                        </div>
+                        <div class="check-item">
+                            <div class="check-icon">✓</div>
+                            <div>
+                                <span>Кастомизация</span>
+                                <small>Любой дизайн виджета</small>
+                            </div>
+                        </div>
+                        <div class="check-item">
+                            <div class="check-icon">✓</div>
+                            <div>
+                                <span>Аналитика</span>
+                                <small>Статистика запросов</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Services/Integration Section -->
+    <section class="services">
+        <div class="container">
+            <div class="services-header text-center">
+                <span class="section-badge">Интеграция</span>
+                <h2 class="section-title">Простое подключение к любой платформе</h2>
+                <p class="section-subtitle">
+                    REST API и готовый виджет работают с любой CMS и фреймворком
+                </p>
+            </div>
+            
+            <div class="services-grid">
+                <div class="service-card">
+                    <div class="service-icon" style="background: linear-gradient(135deg, #EC4899, #F472B6);">📦</div>
+                    <h3>Bitrix / 1С-Битрикс</h3>
+                    <p>Готовый модуль для быстрой интеграции. Поддержка Highload-блоков и инфоблоков.</p>
+                    <a href="#" class="btn-link">
+                        Подробнее
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M5 12h14M12 5l7 7-7 7"/>
+                        </svg>
+                    </a>
+                </div>
+                
+                <div class="service-card">
+                    <div class="service-icon" style="background: linear-gradient(135deg, #06B6D4, #22D3EE);">🛒</div>
+                    <h3>WordPress / WooCommerce</h3>
+                    <p>Плагин с настройкой через админку. Автоматическая синхронизация товаров.</p>
+                    <a href="#" class="btn-link">
+                        Подробнее
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M5 12h14M12 5l7 7-7 7"/>
+                        </svg>
+                    </a>
+                </div>
+                
+                <div class="service-card">
+                    <div class="service-icon" style="background: linear-gradient(135deg, #F97316, #FB923C);">⚙️</div>
+                    <h3>Любая CMS / Custom</h3>
+                    <p>JavaScript виджет и REST API. Подробная документация и примеры кода.</p>
+                    <a href="#" class="btn-link">
+                        Подробнее
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M5 12h14M12 5l7 7-7 7"/>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Cases Section -->
+    <section id="cases" class="cases">
+        <div class="container">
+            <div class="cases-header text-center">
+                <span class="section-badge">Кейсы</span>
+                <h2 class="section-title">Результаты наших клиентов</h2>
+                <p class="section-subtitle">
+                    Реальные истории успеха интернет-магазинов
+                </p>
+            </div>
+            
+            <div class="cases-grid">
+                <div class="case-card">
+                    <div class="case-image">
+                        <div class="case-image-placeholder">🛍️</div>
+                    </div>
+                    <div class="case-content">
+                        <div class="case-tags">
+                            <span class="case-tag">E-commerce</span>
+                            <span class="case-tag">Автозапчасти</span>
+                        </div>
+                        <h3>+42% конверсии поиска</h3>
+                    </div>
+                </div>
+                
+                <div class="case-card">
+                    <div class="case-image" style="background: linear-gradient(135deg, #10B981, #34D399);">
+                        <div class="case-image-placeholder">👗</div>
+                    </div>
+                    <div class="case-content">
+                        <div class="case-tags">
+                            <span class="case-tag">Fashion</span>
+                            <span class="case-tag">Одежда</span>
+                        </div>
+                        <h3>Поиск по 50K товаров за 15ms</h3>
+                    </div>
+                </div>
+                
+                <div class="case-card">
+                    <div class="case-image" style="background: linear-gradient(135deg, #F59E0B, #FBBF24);">
+                        <div class="case-image-placeholder">🔧</div>
+                    </div>
+                    <div class="case-content">
+                        <div class="case-tags">
+                            <span class="case-tag">B2B</span>
+                            <span class="case-tag">Инструменты</span>
+                        </div>
+                        <h3>Снижение отказов на 28%</h3>
                     </div>
                 </div>
             </div>
@@ -138,54 +394,54 @@
     <!-- Pricing Section -->
     <section id="pricing" class="pricing">
         <div class="container">
-            <h2 class="section-title">Простые и понятные тарифы</h2>
-            <p class="section-subtitle">Начните бесплатно, платите по мере роста</p>
+            <div class="pricing-header text-center">
+                <span class="section-badge">Тарифы</span>
+                <h2 class="section-title">Выберите подходящий план</h2>
+                <p class="section-subtitle">
+                    Начните бесплатно и масштабируйтесь по мере роста
+                </p>
+            </div>
             
             <div class="pricing-grid">
                 <div class="pricing-card">
-                    <h3>Стартовый</h3>
-                    <div class="price">
-                        <span class="price-amount">Бесплатно</span>
-                    </div>
+                    <div class="pricing-name">Старт</div>
+                    <div class="pricing-price">0₽ <span>/ мес</span></div>
+                    <div class="pricing-desc">Для небольших магазинов</div>
                     <ul class="pricing-features">
-                        <li>✓ До 1,000 товаров</li>
-                        <li>✓ 10,000 запросов/мес</li>
-                        <li>✓ Базовая аналитика</li>
-                        <li>✓ Email поддержка</li>
+                        <li><span class="check">✓</span> До 1,000 товаров</li>
+                        <li><span class="check">✓</span> 10,000 запросов/мес</li>
+                        <li><span class="check">✓</span> Базовая аналитика</li>
+                        <li><span class="check">✓</span> Email поддержка</li>
                     </ul>
-                    <a href="auth.html?mode=register" class="btn-outline">Начать бесплатно</a>
+                    <a href="/auth.html?mode=register" class="btn btn-outline">Начать бесплатно</a>
                 </div>
-
-                <div class="pricing-card featured">
-                    <div class="badge">Популярный</div>
-                    <h3>Бизнес</h3>
-                    <div class="price">
-                        <span class="price-amount">5,990₽</span>
-                        <span class="price-period">/месяц</span>
-                    </div>
+                
+                <div class="pricing-card popular">
+                    <div class="pricing-name">Бизнес</div>
+                    <div class="pricing-price">2,990₽ <span>/ мес</span></div>
+                    <div class="pricing-desc">Для растущих магазинов</div>
                     <ul class="pricing-features">
-                        <li>✓ До 100,000 товаров</li>
-                        <li>✓ 500,000 запросов/мес</li>
-                        <li>✓ Расширенная аналитика</li>
-                        <li>✓ Синонимы и стоп-слова</li>
-                        <li>✓ Приоритетная поддержка</li>
+                        <li><span class="check">✓</span> До 50,000 товаров</li>
+                        <li><span class="check">✓</span> 100,000 запросов/мес</li>
+                        <li><span class="check">✓</span> Расширенная аналитика</li>
+                        <li><span class="check">✓</span> Приоритетная поддержка</li>
+                        <li><span class="check">✓</span> Кастомизация виджета</li>
                     </ul>
-                    <a href="auth.html?mode=register" class="btn-primary">Начать пробный период</a>
+                    <a href="/auth.html?mode=register" class="btn btn-primary">Выбрать план</a>
                 </div>
-
+                
                 <div class="pricing-card">
-                    <h3>Корпоративный</h3>
-                    <div class="price">
-                        <span class="price-amount">Индивидуально</span>
-                    </div>
+                    <div class="pricing-name">Enterprise</div>
+                    <div class="pricing-price">По запросу</div>
+                    <div class="pricing-desc">Для крупных проектов</div>
                     <ul class="pricing-features">
-                        <li>✓ Безлимитные товары</li>
-                        <li>✓ Безлимитные запросы</li>
-                        <li>✓ Выделенный сервер</li>
-                        <li>✓ SLA 99.99%</li>
-                        <li>✓ Персональный менеджер</li>
+                        <li><span class="check">✓</span> Безлимит товаров</li>
+                        <li><span class="check">✓</span> Безлимит запросов</li>
+                        <li><span class="check">✓</span> Выделенный сервер</li>
+                        <li><span class="check">✓</span> SLA 99.99%</li>
+                        <li><span class="check">✓</span> Персональный менеджер</li>
                     </ul>
-                    <a href="auth.html?mode=register" class="btn-outline">Связаться с нами</a>
+                    <a href="#contact" class="btn btn-secondary">Связаться</a>
                 </div>
             </div>
         </div>
@@ -194,54 +450,100 @@
     <!-- CTA Section -->
     <section class="cta">
         <div class="container">
-            <div class="cta-content">
-                <h2>Готовы улучшить поиск на вашем сайте?</h2>
-                <p>Запустите умный поиск за 5 минут. Без кредитной карты.</p>
-                <a href="auth.html?mode=register" class="btn-large btn-primary">
-                    Начать бесплатно
-                    <span class="arrow">→</span>
-                </a>
-            </div>
+            <h2>Готовы увеличить продажи?</h2>
+            <p>Подключите умный поиск уже сегодня и получите первые результаты через 5 минут</p>
+            <a href="/auth.html?mode=register" class="btn btn-primary">
+                Начать бесплатно
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M5 12h14M12 5l7 7-7 7"/>
+                </svg>
+            </a>
         </div>
     </section>
 
     <!-- Footer -->
     <footer class="footer">
         <div class="container">
-            <div class="footer-content">
-                <div class="footer-section">
-                    <div class="logo">
-                        <span class="logo-icon">🔍</span>
-                        <span class="logo-text">Search Service</span>
-                    </div>
-                    <p>Умный поиск для интернет-магазинов</p>
+            <div class="footer-grid">
+                <div class="footer-brand">
+                    <a href="/" class="logo">
+                        <div class="logo-icon">🔍</div>
+                        <span>SearchPro</span>
+                    </a>
+                    <p>Умный поиск для интернет-магазинов. Увеличьте конверсию с помощью мгновенного поиска.</p>
                 </div>
-                <div class="footer-section">
+                
+                <div class="footer-column">
                     <h4>Продукт</h4>
-                    <a href="#features">Возможности</a>
-                    <a href="#pricing">Тарифы</a>
-                    <a href="#docs">Документация</a>
-                    <a href="/docs">API</a>
+                    <ul>
+                        <li><a href="#features">Возможности</a></li>
+                        <li><a href="#pricing">Тарифы</a></li>
+                        <li><a href="#cases">Кейсы</a></li>
+                        <li><a href="/dashboard/">Личный кабинет</a></li>
+                    </ul>
                 </div>
-                <div class="footer-section">
+                
+                <div class="footer-column">
+                    <h4>Разработчикам</h4>
+                    <ul>
+                        <li><a href="/docs">Документация</a></li>
+                        <li><a href="/api">API Reference</a></li>
+                        <li><a href="#">Виджет</a></li>
+                        <li><a href="#">Примеры</a></li>
+                    </ul>
+                </div>
+                
+                <div class="footer-column">
                     <h4>Компания</h4>
-                    <a href="#about">О нас</a>
-                    <a href="#contact">Контакты</a>
-                    <a href="#blog">Блог</a>
-                </div>
-                <div class="footer-section">
-                    <h4>Поддержка</h4>
-                    <a href="START_HERE.md">Быстрый старт</a>
-                    <a href="QUICKSTART.md">Руководство</a>
-                    <a href="#support">Помощь</a>
+                    <ul>
+                        <li><a href="#">О нас</a></li>
+                        <li><a href="#">Блог</a></li>
+                        <li><a href="#contact">Контакты</a></li>
+                        <li><a href="#">Политика конфиденциальности</a></li>
+                    </ul>
                 </div>
             </div>
+            
             <div class="footer-bottom">
-                <p>&copy; 2026 Search Service. Все права защищены.</p>
+                <p>© 2026 SearchPro. Все права защищены.</p>
+                <div class="social-links">
+                    <a href="#" title="Telegram">📨</a>
+                    <a href="#" title="GitHub">💻</a>
+                    <a href="#" title="Email">✉️</a>
+                </div>
             </div>
         </div>
     </footer>
 
-    <script src="landing.js"></script>
+    <script>
+        // Mobile menu toggle
+        function toggleMobileMenu() {
+            document.getElementById('mobileNav').classList.toggle('active');
+        }
+        
+        // Smooth scroll for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                const href = this.getAttribute('href');
+                if (href !== '#') {
+                    e.preventDefault();
+                    const target = document.querySelector(href);
+                    if (target) {
+                        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                }
+            });
+        });
+        
+        // Header scroll effect
+        window.addEventListener('scroll', () => {
+            const header = document.querySelector('.header');
+            if (window.scrollY > 50) {
+                header.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+            } else {
+                header.style.boxShadow = 'none';
+            }
+        });
+    </script>
 </body>
 </html>
