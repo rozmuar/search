@@ -224,6 +224,161 @@
                 </div>
             </section>
 
+            <!-- ==================== PROJECT DETAIL SECTION ==================== -->
+            <section class="content-section" id="section-project-detail">
+                <div class="section-header">
+                    <div>
+                        <button class="btn btn-ghost back-btn" onclick="showSection('projects')">
+                            ← Назад к проектам
+                        </button>
+                        <h1 class="section-title" id="projectDetailName">Название проекта</h1>
+                        <p class="section-subtitle" id="projectDetailDomain">example.com</p>
+                    </div>
+                    <div class="section-actions">
+                        <button class="btn btn-secondary" onclick="editCurrentProject()">
+                            ✏️ Редактировать
+                        </button>
+                        <button class="btn btn-danger" onclick="deleteCurrentProject()">
+                            🗑️ Удалить
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Project Stats -->
+                <div class="stats-grid stats-grid-4">
+                    <div class="stat-card">
+                        <div class="stat-icon blue">📦</div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="projectStatProducts">0</div>
+                            <div class="stat-label">Товаров</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon green">🔍</div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="projectStatSearches">0</div>
+                            <div class="stat-label">Поисков</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon orange">📂</div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="projectStatCategories">0</div>
+                            <div class="stat-label">Категорий</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon purple">📅</div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="projectStatUpdated">—</div>
+                            <div class="stat-label">Обновлено</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Feed Management Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">🔗 Управление фидом</h3>
+                        <div class="feed-status-badge" id="projectFeedStatus">
+                            <span class="status-dot neutral"></span>
+                            <span>Не загружен</span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="feed-url-row">
+                            <div class="feed-url-info">
+                                <label class="form-label">URL фида</label>
+                                <div class="feed-url-display" id="projectFeedUrl">
+                                    <span class="feed-url-text">Не указан</span>
+                                </div>
+                            </div>
+                            <div class="feed-url-actions">
+                                <button class="btn btn-primary" id="projectLoadFeedBtn" onclick="loadProjectFeed()">
+                                    <span class="btn-text">Загрузить фид</span>
+                                    <span class="btn-spinner" style="display: none;">⏳</span>
+                                </button>
+                                <button class="btn btn-secondary" id="projectRefreshFeedBtn" onclick="refreshProjectFeed()" style="display: none;">
+                                    🔄 Обновить
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Progress Bar -->
+                        <div class="feed-progress" id="feedProgressContainer" style="display: none;">
+                            <div class="feed-progress-header">
+                                <span class="feed-progress-text" id="feedProgressText">Загрузка фида...</span>
+                                <span class="feed-progress-percent" id="feedProgressPercent">0%</span>
+                            </div>
+                            <div class="feed-progress-bar">
+                                <div class="feed-progress-fill" id="feedProgressFill" style="width: 0%"></div>
+                            </div>
+                        </div>
+
+                        <!-- Feed Result -->
+                        <div class="feed-result" id="feedResultContainer" style="display: none;">
+                            <div class="feed-result-stats">
+                                <div class="feed-result-stat">
+                                    <div class="feed-result-value" id="feedResultProducts">0</div>
+                                    <div class="feed-result-label">Товаров загружено</div>
+                                </div>
+                                <div class="feed-result-stat">
+                                    <div class="feed-result-value" id="feedResultCategories">0</div>
+                                    <div class="feed-result-label">Категорий</div>
+                                </div>
+                                <div class="feed-result-stat">
+                                    <div class="feed-result-value" id="feedResultTime">—</div>
+                                    <div class="feed-result-label">Время загрузки</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- API Key Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">🔑 API ключ</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="api-key-row">
+                            <code class="api-key-code" id="projectApiKey">••••••••••••••••</code>
+                            <button class="btn btn-ghost" onclick="toggleApiKeyVisibility()">👁️</button>
+                            <button class="btn btn-ghost" onclick="copyApiKey()">📋</button>
+                            <button class="btn btn-secondary" onclick="regenerateApiKey()">🔄 Сгенерировать новый</button>
+                        </div>
+                        <p class="form-hint">Используйте этот ключ для интеграции виджета на вашем сайте</p>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">⚡ Быстрые действия</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="quick-actions">
+                            <button class="quick-action-btn" onclick="goToProducts()">
+                                <span class="quick-action-icon">📦</span>
+                                <span>Просмотр товаров</span>
+                            </button>
+                            <button class="quick-action-btn" onclick="goToAnalytics()">
+                                <span class="quick-action-icon">📈</span>
+                                <span>Аналитика</span>
+                            </button>
+                            <button class="quick-action-btn" onclick="goToWidget()">
+                                <span class="quick-action-icon">🎨</span>
+                                <span>Настроить виджет</span>
+                            </button>
+                            <button class="quick-action-btn" onclick="goToEmbed()">
+                                <span class="quick-action-icon">📝</span>
+                                <span>Код встраивания</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <!-- ==================== PRODUCTS SECTION ==================== -->
             <section class="content-section" id="section-products">
                 <div class="section-header">

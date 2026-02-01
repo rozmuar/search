@@ -1911,6 +1911,228 @@ body {
     box-shadow: var(--shadow-sm);
 }
 
+/* ========== PROJECT DETAIL ========== */
+.back-btn {
+    margin-bottom: 8px;
+    padding: 6px 12px;
+    font-size: 0.875rem;
+    color: var(--gray-500);
+}
+
+.back-btn:hover {
+    color: var(--primary);
+}
+
+.btn-ghost {
+    background: none;
+    border: none;
+    padding: 8px 12px;
+    cursor: pointer;
+    color: var(--gray-500);
+    border-radius: var(--radius-sm);
+    transition: all 0.2s ease;
+}
+
+.btn-ghost:hover {
+    background: var(--gray-100);
+    color: var(--gray-700);
+}
+
+.btn-danger {
+    background: var(--danger);
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.btn-danger:hover {
+    background: var(--danger-light);
+}
+
+.feed-status-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: var(--gray-100);
+    border-radius: var(--radius);
+    font-size: 0.875rem;
+    color: var(--gray-600);
+}
+
+.feed-status-badge.success {
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--success);
+}
+
+.feed-status-badge.loading {
+    background: rgba(59, 130, 246, 0.1);
+    color: var(--info);
+}
+
+.feed-status-badge.error {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--danger);
+}
+
+.feed-url-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.feed-url-info {
+    flex: 1;
+    min-width: 200px;
+}
+
+.feed-url-display {
+    padding: 12px 16px;
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    font-family: 'Monaco', 'Menlo', monospace;
+    font-size: 0.875rem;
+    color: var(--gray-600);
+    word-break: break-all;
+}
+
+.feed-url-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-spinner {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.feed-progress {
+    margin-top: 20px;
+    padding: 16px;
+    background: var(--gray-50);
+    border-radius: var(--radius);
+}
+
+.feed-progress-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-size: 0.875rem;
+}
+
+.feed-progress-text {
+    color: var(--gray-600);
+}
+
+.feed-progress-percent {
+    font-weight: 600;
+    color: var(--primary);
+}
+
+.feed-progress-bar {
+    height: 8px;
+    background: var(--gray-200);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.feed-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary) 0%, var(--primary-light) 100%);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.feed-result {
+    margin-top: 20px;
+    padding: 20px;
+    background: rgba(16, 185, 129, 0.05);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: var(--radius);
+}
+
+.feed-result-stats {
+    display: flex;
+    gap: 40px;
+    flex-wrap: wrap;
+}
+
+.feed-result-stat {
+    text-align: center;
+}
+
+.feed-result-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--success);
+}
+
+.feed-result-label {
+    font-size: 0.8125rem;
+    color: var(--gray-500);
+    margin-top: 4px;
+}
+
+.api-key-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.api-key-code {
+    flex: 1;
+    min-width: 200px;
+    padding: 12px 16px;
+    background: var(--gray-800);
+    color: #10B981;
+    border-radius: var(--radius);
+    font-family: 'Monaco', 'Menlo', monospace;
+    font-size: 0.875rem;
+    letter-spacing: 1px;
+}
+
+.quick-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+}
+
+.quick-action-btn {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px;
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 0.9375rem;
+    color: var(--gray-700);
+}
+
+.quick-action-btn:hover {
+    background: #fff;
+    border-color: var(--primary);
+    color: var(--primary);
+    box-shadow: var(--shadow-md);
+}
+
+.quick-action-icon {
+    font-size: 1.25rem;
+}
+
 /* ========== RESPONSIVE ========== */
 @media (max-width: 1400px) {
     .stats-grid {

@@ -195,7 +195,7 @@ function renderDashboardProjects() {
     const displayProjects = projects.slice(0, 5);
     
     container.innerHTML = displayProjects.map((p, i) => `
-        <div class="project-item" onclick="selectProject('${p.id}'); showSection('products');">
+        <div class="project-item" onclick="openProjectDetail('${p.id}')">
             <div class="project-icon ${colors[i % colors.length]}">📁</div>
             <div class="project-info">
                 <div class="project-name">${escapeHtml(p.name)}</div>
@@ -212,6 +212,7 @@ function renderDashboardProjects() {
 function selectProject(projectId) {
     currentProject = projects.find(p => p.id === projectId);
     renderProjectsList();
+    openProjectDetail(projectId);
 }
 
 function updateProjectSelect(selectId) {
@@ -319,8 +320,289 @@ async function deleteProject(projectId) {
         showToast('Проект удалён', 'success');
         await loadProjects();
         loadDashboardStats();
+        
+        // If we were on project detail page, go back to projects list
+        if (currentProject?.id === projectId) {
+            currentProject = null;
+            showSection('projects');
+        }
     } catch (err) {
         showToast(err.message || 'Ошибка удаления проекта', 'error');
+    }
+}
+
+// ==================== PROJECT DETAIL ====================
+let apiKeyVisible = false;
+
+async function openProjectDetail(projectId) {
+    const project = projects.find(p => p.id === projectId);
+    if (!project) return;
+    
+    currentProject = project;
+    
+    // Update UI
+    document.getElementById('projectDetailName').textContent = project.name;
+    document.getElementById('projectDetailDomain').textContent = project.domain || 'Домен не указан';
+    
+    // Stats
+    document.getElementById('projectStatProducts').textContent = project.products_count || 0;
+    document.getElementById('projectStatSearches').textContent = project.searches_count || 0;
+    document.getElementById('projectStatCategories').textContent = project.categories_count || 0;
+    
+    // Feed URL
+    const feedUrl = project.feed_url;
+    const feedUrlEl = document.getElementById('projectFeedUrl');
+    if (feedUrl) {
+        feedUrlEl.innerHTML = `<a href="${escapeHtml(feedUrl)}" target="_blank" class="feed-url-text">${escapeHtml(feedUrl)}</a>`;
+    } else {
+        feedUrlEl.innerHTML = '<span class="feed-url-text" style="color: var(--gray-400);">Не указан — добавьте в настройках проекта</span>';
+    }
+    
+    // API Key (hidden by default)
+    apiKeyVisible = false;
+    document.getElementById('projectApiKey').textContent = '••••••••••••••••';
+    
+    // Show section
+    showSection('project-detail');
+    
+    // Load feed status
+    await loadProjectFeedStatus();
+}
+
+async function loadProjectFeedStatus() {
+    if (!currentProject) return;
+    
+    const statusBadge = document.getElementById('projectFeedStatus');
+    const loadBtn = document.getElementById('projectLoadFeedBtn');
+    const refreshBtn = document.getElementById('projectRefreshFeedBtn');
+    const resultContainer = document.getElementById('feedResultContainer');
+    
+    try {
+        const status = await fetchAPI(`/api/v1/projects/${currentProject.id}/feed/status`);
+        
+        if (status.status === 'loaded' || status.products_count > 0) {
+            statusBadge.className = 'feed-status-badge success';
+            statusBadge.innerHTML = '<span class="status-dot success"></span><span>Загружен</span>';
+            
+            loadBtn.style.display = 'none';
+            refreshBtn.style.display = 'inline-flex';
+            
+            // Show result
+            resultContainer.style.display = 'block';
+            document.getElementById('feedResultProducts').textContent = status.products_count || 0;
+            document.getElementById('feedResultCategories').textContent = status.categories_count || 0;
+            
+            const lastUpdate = status.last_update ? new Date(status.last_update).toLocaleString('ru') : '—';
+            document.getElementById('feedResultTime').textContent = lastUpdate;
+            document.getElementById('projectStatUpdated').textContent = lastUpdate.split(',')[0] || '—';
+        } else {
+            statusBadge.className = 'feed-status-badge';
+            statusBadge.innerHTML = '<span class="status-dot neutral"></span><span>Не загружен</span>';
+            loadBtn.style.display = 'inline-flex';
+            refreshBtn.style.display = 'none';
+            resultContainer.style.display = 'none';
+            document.getElementById('projectStatUpdated').textContent = '—';
+        }
+    } catch (err) {
+        console.error('Error loading feed status:', err);
+        statusBadge.className = 'feed-status-badge';
+        statusBadge.innerHTML = '<span class="status-dot neutral"></span><span>Неизвестно</span>';
+    }
+}
+
+async function loadProjectFeed() {
+    if (!currentProject) return;
+    
+    if (!currentProject.feed_url) {
+        showToast('Сначала укажите URL фида в настройках проекта', 'error');
+        editProject(currentProject.id);
+        return;
+    }
+    
+    const btn = document.getElementById('projectLoadFeedBtn');
+    const btnText = btn.querySelector('.btn-text');
+    const btnSpinner = btn.querySelector('.btn-spinner');
+    const progressContainer = document.getElementById('feedProgressContainer');
+    const statusBadge = document.getElementById('projectFeedStatus');
+    
+    // Show loading state
+    btn.disabled = true;
+    btnText.style.display = 'none';
+    btnSpinner.style.display = 'inline';
+    progressContainer.style.display = 'block';
+    statusBadge.className = 'feed-status-badge loading';
+    statusBadge.innerHTML = '<span class="status-dot"></span><span>Загрузка...</span>';
+    
+    // Simulate progress
+    let progress = 0;
+    const progressFill = document.getElementById('feedProgressFill');
+    const progressPercent = document.getElementById('feedProgressPercent');
+    const progressText = document.getElementById('feedProgressText');
+    
+    const progressInterval = setInterval(() => {
+        if (progress < 90) {
+            progress += Math.random() * 15;
+            progress = Math.min(progress, 90);
+            progressFill.style.width = progress + '%';
+            progressPercent.textContent = Math.round(progress) + '%';
+            
+            if (progress < 30) {
+                progressText.textContent = 'Загрузка фида...';
+            } else if (progress < 60) {
+                progressText.textContent = 'Парсинг товаров...';
+            } else {
+                progressText.textContent = 'Индексация...';
+            }
+        }
+    }, 300);
+    
+    try {
+        const startTime = Date.now();
+        const result = await fetchAPI(`/api/v1/projects/${currentProject.id}/feed/load`, {
+            method: 'POST'
+        });
+        
+        clearInterval(progressInterval);
+        
+        // Complete progress
+        progressFill.style.width = '100%';
+        progressPercent.textContent = '100%';
+        progressText.textContent = 'Готово!';
+        
+        // Update project in local array
+        const projectIndex = projects.findIndex(p => p.id === currentProject.id);
+        if (projectIndex !== -1) {
+            projects[projectIndex].products_count = result.products_count;
+            projects[projectIndex].categories_count = result.categories_count;
+            currentProject = projects[projectIndex];
+        }
+        
+        // Show success
+        setTimeout(() => {
+            progressContainer.style.display = 'none';
+            loadProjectFeedStatus();
+            showToast(`Загружено ${result.products_count} товаров`, 'success');
+            
+            // Update stats
+            document.getElementById('projectStatProducts').textContent = result.products_count;
+            document.getElementById('projectStatCategories').textContent = result.categories_count || 0;
+            
+            // Reload projects to update counts
+            loadProjects();
+        }, 500);
+        
+    } catch (err) {
+        clearInterval(progressInterval);
+        progressContainer.style.display = 'none';
+        statusBadge.className = 'feed-status-badge error';
+        statusBadge.innerHTML = '<span class="status-dot"></span><span>Ошибка</span>';
+        showToast(err.message || 'Ошибка загрузки фида', 'error');
+    } finally {
+        btn.disabled = false;
+        btnText.style.display = 'inline';
+        btnSpinner.style.display = 'none';
+    }
+}
+
+async function refreshProjectFeed() {
+    await loadProjectFeed();
+}
+
+function editCurrentProject() {
+    if (currentProject) {
+        editProject(currentProject.id);
+    }
+}
+
+function deleteCurrentProject() {
+    if (currentProject) {
+        deleteProject(currentProject.id);
+    }
+}
+
+async function toggleApiKeyVisibility() {
+    if (!currentProject) return;
+    
+    const el = document.getElementById('projectApiKey');
+    
+    if (apiKeyVisible) {
+        el.textContent = '••••••••••••••••';
+        apiKeyVisible = false;
+    } else {
+        // Fetch project to get API key
+        try {
+            const project = await fetchAPI(`/api/v1/projects/${currentProject.id}`);
+            el.textContent = project.api_key || 'Не найден';
+            apiKeyVisible = true;
+        } catch (err) {
+            showToast('Ошибка загрузки ключа', 'error');
+        }
+    }
+}
+
+function copyApiKey() {
+    if (!currentProject) return;
+    
+    const el = document.getElementById('projectApiKey');
+    const text = el.textContent;
+    
+    if (text.includes('•')) {
+        showToast('Сначала покажите ключ', 'error');
+        return;
+    }
+    
+    navigator.clipboard.writeText(text).then(() => {
+        showToast('API ключ скопирован', 'success');
+    });
+}
+
+async function regenerateApiKey() {
+    if (!currentProject) return;
+    
+    if (!confirm('Сгенерировать новый API ключ? Старый ключ перестанет работать.')) {
+        return;
+    }
+    
+    try {
+        const result = await fetchAPI(`/api/v1/projects/${currentProject.id}/regenerate-key`, {
+            method: 'POST'
+        });
+        document.getElementById('projectApiKey').textContent = result.api_key;
+        apiKeyVisible = true;
+        showToast('Новый ключ сгенерирован', 'success');
+    } catch (err) {
+        showToast(err.message || 'Ошибка генерации ключа', 'error');
+    }
+}
+
+function goToProducts() {
+    if (currentProject) {
+        document.getElementById('productsProjectSelect').value = currentProject.id;
+        showSection('products');
+        onProjectSelectChange();
+    }
+}
+
+function goToAnalytics() {
+    if (currentProject) {
+        document.getElementById('analyticsProjectSelect').value = currentProject.id;
+        showSection('analytics');
+        loadAnalytics();
+    }
+}
+
+function goToWidget() {
+    if (currentProject) {
+        document.getElementById('widgetProjectSelect').value = currentProject.id;
+        showSection('widget');
+    }
+}
+
+function goToEmbed() {
+    if (currentProject) {
+        document.getElementById('embedProjectSelect').value = currentProject.id;
+        showSection('embed');
+        updateEmbedCode();
     }
 }
 
