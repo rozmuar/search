@@ -51,11 +51,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadDashboardStats();
     initCharts();
     
-    // Handle initial URL hash
-    handleHashChange();
-    
-    // Listen for hash changes
-    window.addEventListener('hashchange', handleHashChange);
+    // Handle initial URL
+    handleRoute();
 });
 
 // ==================== USER UI ====================
@@ -81,44 +78,47 @@ function setupNavigation() {
             }
         });
     });
+    
+    // Handle browser back/forward
+    window.addEventListener('popstate', () => {
+        handleRoute();
+    });
 }
 
-// URL-based navigation
+// URL-based navigation with clean URLs
 function navigateTo(sectionId, params = {}) {
-    let hash = `#${sectionId}`;
+    let path = `/dashboard/${sectionId === 'dashboard' ? '' : sectionId + '/'}`;
     
     // Add params if any (e.g., project ID)
-    const paramStr = Object.entries(params)
-        .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
-        .join('&');
-    if (paramStr) {
-        hash += `?${paramStr}`;
+    if (params.id) {
+        path = `/dashboard/project/${params.id}/`;
     }
     
-    window.location.hash = hash;
+    history.pushState({ section: sectionId, params }, '', path);
+    handleRoute();
 }
 
-function handleHashChange() {
-    const hash = window.location.hash.slice(1) || 'dashboard';
-    const [sectionId, paramStr] = hash.split('?');
+function handleRoute() {
+    const path = window.location.pathname;
     
-    // Parse params
-    const params = {};
-    if (paramStr) {
-        paramStr.split('&').forEach(p => {
-            const [k, v] = p.split('=');
-            params[k] = decodeURIComponent(v);
-        });
-    }
-    
-    // Handle special routes
-    if (sectionId === 'project' && params.id) {
-        // Load specific project
-        openProjectDetail(params.id);
+    // Parse path: /dashboard/section/ or /dashboard/project/id/
+    const match = path.match(/^\/dashboard\/?(.*)$/);
+    if (!match) {
+        showSection('dashboard');
         return;
     }
     
-    showSection(sectionId);
+    const parts = match[1].split('/').filter(Boolean);
+    
+    if (parts.length === 0) {
+        showSection('dashboard');
+    } else if (parts[0] === 'project' && parts[1]) {
+        // Project detail: /dashboard/project/{id}/
+        openProjectDetail(parts[1]);
+    } else {
+        // Regular section: /dashboard/{section}/
+        showSection(parts[0]);
+    }
 }
 
 function showSection(sectionId) {
@@ -385,9 +385,9 @@ let apiKeyVisible = false;
 
 async function openProjectDetail(projectId) {
     // If called from click, update URL
-    if (!window.location.hash.includes(`project?id=${projectId}`)) {
-        window.location.hash = `project?id=${projectId}`;
-        return; // handleHashChange will call this function again
+    const expectedPath = `/dashboard/project/${projectId}/`;
+    if (window.location.pathname !== expectedPath) {
+        history.pushState({ section: 'project', params: { id: projectId } }, '', expectedPath);
     }
     
     const project = projects.find(p => p.id === projectId);
