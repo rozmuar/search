@@ -13,8 +13,8 @@ class FeedParser:
     """Парсер XML фидов товаров"""
     
     @staticmethod
-    async def fetch_feed(url: str, timeout: int = 60) -> str:
-        """Загрузка фида по URL"""
+    async def fetch_feed(url: str, timeout: int = 300) -> str:
+        """Загрузка фида по URL (таймаут 5 минут для больших фидов)"""
         async with aiohttp.ClientSession() as session:
             async with session.get(url, timeout=aiohttp.ClientTimeout(total=timeout)) as response:
                 if response.status != 200:
@@ -166,8 +166,12 @@ class FeedManager:
     async def load_feed(self, project_id: str, feed_url: str) -> Dict[str, Any]:
         """Загрузка фида для проекта"""
         try:
+            print(f"[FeedManager] Loading feed from {feed_url} for project {project_id}")
+            
             # Загружаем и парсим
             data = await self.parser.load_and_parse(feed_url)
+            
+            print(f"[FeedManager] Parsed {len(data['products'])} products, {len(data['categories'])} categories")
             
             # Сохраняем метаданные фида
             feed_info = {
@@ -195,6 +199,7 @@ class FeedManager:
             
         except Exception as e:
             # Сохраняем ошибку
+            print(f"[FeedManager] Error loading feed: {e}")
             import json
             await self.redis.hset(
                 f"project:{project_id}:feed",
