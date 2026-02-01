@@ -652,6 +652,15 @@ body {
     margin-top: 4px;
 }
 
+.form-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--gray-200);
+}
+
 /* ========== DONUT CHART ========== */
 .donut-chart-container {
     display: flex;

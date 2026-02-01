@@ -426,6 +426,9 @@ async function openProjectDetail(projectId) {
     
     // Load feed status
     await loadProjectFeedStatus();
+    
+    // Load search settings
+    await loadSearchSettings();
 }
 
 async function loadProjectFeedStatus() {
@@ -495,6 +498,113 @@ async function loadProjectFeedStatus() {
         console.error('Error loading feed status:', err);
         statusBadge.className = 'feed-status-badge';
         statusBadge.innerHTML = '<span class="status-dot neutral"></span><span>Неизвестно</span>';
+    }
+}
+
+// ==================== SEARCH SETTINGS ====================
+let searchSettingsChanged = false;
+
+async function loadSearchSettings() {
+    if (!currentProject) return;
+    
+    const select = document.getElementById('relatedProductsField');
+    const limitInput = document.getElementById('relatedProductsLimit');
+    const saveBtn = document.getElementById('saveSearchSettingsBtn');
+    const statusEl = document.getElementById('searchSettingsStatus');
+    
+    if (!select || !limitInput) return;
+    
+    // Reset
+    select.innerHTML = '<option value="">Отключено</option>';
+    searchSettingsChanged = false;
+    saveBtn.disabled = true;
+    statusEl.textContent = '';
+    
+    try {
+        // Load available fields from feed
+        const feedParams = await fetchAPI(`/api/v1/projects/${currentProject.id}/feed-params`);
+        
+        if (feedParams.fields && feedParams.fields.length > 0) {
+            // Common fields first
+            const commonFields = ['brand', 'vendor', 'category', 'categoryId', 'model'];
+            const sortedFields = [...feedParams.fields].sort((a, b) => {
+                const aCommon = commonFields.indexOf(a);
+                const bCommon = commonFields.indexOf(b);
+                if (aCommon >= 0 && bCommon >= 0) return aCommon - bCommon;
+                if (aCommon >= 0) return -1;
+                if (bCommon >= 0) return 1;
+                return a.localeCompare(b);
+            });
+            
+            sortedFields.forEach(field => {
+                const opt = document.createElement('option');
+                opt.value = field;
+                opt.textContent = field;
+                select.appendChild(opt);
+            });
+        }
+        
+        // Load current settings
+        const settings = await fetchAPI(`/api/v1/projects/${currentProject.id}/search-settings`);
+        
+        if (settings.relatedProductsField) {
+            select.value = settings.relatedProductsField;
+        }
+        if (settings.relatedProductsLimit) {
+            limitInput.value = settings.relatedProductsLimit;
+        }
+        
+    } catch (err) {
+        console.error('Error loading search settings:', err);
+        // If feed not loaded, show message
+        if (err.message?.includes('404') || err.message?.includes('No products')) {
+            statusEl.textContent = 'Сначала загрузите фид';
+        }
+    }
+}
+
+function markSearchSettingsChanged() {
+    searchSettingsChanged = true;
+    document.getElementById('saveSearchSettingsBtn').disabled = false;
+    document.getElementById('searchSettingsStatus').textContent = 'Есть несохранённые изменения';
+}
+
+async function saveSearchSettings() {
+    if (!currentProject) return;
+    
+    const select = document.getElementById('relatedProductsField');
+    const limitInput = document.getElementById('relatedProductsLimit');
+    const saveBtn = document.getElementById('saveSearchSettingsBtn');
+    const statusEl = document.getElementById('searchSettingsStatus');
+    
+    saveBtn.disabled = true;
+    statusEl.textContent = 'Сохранение...';
+    
+    try {
+        const settings = {
+            relatedProductsField: select.value || null,
+            relatedProductsLimit: parseInt(limitInput.value) || 4
+        };
+        
+        await fetchAPI(`/api/v1/projects/${currentProject.id}/search-settings`, {
+            method: 'PUT',
+            body: JSON.stringify(settings)
+        });
+        
+        searchSettingsChanged = false;
+        statusEl.textContent = '✓ Сохранено';
+        showToast('Настройки поиска сохранены', 'success');
+        
+        // Update local project data
+        if (currentProject.search_settings) {
+            currentProject.search_settings = JSON.stringify(settings);
+        }
+        
+    } catch (err) {
+        console.error('Error saving search settings:', err);
+        saveBtn.disabled = false;
+        statusEl.textContent = 'Ошибка сохранения';
+        showToast('Ошибка сохранения настроек', 'error');
     }
 }
 

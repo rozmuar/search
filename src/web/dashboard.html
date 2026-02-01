@@ -358,6 +358,33 @@
                     </div>
                 </div>
 
+                <!-- Search Settings Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">🔍 Настройки поиска</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-group">
+                            <label class="form-label">Связанные товары по параметру</label>
+                            <p class="form-hint">Когда пользователь ищет товар, дополнительно покажем товары с тем же значением выбранного параметра (например, того же бренда)</p>
+                            <select id="relatedProductsField" class="form-input" onchange="markSearchSettingsChanged()">
+                                <option value="">Отключено</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Количество связанных товаров</label>
+                            <input type="number" id="relatedProductsLimit" class="form-input" 
+                                   value="4" min="1" max="20" onchange="markSearchSettingsChanged()">
+                        </div>
+                        <div class="form-actions">
+                            <button class="btn btn-primary" id="saveSearchSettingsBtn" onclick="saveSearchSettings()" disabled>
+                                Сохранить настройки
+                            </button>
+                            <span class="form-hint" id="searchSettingsStatus"></span>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Quick Actions -->
                 <div class="card">
                     <div class="card-header">
