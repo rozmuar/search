@@ -257,13 +257,17 @@ async def regenerate_api_key(project_id: str, user: User = Depends(require_auth)
 
 # ============ FEED ENDPOINTS ============
 
+class FeedLoadRequest(BaseModel):
+    url: Optional[str] = None
+
 @app.post("/api/v1/projects/{project_id}/feed/load")
 async def load_feed(
     project_id: str, 
-    url: Optional[str] = None,
+    request: Optional[FeedLoadRequest] = None,
     user: User = Depends(require_auth)
 ):
     """Загрузка фида проекта. URL можно передать в body или использовать сохранённый в проекте."""
+    url = request.url if request else None
     logger.info(f"[load_feed] Starting for project {project_id}, url param: {url}")
     
     project = await data_store.get_project(project_id)
