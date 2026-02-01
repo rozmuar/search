@@ -17,8 +17,16 @@ RUN pip install --no-cache-dir -r requirements-basic.txt
 
 # Копирование кода
 COPY src /app/src
-COPY scripts /app/scripts
 COPY nginx.conf /etc/nginx/sites-available/default
+
+# Создаём скрипты если их нет
+RUN mkdir -p /app/scripts
+
+# Проверка что PyJWT установлен
+RUN python -c "import jwt; print('PyJWT OK')"
+
+# Проверка что приложение импортируется
+RUN python -c "from src.api.main import app; print('App import OK')"
 
 # Supervisor config
 RUN echo "[supervisord]\n\
