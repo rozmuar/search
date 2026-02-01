@@ -1,745 +1,1001 @@
-// Dashboard Application
+/**
+ * SearchPro Dashboard - Modern UI
+ */
+
+// ==================== CONSTANTS ====================
+const API_BASE = window.location.origin;
 let currentUser = null;
 let projects = [];
 let currentProject = null;
 let products = [];
-let currentPage = 1;
-const productsPerPage = 20;
+let productsPage = 1;
+const productsPerPage = 15;
 
-// Initialize
-document.addEventListener('DOMContentLoaded', () => {
-    checkAuth();
-    initNavigation();
-    initPeriodButtons();
-});
+// Charts
+let searchChart = null;
+let analyticsChart = null;
 
-// Auth Check
-async function checkAuth() {
-    const token = localStorage.getItem('authToken');
+// ==================== INIT ====================
+document.addEventListener('DOMContentLoaded', async () => {
+    // Check auth
+    const token = localStorage.getItem('token');
     if (!token) {
-        window.location.href = 'auth.html';
+        window.location.href = '/auth.html';
         return;
     }
 
+    // Load user
     try {
-        currentUser = await API.getMe();
-        document.getElementById('userEmail').textContent = currentUser.email;
-        await loadProjects();
-    } catch (error) {
-        console.error('Auth error:', error);
-        localStorage.removeItem('authToken');
-        window.location.href = 'auth.html';
+        const response = await fetch(`${API_BASE}/api/auth/me`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Unauthorized');
+        }
+        
+        currentUser = await response.json();
+        updateUserUI();
+    } catch (err) {
+        console.error('Auth error:', err);
+        localStorage.removeItem('token');
+        window.location.href = '/auth.html';
+        return;
     }
+
+    // Setup navigation
+    setupNavigation();
+    
+    // Load initial data
+    await loadProjects();
+    loadDashboardStats();
+    initCharts();
+});
+
+// ==================== USER UI ====================
+function updateUserUI() {
+    if (!currentUser) return;
+    
+    const email = currentUser.email || 'user@example.com';
+    const name = email.split('@')[0];
+    const initial = name.charAt(0).toUpperCase();
+    
+    document.getElementById('userName').textContent = name;
+    document.getElementById('userAvatar').textContent = initial;
 }
 
-function logout() {
-    localStorage.removeItem('authToken');
-    window.location.href = 'auth.html';
-}
-
-// Navigation
-function initNavigation() {
-    const navItems = document.querySelectorAll('.nav-item');
-    navItems.forEach(item => {
+// ==================== NAVIGATION ====================
+function setupNavigation() {
+    document.querySelectorAll('.nav-item').forEach(item => {
         item.addEventListener('click', (e) => {
             e.preventDefault();
             const section = item.dataset.section;
-            showSection(section);
-            
-            navItems.forEach(nav => nav.classList.remove('active'));
-            item.classList.add('active');
+            if (section) {
+                showSection(section);
+            }
         });
     });
 }
 
-function showSection(sectionName) {
-    const sections = document.querySelectorAll('.content-section');
-    sections.forEach(section => section.classList.remove('active'));
+function showSection(sectionId) {
+    // Update nav
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.classList.toggle('active', item.dataset.section === sectionId);
+    });
     
-    const targetSection = document.getElementById(`section-${sectionName}`);
-    if (targetSection) {
-        targetSection.classList.add('active');
+    // Update sections
+    document.querySelectorAll('.content-section').forEach(section => {
+        section.classList.toggle('active', section.id === `section-${sectionId}`);
+    });
+    
+    // Update page title
+    const titles = {
+        'dashboard': 'Дашборд',
+        'projects': 'Проекты',
+        'products': 'Товары',
+        'analytics': 'Аналитика',
+        'widget': 'Виджет',
+        'embed': 'Встраивание'
+    };
+    document.getElementById('pageTitle').textContent = titles[sectionId] || 'Дашборд';
+    
+    // Section-specific actions
+    if (sectionId === 'products') {
+        updateProjectSelect('productsProjectSelect');
+    } else if (sectionId === 'analytics') {
+        updateProjectSelect('analyticsProjectSelect');
+        loadAnalytics();
+    } else if (sectionId === 'widget') {
+        updateProjectSelect('widgetProjectSelect');
+    } else if (sectionId === 'embed') {
+        updateProjectSelect('embedProjectSelect');
+        updateEmbedCode();
     }
+    
+    // Close mobile sidebar
+    closeSidebar();
 }
 
-// Projects
+// ==================== SIDEBAR ====================
+function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('open');
+    document.getElementById('sidebarOverlay').classList.toggle('show');
+}
+
+function closeSidebar() {
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('sidebarOverlay').classList.remove('show');
+}
+
+// ==================== PROJECTS ====================
 async function loadProjects() {
     try {
-        projects = await API.getProjects();
-        renderProjects();
-        populateProjectSelectors();
-    } catch (error) {
-        console.error('Error loading projects:', error);
+        const response = await fetchAPI('/api/projects');
+        projects = response || [];
+        
+        renderProjectsList();
+        renderDashboardProjects();
+        updateAllProjectSelects();
+        
+        // Show empty state if no projects
+        document.getElementById('noProjects').style.display = projects.length === 0 ? 'block' : 'none';
+        document.getElementById('projectsList').style.display = projects.length > 0 ? 'block' : 'none';
+        
+    } catch (err) {
+        console.error('Error loading projects:', err);
         showToast('Ошибка загрузки проектов', 'error');
     }
 }
 
-function renderProjects() {
-    const grid = document.getElementById('projectsGrid');
-    const emptyState = document.getElementById('noProjects');
-
+function renderProjectsList() {
+    const container = document.getElementById('projectsList');
     if (projects.length === 0) {
-        grid.style.display = 'none';
-        emptyState.style.display = 'block';
+        container.innerHTML = '';
         return;
     }
-
-    grid.style.display = 'grid';
-    emptyState.style.display = 'none';
-
-    grid.innerHTML = projects.map(project => `
-        <div class="project-card" data-project-id="${project.id}">
-            <div class="project-card-header">
-                <div>
-                    <div class="project-name">${escapeHtml(project.name)}</div>
-                    <div class="project-domain">${escapeHtml(project.domain)}</div>
-                </div>
-                <button class="project-edit-btn" onclick="showEditProjectModal('${project.id}')">⚙️</button>
+    
+    const colors = ['blue', 'green', 'orange', 'red', 'purple'];
+    
+    container.innerHTML = projects.map((p, i) => `
+        <div class="project-item ${currentProject?.id === p.id ? 'selected' : ''}" 
+             onclick="selectProject('${p.id}')">
+            <div class="project-icon ${colors[i % colors.length]}">📁</div>
+            <div class="project-info">
+                <div class="project-name">${escapeHtml(p.name)}</div>
+                <div class="project-domain">${escapeHtml(p.domain || 'Без домена')}</div>
             </div>
             <div class="project-stats">
-                <div class="project-stat">
-                    <div class="project-stat-value">${project.products_count || 0}</div>
-                    <div class="project-stat-label">Товаров</div>
-                </div>
-                <div class="project-stat">
-                    <div class="project-stat-value">${project.searches_today || 0}</div>
-                    <div class="project-stat-label">Поисков</div>
-                </div>
-                <div class="project-stat">
-                    <div class="project-stat-value">${project.feed_status || '—'}</div>
-                    <div class="project-stat-label">Фид</div>
-                </div>
-            </div>
-            <div class="project-api-key">
-                <code>${project.api_key}</code>
-                <button class="btn-copy-small" onclick="copyToClipboard('${project.api_key}')" title="Копировать">📋</button>
+                <div class="project-products-count">${p.products_count || 0}</div>
+                <div class="project-searches-count">${p.searches_count || 0} поисков</div>
             </div>
         </div>
     `).join('');
 }
 
-function populateProjectSelectors() {
-    const selectors = [
-        'productsProjectSelect',
-        'analyticsProjectSelect',
-        'widgetProjectSelect',
-        'embedProjectSelect'
-    ];
-
-    selectors.forEach(selectorId => {
-        const select = document.getElementById(selectorId);
-        if (select) {
-            const currentValue = select.value;
-            select.innerHTML = '<option value="">Выберите проект</option>' + 
-                projects.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
-            if (currentValue && projects.find(p => p.id === currentValue)) {
-                select.value = currentValue;
-            }
-        }
-    });
+function renderDashboardProjects() {
+    const container = document.getElementById('dashboardProjectsList');
+    
+    if (projects.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state" style="border: none; margin: 20px;">
+                <div class="empty-icon">📁</div>
+                <p class="empty-text">Нет проектов</p>
+                <button class="btn btn-primary btn-sm" onclick="showCreateProjectModal()">Создать</button>
+            </div>
+        `;
+        return;
+    }
+    
+    const colors = ['blue', 'green', 'orange', 'red', 'purple'];
+    const displayProjects = projects.slice(0, 5);
+    
+    container.innerHTML = displayProjects.map((p, i) => `
+        <div class="project-item" onclick="selectProject('${p.id}'); showSection('products');">
+            <div class="project-icon ${colors[i % colors.length]}">📁</div>
+            <div class="project-info">
+                <div class="project-name">${escapeHtml(p.name)}</div>
+                <div class="project-domain">${escapeHtml(p.domain || 'Без домена')}</div>
+            </div>
+            <div class="project-stats">
+                <div class="project-products-count">${p.products_count || 0}</div>
+                <div class="project-searches-count">товаров</div>
+            </div>
+        </div>
+    `).join('');
 }
 
+function selectProject(projectId) {
+    currentProject = projects.find(p => p.id === projectId);
+    renderProjectsList();
+}
+
+function updateProjectSelect(selectId) {
+    const select = document.getElementById(selectId);
+    if (!select) return;
+    
+    const currentValue = select.value;
+    
+    select.innerHTML = '<option value="">Выберите проект</option>' + 
+        projects.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
+    
+    if (currentValue && projects.find(p => p.id === currentValue)) {
+        select.value = currentValue;
+    }
+}
+
+function updateAllProjectSelects() {
+    ['productsProjectSelect', 'analyticsProjectSelect', 'widgetProjectSelect', 'embedProjectSelect']
+        .forEach(id => updateProjectSelect(id));
+}
+
+// ==================== CREATE PROJECT ====================
 function showCreateProjectModal() {
+    document.getElementById('createProjectModal').classList.add('active');
     document.getElementById('projectName').value = '';
     document.getElementById('projectDomain').value = '';
     document.getElementById('projectFeedUrl').value = '';
-    document.getElementById('createProjectModal').classList.add('active');
+    document.getElementById('projectName').focus();
 }
 
-function showEditProjectModal(projectId) {
-    const project = projects.find(p => p.id === projectId);
-    if (!project) return;
-
-    document.getElementById('editProjectId').value = project.id;
-    document.getElementById('editProjectName').value = project.name;
-    document.getElementById('editProjectDomain').value = project.domain;
-    document.getElementById('editProjectFeedUrl').value = project.feed_url || '';
-    document.getElementById('editProjectModal').classList.add('active');
-}
-
-function closeModal(modalId) {
-    document.getElementById(modalId).classList.remove('active');
+function closeCreateProjectModal() {
+    document.getElementById('createProjectModal').classList.remove('active');
 }
 
 async function createProject() {
     const name = document.getElementById('projectName').value.trim();
     const domain = document.getElementById('projectDomain').value.trim();
     const feedUrl = document.getElementById('projectFeedUrl').value.trim();
-
-    if (!name || !domain) {
-        showToast('Заполните обязательные поля', 'error');
-        return;
-    }
-
-    try {
-        const project = await API.createProject({ name, domain, feed_url: feedUrl || null });
-        projects.push(project);
-        renderProjects();
-        populateProjectSelectors();
-        closeModal('createProjectModal');
-        showToast('Проект создан', 'success');
-
-        // Load feed if URL provided
-        if (feedUrl) {
-            loadFeedForProject(project.id, feedUrl);
-        }
-    } catch (error) {
-        showToast('Ошибка создания проекта', 'error');
-    }
-}
-
-async function updateProject() {
-    const id = document.getElementById('editProjectId').value;
-    const name = document.getElementById('editProjectName').value.trim();
-    const domain = document.getElementById('editProjectDomain').value.trim();
-    const feedUrl = document.getElementById('editProjectFeedUrl').value.trim();
-
-    if (!name || !domain) {
-        showToast('Заполните обязательные поля', 'error');
-        return;
-    }
-
-    try {
-        const updated = await API.updateProject(id, { name, domain, feed_url: feedUrl || null });
-        const index = projects.findIndex(p => p.id === id);
-        if (index !== -1) {
-            projects[index] = { ...projects[index], ...updated };
-        }
-        renderProjects();
-        populateProjectSelectors();
-        closeModal('editProjectModal');
-        showToast('Проект обновлён', 'success');
-    } catch (error) {
-        showToast('Ошибка обновления проекта', 'error');
-    }
-}
-
-async function deleteProject() {
-    const id = document.getElementById('editProjectId').value;
     
-    if (!confirm('Вы уверены, что хотите удалить этот проект? Все данные будут потеряны.')) {
+    if (!name) {
+        showToast('Введите название проекта', 'error');
         return;
     }
-
+    
     try {
-        await API.deleteProject(id);
-        projects = projects.filter(p => p.id !== id);
-        renderProjects();
-        populateProjectSelectors();
-        closeModal('editProjectModal');
-        showToast('Проект удалён', 'success');
-    } catch (error) {
-        showToast('Ошибка удаления проекта', 'error');
+        const data = { name, domain };
+        if (feedUrl) data.feed_url = feedUrl;
+        
+        await fetchAPI('/api/projects', {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+        
+        showToast('Проект создан', 'success');
+        closeCreateProjectModal();
+        await loadProjects();
+        loadDashboardStats();
+        
+    } catch (err) {
+        showToast(err.message || 'Ошибка создания проекта', 'error');
     }
 }
 
-// Products
-async function loadProducts() {
+// ==================== DASHBOARD STATS ====================
+async function loadDashboardStats() {
+    // Calculate stats from projects
+    let totalProducts = 0;
+    let totalSearches = 0;
+    let totalClicks = 0;
+    
+    projects.forEach(p => {
+        totalProducts += p.products_count || 0;
+        totalSearches += p.searches_count || 0;
+    });
+    
+    const ctr = totalSearches > 0 ? Math.round((totalClicks / totalSearches) * 100) : 0;
+    
+    animateNumber('statProjects', projects.length);
+    animateNumber('statProducts', totalProducts);
+    animateNumber('statSearches', totalSearches);
+    document.getElementById('statCTR').textContent = ctr + '%';
+    
+    // Load top queries
+    loadTopQueries();
+}
+
+async function loadTopQueries() {
+    const container = document.getElementById('topQueriesList');
+    
+    try {
+        // Try to get analytics from first project
+        if (projects.length > 0) {
+            const analytics = await fetchAPI(`/api/analytics/${projects[0].id}`);
+            const queries = analytics.popular_queries || [];
+            
+            if (queries.length === 0) {
+                container.innerHTML = `
+                    <div style="padding: 40px; text-align: center; color: var(--gray-500);">
+                        Пока нет данных
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = queries.slice(0, 5).map((q, i) => `
+                <div class="query-item">
+                    <span class="query-rank ${i < 3 ? 'top' : ''}">${i + 1}</span>
+                    <span class="query-text">${escapeHtml(q.query)}</span>
+                    <span class="query-count">${q.count}</span>
+                </div>
+            `).join('');
+        } else {
+            container.innerHTML = `
+                <div style="padding: 40px; text-align: center; color: var(--gray-500);">
+                    Создайте проект для начала
+                </div>
+            `;
+        }
+    } catch (err) {
+        container.innerHTML = `
+            <div style="padding: 40px; text-align: center; color: var(--gray-500);">
+                Нет данных
+            </div>
+        `;
+    }
+}
+
+// ==================== CHARTS ====================
+function initCharts() {
+    // Search Chart
+    const searchCtx = document.getElementById('searchChart');
+    if (searchCtx) {
+        searchChart = new Chart(searchCtx, {
+            type: 'line',
+            data: {
+                labels: getLast7Days(),
+                datasets: [{
+                    label: 'Поисков',
+                    data: [0, 0, 0, 0, 0, 0, 0],
+                    borderColor: '#4F46E5',
+                    backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    borderWidth: 2,
+                    pointBackgroundColor: '#4F46E5',
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: 'rgba(0,0,0,0.05)' }
+                    },
+                    x: {
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Analytics Chart
+    const analyticsCtx = document.getElementById('analyticsChart');
+    if (analyticsCtx) {
+        analyticsChart = new Chart(analyticsCtx, {
+            type: 'bar',
+            data: {
+                labels: getLast7Days(),
+                datasets: [{
+                    label: 'Поисков',
+                    data: [0, 0, 0, 0, 0, 0, 0],
+                    backgroundColor: 'rgba(79, 70, 229, 0.8)',
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: 'rgba(0,0,0,0.05)' }
+                    },
+                    x: {
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+    }
+}
+
+function getLast7Days() {
+    const days = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+    const result = [];
+    for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        result.push(days[d.getDay()]);
+    }
+    return result;
+}
+
+// ==================== PRODUCTS ====================
+function onProjectSelectChange() {
     const projectId = document.getElementById('productsProjectSelect').value;
     
     if (!projectId) {
-        document.getElementById('feedControls').style.display = 'none';
-        document.getElementById('productsStats').style.display = 'none';
-        document.getElementById('productsTableBody').innerHTML = '';
+        document.getElementById('feedPanel').style.display = 'none';
+        document.getElementById('productsTable').style.display = 'none';
+        document.getElementById('noProjectSelected').style.display = 'block';
         return;
     }
-
+    
     currentProject = projects.find(p => p.id === projectId);
-    document.getElementById('feedControls').style.display = 'block';
-    document.getElementById('feedUrlInput').value = currentProject?.feed_url || '';
+    document.getElementById('noProjectSelected').style.display = 'none';
+    document.getElementById('feedPanel').style.display = 'block';
+    
+    loadProjectProducts(projectId);
+}
 
+async function loadProjectProducts(projectId) {
     try {
-        // Get feed status
-        await updateFeedStatus(projectId);
-
-        // Get products
-        const response = await API.getProducts(projectId, currentPage, productsPerPage);
-        products = response.products || [];
+        const project = projects.find(p => p.id === projectId);
         
-        document.getElementById('productsStats').style.display = 'flex';
-        document.getElementById('totalProducts').textContent = response.total || 0;
-        document.getElementById('indexedProducts').textContent = response.indexed || 0;
-        document.getElementById('lastUpdate').textContent = response.last_update ? 
-            new Date(response.last_update).toLocaleDateString('ru') : '—';
-
-        renderProducts();
-        renderPagination(response.total || 0);
-    } catch (error) {
-        console.error('Error loading products:', error);
+        // Update feed URL if exists
+        if (project?.feed_url) {
+            document.getElementById('feedUrlInput').value = project.feed_url;
+            document.getElementById('refreshFeedBtn').style.display = 'block';
+            updateFeedStatus('success', 'Фид загружен');
+        } else {
+            document.getElementById('feedUrlInput').value = '';
+            document.getElementById('refreshFeedBtn').style.display = 'none';
+            updateFeedStatus('neutral', 'Фид не загружен');
+        }
+        
+        // Load products
+        const response = await fetchAPI(`/api/products/${projectId}`);
+        products = response.products || response || [];
+        
+        if (products.length > 0) {
+            document.getElementById('productsTable').style.display = 'block';
+            document.getElementById('feedStats').style.display = 'grid';
+            
+            // Update stats
+            const categories = new Set(products.map(p => p.category).filter(Boolean));
+            const inStock = products.filter(p => p.available !== false).length;
+            
+            document.getElementById('feedTotalProducts').textContent = products.length;
+            document.getElementById('feedCategories').textContent = categories.size;
+            document.getElementById('feedInStock').textContent = inStock;
+            document.getElementById('feedLastUpdate').textContent = 'Сегодня';
+            
+            renderProducts();
+        } else {
+            document.getElementById('productsTable').style.display = 'none';
+            document.getElementById('feedStats').style.display = 'none';
+        }
+        
+    } catch (err) {
+        console.error('Error loading products:', err);
         showToast('Ошибка загрузки товаров', 'error');
     }
 }
 
 function renderProducts() {
-    const tbody = document.getElementById('productsTableBody');
+    const container = document.getElementById('productsBody');
+    const start = (productsPage - 1) * productsPerPage;
+    const end = start + productsPerPage;
+    const pageProducts = products.slice(start, end);
     
-    if (products.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="5" style="text-align: center; padding: 40px; color: #6b7280;">
-                    Товары не найдены. Загрузите фид для добавления товаров.
-                </td>
-            </tr>
-        `;
-        return;
-    }
-
-    tbody.innerHTML = products.map(product => `
+    container.innerHTML = pageProducts.map(p => `
         <tr>
             <td>
-                <img src="${product.image || ''}" 
-                     alt="${escapeHtml(product.name)}" 
-                     class="product-image"
-                     onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTAiIGhlaWdodD0iNTAiIHZpZXdCb3g9IjAgMCA1MCA1MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNTAiIGhlaWdodD0iNTAiIGZpbGw9IiNFNUU3RUIiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzlDQTNCOCIgZm9udC1zaXplPSIxMCI+Tm8gaW1nPC90ZXh0Pjwvc3ZnPg=='">
+                <div class="product-cell">
+                    ${p.picture ? 
+                        `<img src="${escapeHtml(p.picture)}" class="product-image" alt="" onerror="this.style.display='none'">` :
+                        `<div class="product-image-placeholder">📦</div>`
+                    }
+                    <span class="product-name">${escapeHtml(p.name || p.title || 'Без названия')}</span>
+                </div>
             </td>
-            <td><span class="product-name">${escapeHtml(product.name)}</span></td>
-            <td><span class="product-price">${formatPrice(product.price)} ₽</span></td>
-            <td><span class="product-category">${escapeHtml(product.category || '—')}</span></td>
+            <td class="product-category">${escapeHtml(p.category || '—')}</td>
+            <td class="product-price">${formatPrice(p.price)} ₽</td>
             <td>
-                <span class="product-availability ${product.available ? 'in-stock' : 'out-of-stock'}">
-                    ${product.available ? 'В наличии' : 'Нет в наличии'}
+                <span class="badge ${p.available !== false ? 'badge-success' : 'badge-danger'}">
+                    ${p.available !== false ? 'В наличии' : 'Нет'}
                 </span>
             </td>
         </tr>
     `).join('');
+    
+    // Update count
+    document.getElementById('productsCount').textContent = `${products.length} товаров`;
+    
+    // Render pagination
+    renderPagination();
 }
 
-function renderPagination(total) {
-    const pagination = document.getElementById('productsPagination');
-    const totalPages = Math.ceil(total / productsPerPage);
-
+function renderPagination() {
+    const totalPages = Math.ceil(products.length / productsPerPage);
+    const container = document.getElementById('productsPagination');
+    
     if (totalPages <= 1) {
-        pagination.innerHTML = '';
+        container.innerHTML = '';
         return;
     }
-
-    let html = '';
-    html += `<button onclick="changePage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>&lt;</button>`;
     
-    for (let i = 1; i <= Math.min(totalPages, 7); i++) {
-        html += `<button onclick="changePage(${i})" class="${i === currentPage ? 'active' : ''}">${i}</button>`;
+    let html = `
+        <button class="page-btn" onclick="changePage(${productsPage - 1})" ${productsPage === 1 ? 'disabled' : ''}>‹</button>
+    `;
+    
+    for (let i = 1; i <= Math.min(totalPages, 5); i++) {
+        html += `
+            <button class="page-btn ${i === productsPage ? 'active' : ''}" onclick="changePage(${i})">${i}</button>
+        `;
     }
     
-    if (totalPages > 7) {
-        html += `<button disabled>...</button>`;
-        html += `<button onclick="changePage(${totalPages})" class="${totalPages === currentPage ? 'active' : ''}">${totalPages}</button>`;
+    if (totalPages > 5) {
+        html += `<span class="pagination-info">...</span>`;
+        html += `<button class="page-btn" onclick="changePage(${totalPages})">${totalPages}</button>`;
     }
     
-    html += `<button onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>&gt;</button>`;
+    html += `
+        <button class="page-btn" onclick="changePage(${productsPage + 1})" ${productsPage === totalPages ? 'disabled' : ''}>›</button>
+    `;
     
-    pagination.innerHTML = html;
+    container.innerHTML = html;
 }
 
 function changePage(page) {
-    currentPage = page;
-    loadProducts();
+    const totalPages = Math.ceil(products.length / productsPerPage);
+    if (page < 1 || page > totalPages) return;
+    productsPage = page;
+    renderProducts();
 }
 
 function filterProducts() {
-    const query = document.getElementById('productsSearchInput').value.toLowerCase();
-    const rows = document.querySelectorAll('#productsTableBody tr');
-    
+    const query = document.getElementById('productsSearch').value.toLowerCase();
+    // Simple filter - in real app would re-render
+    const rows = document.querySelectorAll('#productsBody tr');
     rows.forEach(row => {
         const text = row.textContent.toLowerCase();
         row.style.display = text.includes(query) ? '' : 'none';
     });
 }
 
-async function updateFeedStatus(projectId) {
-    try {
-        const status = await API.getFeedStatus(projectId);
-        const statusEl = document.getElementById('feedStatusValue');
-        
-        if (status.status === 'loading') {
-            statusEl.textContent = 'Загрузка...';
-            statusEl.className = 'status-value loading';
-        } else if (status.status === 'success') {
-            statusEl.textContent = `Загружено (${status.products_count} товаров)`;
-            statusEl.className = 'status-value success';
-        } else if (status.status === 'error') {
-            statusEl.textContent = 'Ошибка загрузки';
-            statusEl.className = 'status-value error';
-        } else {
-            statusEl.textContent = 'Не загружен';
-            statusEl.className = 'status-value';
-        }
-    } catch (error) {
-        console.error('Error getting feed status:', error);
-    }
-}
-
+// ==================== FEED ====================
 async function loadFeed() {
+    const url = document.getElementById('feedUrlInput').value.trim();
     const projectId = document.getElementById('productsProjectSelect').value;
-    const feedUrl = document.getElementById('feedUrlInput').value.trim();
-
-    if (!projectId || !feedUrl) {
-        showToast('Укажите URL фида', 'error');
+    
+    if (!url) {
+        showToast('Введите URL фида', 'error');
         return;
     }
-
-    await loadFeedForProject(projectId, feedUrl);
-}
-
-async function loadFeedForProject(projectId, feedUrl) {
+    
+    if (!projectId) {
+        showToast('Выберите проект', 'error');
+        return;
+    }
+    
+    const btn = document.getElementById('loadFeedBtn');
+    btn.disabled = true;
+    btn.textContent = 'Загрузка...';
+    updateFeedStatus('warning', 'Загрузка...');
+    
     try {
-        document.getElementById('feedStatusValue').textContent = 'Загрузка...';
-        document.getElementById('feedStatusValue').className = 'status-value loading';
-
-        await API.loadFeed(projectId, feedUrl);
-        showToast('Загрузка фида запущена', 'success');
-
-        // Poll for status
-        const pollStatus = setInterval(async () => {
-            const status = await API.getFeedStatus(projectId);
-            if (status.status !== 'loading') {
-                clearInterval(pollStatus);
-                await loadProducts();
-                await loadProjects(); // Update project stats
-            }
-        }, 2000);
-
-    } catch (error) {
-        document.getElementById('feedStatusValue').textContent = 'Ошибка';
-        document.getElementById('feedStatusValue').className = 'status-value error';
-        showToast('Ошибка загрузки фида', 'error');
+        await fetchAPI(`/api/feed/${projectId}/load`, {
+            method: 'POST',
+            body: JSON.stringify({ url })
+        });
+        
+        showToast('Фид успешно загружен', 'success');
+        updateFeedStatus('success', 'Фид загружен');
+        document.getElementById('refreshFeedBtn').style.display = 'block';
+        
+        // Reload projects and products
+        await loadProjects();
+        await loadProjectProducts(projectId);
+        
+    } catch (err) {
+        showToast(err.message || 'Ошибка загрузки фида', 'error');
+        updateFeedStatus('error', 'Ошибка загрузки');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Загрузить';
     }
 }
 
 async function refreshFeed() {
     const projectId = document.getElementById('productsProjectSelect').value;
     if (!projectId) return;
-
-    const project = projects.find(p => p.id === projectId);
-    if (project?.feed_url) {
-        await loadFeedForProject(projectId, project.feed_url);
-    } else {
-        showToast('URL фида не задан', 'error');
-    }
-}
-
-// Analytics
-function initPeriodButtons() {
-    const buttons = document.querySelectorAll('.period-btn');
-    buttons.forEach(btn => {
-        btn.addEventListener('click', () => {
-            buttons.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            loadAnalytics();
-        });
-    });
-}
-
-async function loadAnalytics() {
-    const projectId = document.getElementById('analyticsProjectSelect').value;
-    if (!projectId) return;
-
-    const period = document.querySelector('.period-btn.active')?.dataset.period || 7;
-
-    try {
-        const analytics = await API.getAnalytics(projectId, period);
-        
-        document.getElementById('totalSearches').textContent = analytics.total_searches || 0;
-        document.getElementById('totalClicks').textContent = analytics.total_clicks || 0;
-        document.getElementById('avgResponseTime').textContent = `${analytics.avg_response_time || 0} мс`;
-        
-        const conversion = analytics.total_searches > 0 
-            ? Math.round((analytics.total_clicks / analytics.total_searches) * 100) 
-            : 0;
-        document.getElementById('conversionRate').textContent = `${conversion}%`;
-
-        // Popular queries
-        const popularContainer = document.getElementById('popularQueries');
-        if (analytics.popular_queries?.length > 0) {
-            popularContainer.innerHTML = analytics.popular_queries.map(q => `
-                <span class="query-tag">
-                    ${escapeHtml(q.query)}
-                    <span class="query-count">${q.count}</span>
-                </span>
-            `).join('');
-        } else {
-            popularContainer.innerHTML = '<div class="empty-state-inline">Нет данных</div>';
-        }
-
-        // Zero results queries
-        const zeroContainer = document.getElementById('zeroResults');
-        if (analytics.zero_results?.length > 0) {
-            zeroContainer.innerHTML = analytics.zero_results.map(q => `
-                <span class="zero-result-tag">${escapeHtml(q.query)}</span>
-            `).join('');
-        } else {
-            zeroContainer.innerHTML = '<div class="empty-state-inline">Нет данных</div>';
-        }
-
-        // Chart
-        renderSearchesChart(analytics.searches_by_day || []);
-
-    } catch (error) {
-        console.error('Error loading analytics:', error);
-        showToast('Ошибка загрузки аналитики', 'error');
-    }
-}
-
-function renderSearchesChart(data) {
-    const container = document.getElementById('searchesChart');
     
-    if (data.length === 0) {
-        container.innerHTML = '<div class="empty-state-inline">Нет данных для отображения</div>';
+    const project = projects.find(p => p.id === projectId);
+    if (!project?.feed_url) {
+        showToast('URL фида не указан', 'error');
         return;
     }
-
-    // Simple bar chart with CSS
-    const maxValue = Math.max(...data.map(d => d.count), 1);
     
+    document.getElementById('feedUrlInput').value = project.feed_url;
+    await loadFeed();
+}
+
+function updateFeedStatus(status, text) {
+    const container = document.getElementById('feedStatus');
     container.innerHTML = `
-        <div style="display: flex; align-items: flex-end; gap: 8px; height: 200px; padding: 20px 0;">
-            ${data.map(d => `
-                <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
-                    <div style="
-                        width: 100%;
-                        height: ${(d.count / maxValue) * 150}px;
-                        background: #2563eb;
-                        border-radius: 4px 4px 0 0;
-                        min-height: 4px;
-                    "></div>
-                    <div style="font-size: 10px; color: #6b7280; margin-top: 8px; writing-mode: vertical-rl; transform: rotate(180deg);">
-                        ${d.date}
-                    </div>
-                </div>
-            `).join('')}
-        </div>
+        <span class="status-dot ${status}"></span>
+        <span>${text}</span>
     `;
 }
 
-// Widget Settings
-async function loadWidgetSettings() {
-    const projectId = document.getElementById('widgetProjectSelect').value;
-    if (!projectId) return;
-
+// ==================== ANALYTICS ====================
+async function loadAnalytics() {
+    const projectId = document.getElementById('analyticsProjectSelect').value;
+    
     try {
-        const config = await API.getWidgetConfig(projectId);
+        let analytics;
         
-        document.getElementById('widgetTheme').value = config.theme || 'light';
-        document.getElementById('widgetPrimaryColor').value = config.primary_color || '#2563eb';
-        document.getElementById('widgetTextColor').value = config.text_color || '#1f2937';
-        document.getElementById('widgetBgColor').value = config.bg_color || '#ffffff';
-        document.getElementById('widgetBorderRadius').value = config.border_radius || 8;
-        document.getElementById('borderRadiusValue').textContent = config.border_radius || 8;
-        document.getElementById('widgetPlaceholder').value = config.placeholder || 'Поиск товаров...';
-        document.getElementById('widgetResultsPerPage').value = config.results_per_page || 10;
-        document.getElementById('widgetShowImages').checked = config.show_images !== false;
-        document.getElementById('widgetShowPrices').checked = config.show_prices !== false;
-        document.getElementById('widgetShowSuggestions').checked = config.show_suggestions !== false;
-
-        updateWidgetPreview();
-    } catch (error) {
-        console.error('Error loading widget config:', error);
+        if (projectId) {
+            analytics = await fetchAPI(`/api/analytics/${projectId}`);
+        } else if (projects.length > 0) {
+            // Aggregate all projects
+            analytics = { total_searches: 0, total_clicks: 0, popular_queries: [] };
+            for (const p of projects) {
+                try {
+                    const a = await fetchAPI(`/api/analytics/${p.id}`);
+                    analytics.total_searches += a.total_searches || 0;
+                    analytics.total_clicks += a.total_clicks || 0;
+                } catch (e) {}
+            }
+        } else {
+            analytics = { total_searches: 0, total_clicks: 0, popular_queries: [] };
+        }
+        
+        // Update stats
+        const searches = analytics.total_searches || 0;
+        const clicks = analytics.total_clicks || 0;
+        const ctr = searches > 0 ? Math.round((clicks / searches) * 100) : 0;
+        
+        animateNumber('analyticsSearches', searches);
+        animateNumber('analyticsClicks', clicks);
+        document.getElementById('analyticsCTR').textContent = ctr + '%';
+        document.getElementById('analyticsAvgTime').textContent = (analytics.avg_time || 45) + 'ms';
+        
+        // Update donut
+        const donut = document.getElementById('conversionDonut');
+        const circumference = 2 * Math.PI * 40;
+        const offset = circumference * (1 - ctr / 100);
+        donut.style.strokeDasharray = `${circumference - offset} ${offset}`;
+        document.getElementById('conversionValue').textContent = ctr + '%';
+        document.getElementById('legendClicks').textContent = clicks;
+        document.getElementById('legendNoClicks').textContent = Math.max(0, searches - clicks);
+        
+        // Update queries list
+        const queries = analytics.popular_queries || [];
+        const container = document.getElementById('analyticsQueriesList');
+        
+        if (queries.length === 0) {
+            container.innerHTML = `
+                <div style="padding: 40px; text-align: center; color: var(--gray-500);">
+                    Пока нет данных о запросах
+                </div>
+            `;
+        } else {
+            container.innerHTML = queries.slice(0, 10).map((q, i) => `
+                <div class="query-item">
+                    <span class="query-rank ${i < 3 ? 'top' : ''}">${i + 1}</span>
+                    <span class="query-text">${escapeHtml(q.query)}</span>
+                    <span class="query-count">${q.count}</span>
+                </div>
+            `).join('');
+        }
+        
+    } catch (err) {
+        console.error('Error loading analytics:', err);
     }
 }
 
+// ==================== WIDGET SETTINGS ====================
+function loadWidgetSettings() {
+    const projectId = document.getElementById('widgetProjectSelect').value;
+    document.getElementById('saveWidgetBtn').disabled = !projectId;
+    
+    if (!projectId) return;
+    
+    // Load saved settings or use defaults
+    const project = projects.find(p => p.id === projectId);
+    const settings = project?.widget_settings || {};
+    
+    document.getElementById('widgetPrimaryColor').value = settings.primaryColor || '#4F46E5';
+    document.getElementById('widgetPrimaryColorText').value = settings.primaryColor || '#4F46E5';
+    document.getElementById('widgetTextColor').value = settings.textColor || '#1F2937';
+    document.getElementById('widgetTextColorText').value = settings.textColor || '#1F2937';
+    document.getElementById('widgetBgColor').value = settings.bgColor || '#FFFFFF';
+    document.getElementById('widgetBgColorText').value = settings.bgColor || '#FFFFFF';
+    document.getElementById('widgetBorderColor').value = settings.borderColor || '#E5E7EB';
+    document.getElementById('widgetBorderColorText').value = settings.borderColor || '#E5E7EB';
+    document.getElementById('widgetBorderRadius').value = settings.borderRadius || 10;
+    document.getElementById('widgetFontSize').value = settings.fontSize || 15;
+    document.getElementById('widgetPlaceholder').value = settings.placeholder || 'Поиск товаров...';
+    document.getElementById('widgetShowButton').checked = settings.showButton !== false;
+    document.getElementById('widgetShowImages').checked = settings.showImages !== false;
+    
+    updateWidgetPreview();
+}
+
 function updateWidgetPreview() {
-    const preview = document.getElementById('previewWidget');
-    const theme = document.getElementById('widgetTheme').value;
     const primaryColor = document.getElementById('widgetPrimaryColor').value;
     const textColor = document.getElementById('widgetTextColor').value;
     const bgColor = document.getElementById('widgetBgColor').value;
+    const borderColor = document.getElementById('widgetBorderColor').value;
     const borderRadius = document.getElementById('widgetBorderRadius').value;
+    const fontSize = document.getElementById('widgetFontSize').value;
     const placeholder = document.getElementById('widgetPlaceholder').value;
+    const showButton = document.getElementById('widgetShowButton').checked;
     const showImages = document.getElementById('widgetShowImages').checked;
-    const showPrices = document.getElementById('widgetShowPrices').checked;
-
-    document.getElementById('borderRadiusValue').textContent = borderRadius;
-
-    preview.style.setProperty('--primary-color', primaryColor);
-    preview.style.setProperty('--text-color', textColor);
-    preview.style.setProperty('--bg-color', bgColor);
+    
+    // Update range values
+    document.getElementById('borderRadiusValue').textContent = borderRadius + 'px';
+    document.getElementById('fontSizeValue').textContent = fontSize + 'px';
+    
+    // Update preview
+    const preview = document.getElementById('widgetPreview');
+    preview.style.backgroundColor = bgColor;
     preview.style.borderRadius = borderRadius + 'px';
-    preview.style.background = bgColor;
     preview.style.color = textColor;
-
-    const searchBtn = preview.querySelector('.preview-search-box button');
-    if (searchBtn) searchBtn.style.background = primaryColor;
-
-    const input = preview.querySelector('.preview-search-box input');
-    if (input) input.placeholder = placeholder;
-
-    const images = preview.querySelectorAll('.preview-result-image');
-    images.forEach(img => img.style.display = showImages ? 'block' : 'none');
-
-    const prices = preview.querySelectorAll('.preview-result-price');
-    prices.forEach(p => {
-        p.style.display = showPrices ? 'block' : 'none';
-        p.style.color = primaryColor;
+    
+    const input = document.getElementById('previewInput');
+    input.placeholder = placeholder;
+    input.style.fontSize = fontSize + 'px';
+    input.style.borderColor = borderColor;
+    input.style.borderRadius = (borderRadius * 0.8) + 'px';
+    input.style.color = textColor;
+    
+    const button = document.getElementById('previewButton');
+    button.style.backgroundColor = primaryColor;
+    button.style.borderRadius = (borderRadius * 0.8) + 'px';
+    button.style.display = showButton ? 'block' : 'none';
+    
+    document.querySelectorAll('.preview-result-img').forEach(img => {
+        img.style.display = showImages ? 'block' : 'none';
     });
+    
+    document.querySelectorAll('.preview-result-price').forEach(price => {
+        price.style.color = primaryColor;
+    });
+}
 
-    const container = document.getElementById('widgetPreviewContainer');
-    if (theme === 'dark') {
-        container.style.background = '#1f2937';
-    } else {
-        container.style.background = '#f3f4f6';
-    }
+function syncColorInput(inputId) {
+    const textInput = document.getElementById(inputId + 'Text');
+    const colorInput = document.getElementById(inputId);
+    colorInput.value = textInput.value;
+    updateWidgetPreview();
 }
 
 async function saveWidgetSettings() {
     const projectId = document.getElementById('widgetProjectSelect').value;
-    if (!projectId) {
-        showToast('Выберите проект', 'error');
-        return;
-    }
-
-    const config = {
-        theme: document.getElementById('widgetTheme').value,
-        primary_color: document.getElementById('widgetPrimaryColor').value,
-        text_color: document.getElementById('widgetTextColor').value,
-        bg_color: document.getElementById('widgetBgColor').value,
-        border_radius: parseInt(document.getElementById('widgetBorderRadius').value),
+    if (!projectId) return;
+    
+    const settings = {
+        primaryColor: document.getElementById('widgetPrimaryColor').value,
+        textColor: document.getElementById('widgetTextColor').value,
+        bgColor: document.getElementById('widgetBgColor').value,
+        borderColor: document.getElementById('widgetBorderColor').value,
+        borderRadius: parseInt(document.getElementById('widgetBorderRadius').value),
+        fontSize: parseInt(document.getElementById('widgetFontSize').value),
         placeholder: document.getElementById('widgetPlaceholder').value,
-        results_per_page: parseInt(document.getElementById('widgetResultsPerPage').value),
-        show_images: document.getElementById('widgetShowImages').checked,
-        show_prices: document.getElementById('widgetShowPrices').checked,
-        show_suggestions: document.getElementById('widgetShowSuggestions').checked
+        showButton: document.getElementById('widgetShowButton').checked,
+        showImages: document.getElementById('widgetShowImages').checked
     };
-
+    
     try {
-        await API.updateWidgetConfig(projectId, config);
+        await fetchAPI(`/api/projects/${projectId}/widget`, {
+            method: 'PUT',
+            body: JSON.stringify(settings)
+        });
+        
         showToast('Настройки сохранены', 'success');
-    } catch (error) {
+        
+        // Update local cache
+        const project = projects.find(p => p.id === projectId);
+        if (project) {
+            project.widget_settings = settings;
+        }
+        
+    } catch (err) {
         showToast('Ошибка сохранения настроек', 'error');
     }
 }
 
-// Embed Section
+// ==================== EMBED ====================
 function updateEmbedCode() {
     const projectId = document.getElementById('embedProjectSelect').value;
-    const embedContent = document.getElementById('embedContent');
-    const noProject = document.getElementById('noEmbedProject');
-
-    if (!projectId) {
-        embedContent.style.display = 'none';
-        noProject.style.display = 'block';
-        return;
-    }
-
-    embedContent.style.display = 'block';
-    noProject.style.display = 'none';
-
     const project = projects.find(p => p.id === projectId);
-    if (!project) return;
-
-    const apiKey = project.api_key;
-    document.getElementById('projectApiKey').textContent = apiKey;
-
-    // Update script code
-    const scriptCode = document.getElementById('embedScriptCode');
-    scriptCode.textContent = `<script src="/api/v1/widget/embed.js" data-api-key="${apiKey}"></script>`;
-
-    // Update advanced code
-    const advancedCode = document.getElementById('embedAdvancedCode');
-    advancedCode.textContent = `<script>
-window.SearchProConfig = {
-    apiKey: '${apiKey}',
-    container: '#searchpro-widget',
-    placeholder: 'Найти товар...',
-    theme: 'light',
-    showImages: true,
-    showPrices: true,
-    resultsPerPage: 10,
-    onSearch: function(query, results) {
-        console.log('Поиск:', query, results);
-    },
-    onSelect: function(product) {
-        window.location.href = product.url;
-    }
-};
-</script>
-<script src="/api/v1/widget/embed.js"></script>`;
-}
-
-async function testSearch() {
-    const projectId = document.getElementById('embedProjectSelect').value;
-    const query = document.getElementById('testSearchInput').value.trim();
-
-    if (!projectId || !query) {
-        showToast('Введите поисковый запрос', 'error');
-        return;
-    }
-
-    const project = projects.find(p => p.id === projectId);
-    if (!project) return;
-
-    try {
-        const results = await API.search(project.api_key, query);
-        renderTestResults(results.products || []);
-    } catch (error) {
-        showToast('Ошибка поиска', 'error');
-    }
-}
-
-function renderTestResults(results) {
-    const container = document.getElementById('testResults');
+    const apiKey = project?.api_key || 'ВАШ_API_КЛЮЧ';
     
-    if (results.length === 0) {
-        container.innerHTML = '<div class="empty-state-inline">Ничего не найдено</div>';
-        return;
-    }
-
-    container.innerHTML = results.slice(0, 10).map(product => `
-        <div class="test-result-item">
-            <img src="${product.image || ''}" 
-                 alt="${escapeHtml(product.name)}" 
-                 class="test-result-image"
-                 onerror="this.style.background='#f3f4f6'">
-            <div class="test-result-content">
-                <div class="test-result-title">${escapeHtml(product.name)}</div>
-                <div class="test-result-price">${formatPrice(product.price)} ₽</div>
-            </div>
-        </div>
-    `).join('');
+    const baseUrl = window.location.origin;
+    
+    document.getElementById('projectApiKey').textContent = project ? apiKey : 'Выберите проект';
+    document.getElementById('embedScriptUrl').textContent = `${baseUrl}/embed.js`;
+    document.getElementById('embedScriptUrl2').textContent = `${baseUrl}/embed.js`;
+    document.getElementById('embedApiKey').textContent = apiKey;
+    document.getElementById('embedApiKey2').textContent = apiKey;
 }
 
 function copyApiKey() {
     const apiKey = document.getElementById('projectApiKey').textContent;
+    if (apiKey === 'Выберите проект') {
+        showToast('Сначала выберите проект', 'error');
+        return;
+    }
     copyToClipboard(apiKey);
+    showToast('API ключ скопирован', 'success');
 }
 
 function copyCode(elementId) {
-    const code = document.getElementById(elementId).textContent;
+    const element = document.getElementById(elementId);
+    const code = element.textContent;
     copyToClipboard(code);
+    showToast('Код скопирован', 'success');
 }
 
-// Utilities
 function copyToClipboard(text) {
-    navigator.clipboard.writeText(text).then(() => {
-        showToast('Скопировано!', 'success');
-    }).catch(() => {
-        showToast('Не удалось скопировать', 'error');
+    navigator.clipboard.writeText(text).catch(() => {
+        // Fallback
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
     });
 }
 
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text || '';
-    return div.innerHTML;
-}
-
-function formatPrice(price) {
-    return new Intl.NumberFormat('ru-RU').format(price || 0);
-}
-
-function showToast(message, type = 'info') {
-    const toast = document.getElementById('toast');
-    const toastMessage = document.getElementById('toastMessage');
+// ==================== TEST SEARCH ====================
+async function testSearch() {
+    const query = document.getElementById('testSearchInput').value.trim();
+    const projectId = document.getElementById('embedProjectSelect').value;
     
-    toastMessage.textContent = message;
-    toast.className = `toast show ${type}`;
+    if (!query) {
+        showToast('Введите поисковый запрос', 'error');
+        return;
+    }
+    
+    if (!projectId) {
+        showToast('Выберите проект', 'error');
+        return;
+    }
+    
+    const container = document.getElementById('testResults');
+    container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+    
+    try {
+        const project = projects.find(p => p.id === projectId);
+        const response = await fetch(`${API_BASE}/api/search/${project.api_key}?q=${encodeURIComponent(query)}`);
+        const data = await response.json();
+        
+        const results = data.results || [];
+        
+        if (results.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state" style="border: none; background: transparent;">
+                    <div class="empty-icon">😕</div>
+                    <p class="empty-text">Ничего не найдено</p>
+                </div>
+            `;
+            return;
+        }
+        
+        container.innerHTML = results.slice(0, 10).map(p => `
+            <div class="test-result-item">
+                ${p.picture ? 
+                    `<img src="${escapeHtml(p.picture)}" class="test-result-img" alt="" onerror="this.style.display='none'">` :
+                    `<div class="test-result-img" style="display: flex; align-items: center; justify-content: center; color: var(--gray-400);">📦</div>`
+                }
+                <div class="test-result-info">
+                    <div class="test-result-title">${escapeHtml(p.name || p.title)}</div>
+                    <div class="test-result-price">${formatPrice(p.price)} ₽</div>
+                    <div class="test-result-category">${escapeHtml(p.category || '')}</div>
+                </div>
+            </div>
+        `).join('');
+        
+    } catch (err) {
+        container.innerHTML = `
+            <div class="empty-state" style="border: none; background: transparent;">
+                <div class="empty-icon">⚠️</div>
+                <p class="empty-text">Ошибка поиска</p>
+            </div>
+        `;
+    }
+}
+
+// ==================== LOGOUT ====================
+function logout() {
+    localStorage.removeItem('token');
+    window.location.href = '/auth.html';
+}
+
+// ==================== UTILITIES ====================
+async function fetchAPI(url, options = {}) {
+    const token = localStorage.getItem('token');
+    
+    const response = await fetch(`${API_BASE}${url}`, {
+        ...options,
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+            ...options.headers
+        }
+    });
+    
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.detail || 'Request failed');
+    }
+    
+    return response.json();
+}
+
+function showToast(message, type = 'success') {
+    const toast = document.getElementById('toast');
+    const icon = document.getElementById('toastIcon');
+    const msg = document.getElementById('toastMessage');
+    
+    toast.className = `toast ${type}`;
+    icon.textContent = type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ';
+    msg.textContent = message;
+    
+    toast.classList.add('show');
     
     setTimeout(() => {
         toast.classList.remove('show');
     }, 3000);
 }
 
-// Handle Enter key in test search
-document.addEventListener('keyup', (e) => {
-    if (e.target.id === 'testSearchInput' && e.key === 'Enter') {
-        testSearch();
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function formatPrice(price) {
+    if (!price) return '0';
+    return new Intl.NumberFormat('ru-RU').format(price);
+}
+
+function animateNumber(elementId, target) {
+    const element = document.getElementById(elementId);
+    if (!element) return;
+    
+    const start = parseInt(element.textContent) || 0;
+    const duration = 500;
+    const startTime = performance.now();
+    
+    function update(currentTime) {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        const current = Math.floor(start + (target - start) * easeOutQuad(progress));
+        element.textContent = current.toLocaleString('ru-RU');
+        
+        if (progress < 1) {
+            requestAnimationFrame(update);
+        }
     }
-});
+    
+    requestAnimationFrame(update);
+}
+
+function easeOutQuad(t) {
+    return t * (2 - t);
+}
+
+function toggleUserMenu() {
+    // Could show dropdown with settings, profile, etc.
+    console.log('Toggle user menu');
+}

@@ -3,307 +3,536 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Личный кабинет — SearchPro</title>
+    <title>Панель управления — SearchPro</title>
     <link rel="stylesheet" href="dashboard.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
-    <!-- Header -->
-    <header class="header">
-        <div class="header-content">
-            <a href="/" class="logo">🔍 SearchPro</a>
-            <div class="user-menu">
-                <span class="user-email" id="userEmail">user@example.com</span>
-                <button class="btn-logout" onclick="logout()">Выйти</button>
-            </div>
-        </div>
-    </header>
+    <!-- Sidebar Overlay (mobile) -->
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
 
-    <div class="app-container">
-        <!-- Sidebar -->
-        <aside class="sidebar">
-            <nav class="sidebar-nav">
-                <a href="#" class="nav-item active" data-section="projects">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <a href="/" class="sidebar-logo">
+                <div class="logo-icon">🔍</div>
+                <span class="logo-text">SearchPro</span>
+            </a>
+        </div>
+        
+        <nav class="sidebar-nav">
+            <div class="nav-section">
+                <div class="nav-section-title">Главное</div>
+                <a class="nav-item active" data-section="dashboard">
+                    <span class="nav-icon">📊</span>
+                    <span>Дашборд</span>
+                </a>
+                <a class="nav-item" data-section="projects">
                     <span class="nav-icon">📁</span>
                     <span>Проекты</span>
                 </a>
-                <a href="#" class="nav-item" data-section="products">
+            </div>
+            
+            <div class="nav-section">
+                <div class="nav-section-title">Данные</div>
+                <a class="nav-item" data-section="products">
                     <span class="nav-icon">📦</span>
                     <span>Товары</span>
                 </a>
-                <a href="#" class="nav-item" data-section="analytics">
-                    <span class="nav-icon">📊</span>
+                <a class="nav-item" data-section="analytics">
+                    <span class="nav-icon">📈</span>
                     <span>Аналитика</span>
                 </a>
-                <a href="#" class="nav-item" data-section="widget">
+            </div>
+            
+            <div class="nav-section">
+                <div class="nav-section-title">Интеграция</div>
+                <a class="nav-item" data-section="widget">
                     <span class="nav-icon">🎨</span>
                     <span>Виджет</span>
                 </a>
-                <a href="#" class="nav-item" data-section="embed">
+                <a class="nav-item" data-section="embed">
                     <span class="nav-icon">📝</span>
                     <span>Встраивание</span>
                 </a>
-            </nav>
-        </aside>
+            </div>
+        </nav>
+        
+        <div class="sidebar-footer">
+            <div class="sidebar-user" onclick="toggleUserMenu()">
+                <div class="user-avatar" id="userAvatar">U</div>
+                <div class="user-info">
+                    <div class="user-name" id="userName">Пользователь</div>
+                    <div class="user-role">Администратор</div>
+                </div>
+                <span class="user-dropdown-icon">▼</span>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Wrapper -->
+    <div class="main-wrapper">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+                <h1 class="page-title" id="pageTitle">Дашборд</h1>
+            </div>
+            
+            <div class="header-search">
+                <span class="header-search-icon">🔍</span>
+                <input type="text" placeholder="Поиск по панели..." id="globalSearch">
+            </div>
+            
+            <div class="header-right">
+                <button class="header-btn" title="Уведомления">
+                    🔔
+                    <span class="badge" id="notifCount" style="display: none;">0</span>
+                </button>
+                <button class="header-btn" title="Настройки">⚙️</button>
+                <button class="btn-logout" onclick="logout()">Выйти</button>
+            </div>
+        </header>
 
         <!-- Main Content -->
         <main class="main-content">
-            <!-- Projects Section -->
-            <section class="content-section active" id="section-projects">
-                <div class="section-header">
-                    <h1>Мои проекты</h1>
-                    <button class="btn btn-primary" onclick="showCreateProjectModal()">
-                        + Создать проект
-                    </button>
+            
+            <!-- ==================== DASHBOARD SECTION ==================== -->
+            <section class="content-section active" id="section-dashboard">
+                <!-- Stats Cards -->
+                <div class="stats-grid">
+                    <div class="stat-card gradient-blue">
+                        <div class="stat-card-icon">📁</div>
+                        <div class="stat-card-value" id="statProjects">0</div>
+                        <div class="stat-card-label">Проектов</div>
+                        <div class="stat-card-change positive">Активные проекты</div>
+                    </div>
+                    <div class="stat-card gradient-green">
+                        <div class="stat-card-icon">📦</div>
+                        <div class="stat-card-value" id="statProducts">0</div>
+                        <div class="stat-card-label">Товаров</div>
+                        <div class="stat-card-change positive">Всего в каталоге</div>
+                    </div>
+                    <div class="stat-card gradient-orange">
+                        <div class="stat-card-icon">🔍</div>
+                        <div class="stat-card-value" id="statSearches">0</div>
+                        <div class="stat-card-label">Поисков</div>
+                        <div class="stat-card-change positive">За всё время</div>
+                    </div>
+                    <div class="stat-card gradient-red">
+                        <div class="stat-card-icon">📊</div>
+                        <div class="stat-card-value" id="statCTR">0%</div>
+                        <div class="stat-card-label">CTR</div>
+                        <div class="stat-card-change positive">Кликабельность</div>
+                    </div>
                 </div>
 
-                <div class="projects-grid" id="projectsGrid">
-                    <!-- Projects will be loaded here -->
+                <!-- Dashboard Grid -->
+                <div class="dashboard-grid">
+                    <!-- Chart -->
+                    <div class="card">
+                        <div class="card-header">
+                            <div>
+                                <h3 class="card-title">Статистика поисков</h3>
+                                <p class="card-subtitle">Динамика за последние 7 дней</p>
+                            </div>
+                            <div class="card-actions">
+                                <button class="btn btn-sm btn-outline">7 дней</button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container">
+                                <canvas id="searchChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Popular Queries -->
+                    <div class="card">
+                        <div class="card-header">
+                            <div>
+                                <h3 class="card-title">Топ запросов</h3>
+                                <p class="card-subtitle">Самые популярные</p>
+                            </div>
+                        </div>
+                        <div class="card-body-flush">
+                            <div class="queries-list" id="topQueriesList">
+                                <div class="loading">
+                                    <div class="spinner"></div>
+                                    <span class="loading-text">Загрузка...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Projects Overview -->
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <h3 class="card-title">Мои проекты</h3>
+                            <p class="card-subtitle">Быстрый доступ к проектам</p>
+                        </div>
+                        <button class="btn btn-sm btn-primary" onclick="showSection('projects')">
+                            Все проекты
+                        </button>
+                    </div>
+                    <div class="card-body-flush">
+                        <div class="projects-list" id="dashboardProjectsList">
+                            <div class="loading">
+                                <div class="spinner"></div>
+                                <span class="loading-text">Загрузка проектов...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== PROJECTS SECTION ==================== -->
+            <section class="content-section" id="section-projects">
+                <div class="section-header">
+                    <div>
+                        <h1 class="section-title">Проекты</h1>
+                        <p class="section-subtitle">Управление вашими поисковыми проектами</p>
+                    </div>
+                    <div class="section-actions">
+                        <button class="btn btn-primary" onclick="showCreateProjectModal()">
+                            <span>+</span> Создать проект
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-body-flush">
+                        <div class="projects-list" id="projectsList">
+                            <div class="loading">
+                                <div class="spinner"></div>
+                                <span class="loading-text">Загрузка проектов...</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="empty-state" id="noProjects" style="display: none;">
                     <div class="empty-icon">📁</div>
-                    <h3>У вас пока нет проектов</h3>
-                    <p>Создайте первый проект для настройки поиска на вашем сайте</p>
-                    <button class="btn btn-primary" onclick="showCreateProjectModal()">
+                    <h3 class="empty-title">У вас пока нет проектов</h3>
+                    <p class="empty-text">Создайте первый проект для настройки поиска на вашем сайте</p>
+                    <button class="btn btn-primary btn-lg" onclick="showCreateProjectModal()">
                         Создать проект
                     </button>
                 </div>
             </section>
 
-            <!-- Products Section -->
+            <!-- ==================== PRODUCTS SECTION ==================== -->
             <section class="content-section" id="section-products">
                 <div class="section-header">
-                    <h1>Товары</h1>
-                    <div class="project-selector">
-                        <select id="productsProjectSelect" onchange="loadProducts()">
-                            <option value="">Выберите проект</option>
-                        </select>
+                    <div>
+                        <h1 class="section-title">Товары</h1>
+                        <p class="section-subtitle">Каталог товаров из вашего фида</p>
+                    </div>
+                    <div class="section-actions">
+                        <div class="select-wrapper">
+                            <select id="productsProjectSelect" onchange="onProjectSelectChange()">
+                                <option value="">Выберите проект</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
 
-                <div class="feed-controls" id="feedControls" style="display: none;">
-                    <div class="feed-status" id="feedStatus">
-                        <span class="status-label">Статус фида:</span>
-                        <span class="status-value" id="feedStatusValue">Не загружен</span>
+                <!-- Feed Panel -->
+                <div class="feed-panel" id="feedPanel" style="display: none;">
+                    <div class="feed-panel-header">
+                        <h3 class="feed-panel-title">Управление фидом</h3>
+                        <div class="feed-status" id="feedStatus">
+                            <span class="status-dot neutral"></span>
+                            <span>Фид не загружен</span>
+                        </div>
                     </div>
-                    <div class="feed-actions">
-                        <input type="url" id="feedUrlInput" placeholder="URL фида (XML/YML)" class="input-feed-url">
-                        <button class="btn btn-primary" onclick="loadFeed()">Загрузить фид</button>
-                        <button class="btn btn-secondary" onclick="refreshFeed()">🔄 Обновить</button>
+                    
+                    <div class="feed-url-form">
+                        <input type="url" 
+                               id="feedUrlInput" 
+                               class="feed-url-input" 
+                               placeholder="URL фида (XML/YML), например: https://example.com/feed.xml">
+                        <button class="btn btn-primary" onclick="loadFeed()" id="loadFeedBtn">
+                            Загрузить
+                        </button>
+                        <button class="btn btn-secondary" onclick="refreshFeed()" id="refreshFeedBtn" style="display: none;">
+                            🔄 Обновить
+                        </button>
+                    </div>
+                    
+                    <div class="feed-stats" id="feedStats" style="display: none;">
+                        <div class="feed-stat">
+                            <div class="feed-stat-value" id="feedTotalProducts">0</div>
+                            <div class="feed-stat-label">Товаров</div>
+                        </div>
+                        <div class="feed-stat">
+                            <div class="feed-stat-value" id="feedCategories">0</div>
+                            <div class="feed-stat-label">Категорий</div>
+                        </div>
+                        <div class="feed-stat">
+                            <div class="feed-stat-value" id="feedInStock">0</div>
+                            <div class="feed-stat-label">В наличии</div>
+                        </div>
+                        <div class="feed-stat">
+                            <div class="feed-stat-value" id="feedLastUpdate">—</div>
+                            <div class="feed-stat-label">Обновлено</div>
+                        </div>
                     </div>
                 </div>
 
-                <div class="products-stats" id="productsStats" style="display: none;">
-                    <div class="stat-item">
-                        <span class="stat-value" id="totalProducts">0</span>
-                        <span class="stat-label">Товаров</span>
+                <!-- Products Table -->
+                <div class="table-container" id="productsTable" style="display: none;">
+                    <div class="table-header">
+                        <span class="table-title" id="productsCount">0 товаров</span>
+                        <div class="table-search">
+                            <span class="table-search-icon">🔍</span>
+                            <input type="text" id="productsSearch" placeholder="Поиск товаров..." oninput="filterProducts()">
+                        </div>
                     </div>
-                    <div class="stat-item">
-                        <span class="stat-value" id="indexedProducts">0</span>
-                        <span class="stat-label">Индексировано</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-value" id="lastUpdate">—</span>
-                        <span class="stat-label">Обновлено</span>
-                    </div>
-                </div>
-
-                <div class="products-search">
-                    <input type="text" id="productsSearchInput" placeholder="Поиск по товарам..." onkeyup="filterProducts()">
-                </div>
-
-                <div class="products-table-container">
-                    <table class="products-table" id="productsTable">
+                    <table class="data-table">
                         <thead>
                             <tr>
-                                <th>Фото</th>
-                                <th>Название</th>
-                                <th>Цена</th>
+                                <th>Товар</th>
                                 <th>Категория</th>
+                                <th>Цена</th>
                                 <th>Наличие</th>
                             </tr>
                         </thead>
-                        <tbody id="productsTableBody">
+                        <tbody id="productsBody">
                         </tbody>
                     </table>
+                    <div class="pagination" id="productsPagination">
+                    </div>
                 </div>
 
-                <div class="pagination" id="productsPagination"></div>
-
-                <div class="empty-state" id="noProducts" style="display: none;">
+                <!-- No Project Selected -->
+                <div class="empty-state" id="noProjectSelected">
                     <div class="empty-icon">📦</div>
-                    <h3>Товары не найдены</h3>
-                    <p>Загрузите фид товаров или выберите проект</p>
+                    <h3 class="empty-title">Выберите проект</h3>
+                    <p class="empty-text">Выберите проект из списка выше, чтобы просмотреть товары</p>
                 </div>
             </section>
 
-            <!-- Analytics Section -->
+            <!-- ==================== ANALYTICS SECTION ==================== -->
             <section class="content-section" id="section-analytics">
                 <div class="section-header">
-                    <h1>Аналитика</h1>
-                    <div class="project-selector">
-                        <select id="analyticsProjectSelect" onchange="loadAnalytics()">
-                            <option value="">Выберите проект</option>
-                        </select>
+                    <div>
+                        <h1 class="section-title">Аналитика</h1>
+                        <p class="section-subtitle">Статистика поисковых запросов</p>
                     </div>
-                </div>
-
-                <div class="analytics-period">
-                    <button class="period-btn active" data-period="7">7 дней</button>
-                    <button class="period-btn" data-period="30">30 дней</button>
-                    <button class="period-btn" data-period="90">90 дней</button>
-                </div>
-
-                <div class="analytics-cards" id="analyticsCards">
-                    <div class="analytics-card">
-                        <div class="card-icon">🔍</div>
-                        <div class="card-content">
-                            <div class="card-value" id="totalSearches">0</div>
-                            <div class="card-label">Поисковых запросов</div>
-                        </div>
-                    </div>
-                    <div class="analytics-card">
-                        <div class="card-icon">👆</div>
-                        <div class="card-content">
-                            <div class="card-value" id="totalClicks">0</div>
-                            <div class="card-label">Кликов по результатам</div>
-                        </div>
-                    </div>
-                    <div class="analytics-card">
-                        <div class="card-icon">⚡</div>
-                        <div class="card-content">
-                            <div class="card-value" id="avgResponseTime">0 мс</div>
-                            <div class="card-label">Среднее время ответа</div>
-                        </div>
-                    </div>
-                    <div class="analytics-card">
-                        <div class="card-icon">📈</div>
-                        <div class="card-content">
-                            <div class="card-value" id="conversionRate">0%</div>
-                            <div class="card-label">Конверсия в клик</div>
+                    <div class="section-actions">
+                        <div class="select-wrapper">
+                            <select id="analyticsProjectSelect" onchange="loadAnalytics()">
+                                <option value="">Все проекты</option>
+                            </select>
                         </div>
                     </div>
                 </div>
 
-                <div class="analytics-section">
-                    <h3>Популярные запросы</h3>
-                    <div class="popular-queries" id="popularQueries">
-                        <div class="empty-state-inline">Нет данных</div>
+                <!-- Analytics Stats -->
+                <div class="stats-grid">
+                    <div class="stat-card gradient-purple">
+                        <div class="stat-card-icon">🔍</div>
+                        <div class="stat-card-value" id="analyticsSearches">0</div>
+                        <div class="stat-card-label">Поисков</div>
+                    </div>
+                    <div class="stat-card gradient-blue">
+                        <div class="stat-card-icon">👆</div>
+                        <div class="stat-card-value" id="analyticsClicks">0</div>
+                        <div class="stat-card-label">Кликов</div>
+                    </div>
+                    <div class="stat-card gradient-green">
+                        <div class="stat-card-icon">📊</div>
+                        <div class="stat-card-value" id="analyticsCTR">0%</div>
+                        <div class="stat-card-label">CTR</div>
+                    </div>
+                    <div class="stat-card gradient-orange">
+                        <div class="stat-card-icon">⚡</div>
+                        <div class="stat-card-value" id="analyticsAvgTime">0ms</div>
+                        <div class="stat-card-label">Ср. время</div>
                     </div>
                 </div>
 
-                <div class="analytics-section">
-                    <h3>Запросы без результатов</h3>
-                    <div class="zero-results" id="zeroResults">
-                        <div class="empty-state-inline">Нет данных</div>
+                <div class="dashboard-grid-equal">
+                    <!-- Search Chart -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Динамика поисков</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container">
+                                <canvas id="analyticsChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Conversion Donut -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Конверсия</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="donut-chart-container">
+                                <div class="donut-chart">
+                                    <svg viewBox="0 0 100 100">
+                                        <circle class="donut-bg" cx="50" cy="50" r="40"></circle>
+                                        <circle class="donut-fill" cx="50" cy="50" r="40" 
+                                                stroke-dasharray="0 251" id="conversionDonut"></circle>
+                                    </svg>
+                                    <div class="donut-center">
+                                        <div class="donut-value" id="conversionValue">0%</div>
+                                        <div class="donut-label">CTR</div>
+                                    </div>
+                                </div>
+                                <div class="donut-legend">
+                                    <div class="legend-item">
+                                        <div class="legend-color" style="background: var(--primary);"></div>
+                                        <span class="legend-text">С кликами</span>
+                                        <span class="legend-value" id="legendClicks">0</span>
+                                    </div>
+                                    <div class="legend-item">
+                                        <div class="legend-color" style="background: var(--gray-200);"></div>
+                                        <span class="legend-text">Без кликов</span>
+                                        <span class="legend-value" id="legendNoClicks">0</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <div class="analytics-section">
-                    <h3>Поиски по дням</h3>
-                    <div class="chart-container" id="searchesChart">
-                        <canvas id="searchesChartCanvas"></canvas>
+                <!-- Top Queries Table -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Популярные запросы</h3>
+                    </div>
+                    <div class="card-body-flush">
+                        <div class="queries-list" id="analyticsQueriesList">
+                            <div class="loading">
+                                <div class="spinner"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
 
-            <!-- Widget Section -->
+            <!-- ==================== WIDGET SECTION ==================== -->
             <section class="content-section" id="section-widget">
                 <div class="section-header">
-                    <h1>Настройка виджета</h1>
-                    <div class="project-selector">
-                        <select id="widgetProjectSelect" onchange="loadWidgetSettings()">
-                            <option value="">Выберите проект</option>
-                        </select>
+                    <div>
+                        <h1 class="section-title">Настройка виджета</h1>
+                        <p class="section-subtitle">Кастомизация внешнего вида поисковой строки</p>
+                    </div>
+                    <div class="section-actions">
+                        <div class="select-wrapper">
+                            <select id="widgetProjectSelect" onchange="loadWidgetSettings()">
+                                <option value="">Выберите проект</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary" onclick="saveWidgetSettings()" id="saveWidgetBtn" disabled>
+                            Сохранить
+                        </button>
                     </div>
                 </div>
 
-                <div class="widget-editor">
-                    <div class="widget-settings">
-                        <h3>Внешний вид</h3>
+                <div class="widget-layout">
+                    <!-- Settings -->
+                    <div class="settings-card">
+                        <h3 class="settings-title">Внешний вид</h3>
                         
-                        <div class="setting-group">
-                            <label>Тема</label>
-                            <select id="widgetTheme" onchange="updateWidgetPreview()">
-                                <option value="light">Светлая</option>
-                                <option value="dark">Тёмная</option>
-                                <option value="auto">Авто (системная)</option>
-                            </select>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">Основной цвет</label>
+                                <div class="color-input-group">
+                                    <input type="color" class="color-input" id="widgetPrimaryColor" value="#4F46E5" onchange="updateWidgetPreview()">
+                                    <input type="text" class="color-value" id="widgetPrimaryColorText" value="#4F46E5" onchange="syncColorInput('widgetPrimaryColor')">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Цвет текста</label>
+                                <div class="color-input-group">
+                                    <input type="color" class="color-input" id="widgetTextColor" value="#1F2937" onchange="updateWidgetPreview()">
+                                    <input type="text" class="color-value" id="widgetTextColorText" value="#1F2937" onchange="syncColorInput('widgetTextColor')">
+                                </div>
+                            </div>
                         </div>
 
-                        <div class="setting-group">
-                            <label>Основной цвет</label>
-                            <input type="color" id="widgetPrimaryColor" value="#2563eb" onchange="updateWidgetPreview()">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">Цвет фона</label>
+                                <div class="color-input-group">
+                                    <input type="color" class="color-input" id="widgetBgColor" value="#FFFFFF" onchange="updateWidgetPreview()">
+                                    <input type="text" class="color-value" id="widgetBgColorText" value="#FFFFFF" onchange="syncColorInput('widgetBgColor')">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Цвет границы</label>
+                                <div class="color-input-group">
+                                    <input type="color" class="color-input" id="widgetBorderColor" value="#E5E7EB" onchange="updateWidgetPreview()">
+                                    <input type="text" class="color-value" id="widgetBorderColorText" value="#E5E7EB" onchange="syncColorInput('widgetBorderColor')">
+                                </div>
+                            </div>
                         </div>
 
-                        <div class="setting-group">
-                            <label>Цвет текста</label>
-                            <input type="color" id="widgetTextColor" value="#1f2937" onchange="updateWidgetPreview()">
+                        <div class="form-group">
+                            <label class="form-label">Скругление углов</label>
+                            <div class="range-group">
+                                <input type="range" class="range-input" id="widgetBorderRadius" min="0" max="24" value="10" oninput="updateWidgetPreview()">
+                                <span class="range-value" id="borderRadiusValue">10px</span>
+                            </div>
                         </div>
 
-                        <div class="setting-group">
-                            <label>Цвет фона</label>
-                            <input type="color" id="widgetBgColor" value="#ffffff" onchange="updateWidgetPreview()">
+                        <div class="form-group">
+                            <label class="form-label">Размер шрифта</label>
+                            <div class="range-group">
+                                <input type="range" class="range-input" id="widgetFontSize" min="12" max="20" value="15" oninput="updateWidgetPreview()">
+                                <span class="range-value" id="fontSizeValue">15px</span>
+                            </div>
                         </div>
 
-                        <div class="setting-group">
-                            <label>Скругление углов (px)</label>
-                            <input type="range" id="widgetBorderRadius" min="0" max="24" value="8" onchange="updateWidgetPreview()">
-                            <span id="borderRadiusValue">8</span>
+                        <div class="form-group">
+                            <label class="form-label">Placeholder</label>
+                            <input type="text" class="form-input" id="widgetPlaceholder" value="Поиск товаров..." oninput="updateWidgetPreview()">
                         </div>
 
-                        <h3>Поведение</h3>
-
-                        <div class="setting-group">
-                            <label>Placeholder</label>
-                            <input type="text" id="widgetPlaceholder" value="Поиск товаров..." onchange="updateWidgetPreview()">
+                        <div class="form-group">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="widgetShowButton" checked onchange="updateWidgetPreview()">
+                                <label for="widgetShowButton">Показывать кнопку поиска</label>
+                            </div>
                         </div>
 
-                        <div class="setting-group">
-                            <label>Результатов на странице</label>
-                            <input type="number" id="widgetResultsPerPage" min="5" max="50" value="10">
+                        <div class="form-group">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="widgetShowImages" checked onchange="updateWidgetPreview()">
+                                <label for="widgetShowImages">Показывать изображения товаров</label>
+                            </div>
                         </div>
-
-                        <div class="setting-group checkbox-group">
-                            <input type="checkbox" id="widgetShowImages" checked onchange="updateWidgetPreview()">
-                            <label for="widgetShowImages">Показывать изображения</label>
-                        </div>
-
-                        <div class="setting-group checkbox-group">
-                            <input type="checkbox" id="widgetShowPrices" checked onchange="updateWidgetPreview()">
-                            <label for="widgetShowPrices">Показывать цены</label>
-                        </div>
-
-                        <div class="setting-group checkbox-group">
-                            <input type="checkbox" id="widgetShowSuggestions" checked>
-                            <label for="widgetShowSuggestions">Автодополнение</label>
-                        </div>
-
-                        <button class="btn btn-primary btn-save-widget" onclick="saveWidgetSettings()">
-                            Сохранить настройки
-                        </button>
                     </div>
 
-                    <div class="widget-preview">
-                        <h3>Предпросмотр</h3>
-                        <div class="preview-container" id="widgetPreviewContainer">
-                            <div class="preview-widget" id="previewWidget">
+                    <!-- Preview -->
+                    <div class="settings-card">
+                        <h3 class="settings-title">Предпросмотр</h3>
+                        <div class="preview-container">
+                            <div class="preview-widget" id="widgetPreview">
                                 <div class="preview-search-box">
-                                    <input type="text" placeholder="Поиск товаров..." disabled>
-                                    <button>🔍</button>
+                                    <input type="text" id="previewInput" placeholder="Поиск товаров...">
+                                    <button id="previewButton">🔍</button>
                                 </div>
-                                <div class="preview-results">
+                                <div class="preview-results" id="previewResults">
                                     <div class="preview-result-item">
-                                        <div class="preview-result-image"></div>
-                                        <div class="preview-result-content">
-                                            <div class="preview-result-title">Название товара</div>
+                                        <div class="preview-result-img" id="previewImg1"></div>
+                                        <div class="preview-result-info">
+                                            <div class="preview-result-title">Пример товара 1</div>
                                             <div class="preview-result-price">1 990 ₽</div>
                                         </div>
                                     </div>
                                     <div class="preview-result-item">
-                                        <div class="preview-result-image"></div>
-                                        <div class="preview-result-content">
-                                            <div class="preview-result-title">Другой товар</div>
+                                        <div class="preview-result-img" id="previewImg2"></div>
+                                        <div class="preview-result-info">
+                                            <div class="preview-result-title">Пример товара 2</div>
                                             <div class="preview-result-price">2 490 ₽</div>
                                         </div>
                                     </div>
@@ -314,108 +543,147 @@
                 </div>
             </section>
 
-            <!-- Embed Section -->
+            <!-- ==================== EMBED SECTION ==================== -->
             <section class="content-section" id="section-embed">
                 <div class="section-header">
-                    <h1>Встраивание на сайт</h1>
-                    <div class="project-selector">
-                        <select id="embedProjectSelect" onchange="updateEmbedCode()">
-                            <option value="">Выберите проект</option>
-                        </select>
+                    <div>
+                        <h1 class="section-title">Встраивание виджета</h1>
+                        <p class="section-subtitle">Инструкция по добавлению поиска на ваш сайт</p>
+                    </div>
+                    <div class="section-actions">
+                        <div class="select-wrapper">
+                            <select id="embedProjectSelect" onchange="updateEmbedCode()">
+                                <option value="">Выберите проект</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
 
-                <div class="embed-content" id="embedContent" style="display: none;">
-                    <div class="api-key-section">
-                        <h3>🔑 Ваш API-ключ</h3>
-                        <div class="api-key-display">
-                            <code id="projectApiKey">sk_xxxxxxxxxxxx</code>
-                            <button class="btn-copy" onclick="copyApiKey()">📋 Копировать</button>
+                <!-- API Key -->
+                <div class="embed-section">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">API Ключ проекта</h3>
                         </div>
-                        <p class="api-key-warning">⚠️ Не передавайте API-ключ третьим лицам</p>
-                    </div>
-
-                    <div class="embed-instructions">
-                        <h3>📝 Инструкция по установке</h3>
-                        
-                        <div class="step">
-                            <div class="step-number">1</div>
-                            <div class="step-content">
-                                <h4>Добавьте контейнер для виджета</h4>
-                                <p>Вставьте этот HTML-код в то место на странице, где должен отображаться поиск:</p>
-                                <div class="code-block">
-                                    <pre id="embedHtmlCode">&lt;div id="searchpro-widget"&gt;&lt;/div&gt;</pre>
-                                    <button class="btn-copy-code" onclick="copyCode('embedHtmlCode')">Копировать</button>
+                        <div class="card-body">
+                            <div class="api-key-box">
+                                <div>
+                                    <div class="api-key-label">Ваш API ключ</div>
+                                    <div class="api-key-value" id="projectApiKey">Выберите проект</div>
                                 </div>
-                            </div>
-                        </div>
-
-                        <div class="step">
-                            <div class="step-number">2</div>
-                            <div class="step-content">
-                                <h4>Подключите скрипт виджета</h4>
-                                <p>Добавьте этот код перед закрывающим тегом <code>&lt;/body&gt;</code>:</p>
-                                <div class="code-block">
-                                    <pre id="embedScriptCode">&lt;script src="/api/v1/widget/embed.js" data-api-key="YOUR_API_KEY"&gt;&lt;/script&gt;</pre>
-                                    <button class="btn-copy-code" onclick="copyCode('embedScriptCode')">Копировать</button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="step">
-                            <div class="step-number">3</div>
-                            <div class="step-content">
-                                <h4>Готово!</h4>
-                                <p>Виджет поиска автоматически инициализируется и будет готов к работе.</p>
+                                <button class="btn-copy" onclick="copyApiKey()">📋 Копировать</button>
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    <div class="embed-advanced">
-                        <h3>⚙️ Расширенная настройка</h3>
-                        <p>Вы можете кастомизировать виджет программно:</p>
+                <!-- Steps -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Пошаговая инструкция</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="steps-list">
+                            <div class="step-item">
+                                <div class="step-number">1</div>
+                                <div class="step-content">
+                                    <h4>Добавьте контейнер</h4>
+                                    <p>Разместите пустой div с id="search-widget" в том месте страницы, где хотите видеть поиск</p>
+                                    <div class="code-block">
+                                        <div class="code-block-header">
+                                            <span class="code-block-title">HTML</span>
+                                            <button class="btn-copy" onclick="copyCode('step1Code')">📋</button>
+                                        </div>
+                                        <pre id="step1Code"><code>&lt;div id="search-widget"&gt;&lt;/div&gt;</code></pre>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="step-item">
+                                <div class="step-number">2</div>
+                                <div class="step-content">
+                                    <h4>Подключите скрипт</h4>
+                                    <p>Добавьте скрипт виджета перед закрывающим тегом &lt;/body&gt;</p>
+                                    <div class="code-block">
+                                        <div class="code-block-header">
+                                            <span class="code-block-title">HTML</span>
+                                            <button class="btn-copy" onclick="copyCode('step2Code')">📋</button>
+                                        </div>
+                                        <pre id="step2Code"><code>&lt;script src="<span id="embedScriptUrl">/embed.js</span>"&gt;&lt;/script&gt;</code></pre>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="step-item">
+                                <div class="step-number">3</div>
+                                <div class="step-content">
+                                    <h4>Инициализируйте виджет</h4>
+                                    <p>Вызовите функцию инициализации с вашим API ключом</p>
+                                    <div class="code-block">
+                                        <div class="code-block-header">
+                                            <span class="code-block-title">JavaScript</span>
+                                            <button class="btn-copy" onclick="copyCode('step3Code')">📋</button>
+                                        </div>
+                                        <pre id="step3Code"><code>&lt;script&gt;
+  SearchWidget.init({
+    apiKey: '<span id="embedApiKey">ВАШ_API_КЛЮЧ</span>',
+    container: '#search-widget'
+  });
+&lt;/script&gt;</code></pre>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Full Code -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Полный код для встраивания</h3>
+                    </div>
+                    <div class="card-body">
                         <div class="code-block">
-                            <pre id="embedAdvancedCode">&lt;script&gt;
-window.SearchProConfig = {
-    apiKey: 'YOUR_API_KEY',
-    container: '#searchpro-widget',
-    placeholder: 'Найти товар...',
-    theme: 'light',
-    showImages: true,
-    showPrices: true,
-    resultsPerPage: 10,
-    onSearch: function(query, results) {
-        console.log('Поиск:', query, results);
-    },
-    onSelect: function(product) {
-        window.location.href = product.url;
-    }
-};
-&lt;/script&gt;
-&lt;script src="/api/v1/widget/embed.js"&gt;&lt;/script&gt;</pre>
-                            <button class="btn-copy-code" onclick="copyCode('embedAdvancedCode')">Копировать</button>
-                        </div>
-                    </div>
-
-                    <div class="embed-test">
-                        <h3>🧪 Тестирование</h3>
-                        <p>Проверьте работу поиска прямо здесь:</p>
-                        <div class="test-widget-container" id="testWidgetContainer">
-                            <div class="test-search-box">
-                                <input type="text" id="testSearchInput" placeholder="Введите поисковый запрос...">
-                                <button onclick="testSearch()">Найти</button>
+                            <div class="code-block-header">
+                                <span class="code-block-title">HTML</span>
+                                <button class="btn-copy" onclick="copyCode('fullEmbedCode')">📋 Копировать весь код</button>
                             </div>
-                            <div class="test-results" id="testResults"></div>
+                            <pre id="fullEmbedCode"><code>&lt;!-- SearchPro Widget --&gt;
+&lt;div id="search-widget"&gt;&lt;/div&gt;
+&lt;script src="<span id="embedScriptUrl2">/embed.js</span>"&gt;&lt;/script&gt;
+&lt;script&gt;
+  SearchWidget.init({
+    apiKey: '<span id="embedApiKey2">ВАШ_API_КЛЮЧ</span>',
+    container: '#search-widget'
+  });
+&lt;/script&gt;</code></pre>
                         </div>
                     </div>
                 </div>
 
-                <div class="empty-state" id="noEmbedProject">
-                    <div class="empty-icon">📝</div>
-                    <h3>Выберите проект</h3>
-                    <p>Для получения кода встраивания выберите проект из списка выше</p>
+                <!-- Test Search -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Тестовый поиск</h3>
+                        <p class="card-subtitle">Проверьте работу поиска по вашему каталогу</p>
+                    </div>
+                    <div class="card-body">
+                        <div class="test-container">
+                            <div class="test-search">
+                                <input type="text" id="testSearchInput" placeholder="Введите поисковый запрос...">
+                                <button class="btn btn-primary" onclick="testSearch()">Найти</button>
+                            </div>
+                            <div class="test-results" id="testResults">
+                                <div class="empty-state" style="border: none; background: transparent;">
+                                    <div class="empty-icon">🔍</div>
+                                    <p class="empty-text">Введите запрос для поиска</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </section>
+
         </main>
     </div>
 
@@ -423,66 +691,36 @@ window.SearchProConfig = {
     <div class="modal" id="createProjectModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Создать проект</h2>
-                <button class="modal-close" onclick="closeModal('createProjectModal')">&times;</button>
+                <h3 class="modal-title">Создать проект</h3>
+                <button class="modal-close" onclick="closeCreateProjectModal()">×</button>
             </div>
             <div class="modal-body">
                 <div class="form-group">
-                    <label for="projectName">Название проекта *</label>
-                    <input type="text" id="projectName" placeholder="Мой интернет-магазин">
+                    <label class="form-label">Название проекта *</label>
+                    <input type="text" class="form-input" id="projectName" placeholder="Например: Мой магазин">
                 </div>
                 <div class="form-group">
-                    <label for="projectDomain">Домен сайта *</label>
-                    <input type="text" id="projectDomain" placeholder="example.com">
+                    <label class="form-label">Домен сайта *</label>
+                    <input type="text" class="form-input" id="projectDomain" placeholder="example.com">
                 </div>
                 <div class="form-group">
-                    <label for="projectFeedUrl">URL фида товаров (XML/YML)</label>
-                    <input type="url" id="projectFeedUrl" placeholder="https://example.com/feed.xml">
+                    <label class="form-label">URL фида (необязательно)</label>
+                    <input type="url" class="form-input" id="projectFeedUrl" placeholder="https://example.com/feed.xml">
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeModal('createProjectModal')">Отмена</button>
+                <button class="btn btn-secondary" onclick="closeCreateProjectModal()">Отмена</button>
                 <button class="btn btn-primary" onclick="createProject()">Создать</button>
             </div>
         </div>
     </div>
 
-    <!-- Edit Project Modal -->
-    <div class="modal" id="editProjectModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Редактировать проект</h2>
-                <button class="modal-close" onclick="closeModal('editProjectModal')">&times;</button>
-            </div>
-            <div class="modal-body">
-                <input type="hidden" id="editProjectId">
-                <div class="form-group">
-                    <label for="editProjectName">Название проекта *</label>
-                    <input type="text" id="editProjectName">
-                </div>
-                <div class="form-group">
-                    <label for="editProjectDomain">Домен сайта *</label>
-                    <input type="text" id="editProjectDomain">
-                </div>
-                <div class="form-group">
-                    <label for="editProjectFeedUrl">URL фида товаров</label>
-                    <input type="url" id="editProjectFeedUrl">
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-danger" onclick="deleteProject()">Удалить</button>
-                <button class="btn btn-secondary" onclick="closeModal('editProjectModal')">Отмена</button>
-                <button class="btn btn-primary" onclick="updateProject()">Сохранить</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Toast Notification -->
+    <!-- Toast -->
     <div class="toast" id="toast">
-        <span class="toast-message" id="toastMessage"></span>
+        <span class="toast-icon" id="toastIcon">✓</span>
+        <span id="toastMessage">Сообщение</span>
     </div>
 
-    <script src="api.js"></script>
     <script src="dashboard.js"></script>
 </body>
 </html>
