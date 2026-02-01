@@ -366,9 +366,10 @@
                     <div class="card-body">
                         <div class="form-group">
                             <label class="form-label">Связанные товары по параметрам</label>
-                            <p class="form-hint">Выберите параметры для группировки связанных товаров (Ctrl+клик для выбора нескольких)</p>
-                            <select id="relatedProductsFields" class="form-input" multiple size="6" onchange="markSearchSettingsChanged()">
-                            </select>
+                            <p class="form-hint">Выберите параметры для группировки связанных товаров</p>
+                            <div id="relatedProductsFields" class="checkbox-group">
+                                <div class="form-hint">Загрузка параметров...</div>
+                            </div>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Количество связанных товаров (на каждый параметр)</label>

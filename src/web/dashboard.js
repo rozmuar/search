@@ -507,18 +507,35 @@ let searchSettingsChanged = false;
 async function loadSearchSettings() {
     if (!currentProject) return;
     
-    const select = document.getElementById('relatedProductsFields');
+    const container = document.getElementById('relatedProductsFields');
     const limitInput = document.getElementById('relatedProductsLimit');
     const saveBtn = document.getElementById('saveSearchSettingsBtn');
     const statusEl = document.getElementById('searchSettingsStatus');
     
-    if (!select || !limitInput) return;
+    if (!container || !limitInput) return;
     
     // Reset
-    select.innerHTML = '';
+    container.innerHTML = '<div class="form-hint">Загрузка параметров...</div>';
     searchSettingsChanged = false;
     saveBtn.disabled = true;
     statusEl.textContent = '';
+    
+    let selectedFields = [];
+    
+    try {
+        // Load current settings first
+        const settings = await fetchAPI(`/api/v1/projects/${currentProject.id}/search-settings`);
+        console.log('Search settings loaded:', settings);
+        
+        selectedFields = settings.relatedProductsFields || 
+                        (settings.relatedProductsField ? [settings.relatedProductsField] : []);
+        
+        if (settings.relatedProductsLimit) {
+            limitInput.value = settings.relatedProductsLimit;
+        }
+    } catch (err) {
+        console.log('No search settings yet');
+    }
     
     try {
         // Load available fields from feed
@@ -537,37 +554,23 @@ async function loadSearchSettings() {
                 return a.localeCompare(b);
             });
             
-            sortedFields.forEach(field => {
-                const opt = document.createElement('option');
-                opt.value = field;
-                opt.textContent = field;
-                select.appendChild(opt);
-            });
-        }
-        
-        // Load current settings
-        const settings = await fetchAPI(`/api/v1/projects/${currentProject.id}/search-settings`);
-        console.log('Search settings loaded:', settings);
-        
-        // Устанавливаем выбранные поля (поддержка и массива и строки)
-        const selectedFields = settings.relatedProductsFields || 
-                              (settings.relatedProductsField ? [settings.relatedProductsField] : []);
-        
-        if (selectedFields.length > 0) {
-            Array.from(select.options).forEach(opt => {
-                opt.selected = selectedFields.includes(opt.value);
-            });
-        }
-        
-        if (settings.relatedProductsLimit) {
-            limitInput.value = settings.relatedProductsLimit;
+            // Render checkboxes
+            container.innerHTML = sortedFields.map(field => {
+                const checked = selectedFields.includes(field) ? 'checked' : '';
+                return `
+                    <label class="checkbox-item">
+                        <input type="checkbox" name="relatedField" value="${field}" ${checked} onchange="markSearchSettingsChanged()">
+                        <span>${field}</span>
+                    </label>
+                `;
+            }).join('');
+        } else {
+            container.innerHTML = '<div class="form-hint">Нет доступных параметров. Загрузите фид.</div>';
         }
         
     } catch (err) {
         console.error('Error loading search settings:', err);
-        if (err.message?.includes('404') || err.message?.includes('No products')) {
-            statusEl.textContent = 'Сначала загрузите фид';
-        }
+        container.innerHTML = '<div class="form-hint">Сначала загрузите фид</div>';
     }
 }
 
@@ -580,7 +583,7 @@ function markSearchSettingsChanged() {
 async function saveSearchSettings() {
     if (!currentProject) return;
     
-    const select = document.getElementById('relatedProductsFields');
+    const container = document.getElementById('relatedProductsFields');
     const limitInput = document.getElementById('relatedProductsLimit');
     const saveBtn = document.getElementById('saveSearchSettingsBtn');
     const statusEl = document.getElementById('searchSettingsStatus');
@@ -589,8 +592,9 @@ async function saveSearchSettings() {
     statusEl.textContent = 'Сохранение...';
     
     try {
-        // Получаем все выбранные поля
-        const selectedFields = Array.from(select.selectedOptions).map(opt => opt.value);
+        // Получаем все отмеченные чекбоксы
+        const checkboxes = container.querySelectorAll('input[name="relatedField"]:checked');
+        const selectedFields = Array.from(checkboxes).map(cb => cb.value);
         
         const settings = {
             relatedProductsFields: selectedFields,
