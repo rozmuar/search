@@ -692,7 +692,7 @@
     <div class="modal" id="createProjectModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3 class="modal-title">Создать проект</h3>
+                <h3 class="modal-title" id="modalTitle">Создать проект</h3>
                 <button class="modal-close" onclick="closeCreateProjectModal()">×</button>
             </div>
             <div class="modal-body">
@@ -701,17 +701,18 @@
                     <input type="text" class="form-input" id="projectName" placeholder="Например: Мой магазин">
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Домен сайта *</label>
+                    <label class="form-label">Домен сайта</label>
                     <input type="text" class="form-input" id="projectDomain" placeholder="example.com">
                 </div>
                 <div class="form-group">
                     <label class="form-label">URL фида (необязательно)</label>
                     <input type="url" class="form-input" id="projectFeedUrl" placeholder="https://example.com/feed.xml">
+                    <small class="form-hint">Фид можно добавить позже</small>
                 </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeCreateProjectModal()">Отмена</button>
-                <button class="btn btn-primary" onclick="createProject()">Создать</button>
+                <button class="btn btn-primary" id="projectSubmitBtn" onclick="createProject()">Создать</button>
             </div>
         </div>
     </div>

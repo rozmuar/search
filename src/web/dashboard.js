@@ -165,6 +165,10 @@ function renderProjectsList() {
                 <div class="project-name">${escapeHtml(p.name)}</div>
                 <div class="project-domain">${escapeHtml(p.domain || 'Без домена')}</div>
             </div>
+            <div class="project-actions">
+                <button class="btn-icon" onclick="event.stopPropagation(); editProject('${p.id}')" title="Редактировать">✏️</button>
+                <button class="btn-icon" onclick="event.stopPropagation(); deleteProject('${p.id}')" title="Удалить">🗑️</button>
+            </div>
             <div class="project-stats">
                 <div class="project-products-count">${p.products_count || 0}</div>
                 <div class="project-searches-count">${p.searches_count || 0} поисков</div>
@@ -230,7 +234,12 @@ function updateAllProjectSelects() {
 }
 
 // ==================== CREATE PROJECT ====================
+let editingProjectId = null;
+
 function showCreateProjectModal() {
+    editingProjectId = null;
+    document.getElementById('modalTitle').textContent = 'Создать проект';
+    document.getElementById('projectSubmitBtn').textContent = 'Создать';
     document.getElementById('createProjectModal').classList.add('active');
     document.getElementById('projectName').value = '';
     document.getElementById('projectDomain').value = '';
@@ -256,18 +265,62 @@ async function createProject() {
         const data = { name, domain };
         if (feedUrl) data.feed_url = feedUrl;
         
-        await fetchAPI('/api/v1/projects', {
-            method: 'POST',
-            body: JSON.stringify(data)
-        });
+        if (editingProjectId) {
+            // Update existing project
+            await fetchAPI(`/api/v1/projects/${editingProjectId}`, {
+                method: 'PUT',
+                body: JSON.stringify(data)
+            });
+            showToast('Проект обновлён', 'success');
+        } else {
+            // Create new project
+            await fetchAPI('/api/v1/projects', {
+                method: 'POST',
+                body: JSON.stringify(data)
+            });
+            showToast('Проект создан', 'success');
+        }
         
-        showToast('Проект создан', 'success');
         closeCreateProjectModal();
         await loadProjects();
         loadDashboardStats();
         
     } catch (err) {
-        showToast(err.message || 'Ошибка создания проекта', 'error');
+        showToast(err.message || 'Ошибка сохранения проекта', 'error');
+    }
+}
+
+function editProject(projectId) {
+    const project = projects.find(p => p.id === projectId);
+    if (!project) return;
+    
+    editingProjectId = projectId;
+    document.getElementById('modalTitle').textContent = 'Редактировать проект';
+    document.getElementById('projectSubmitBtn').textContent = 'Сохранить';
+    document.getElementById('createProjectModal').classList.add('active');
+    document.getElementById('projectName').value = project.name || '';
+    document.getElementById('projectDomain').value = project.domain || '';
+    document.getElementById('projectFeedUrl').value = project.feed_url || '';
+    document.getElementById('projectName').focus();
+}
+
+async function deleteProject(projectId) {
+    const project = projects.find(p => p.id === projectId);
+    if (!project) return;
+    
+    if (!confirm(`Удалить проект "${project.name}"? Это действие нельзя отменить.`)) {
+        return;
+    }
+    
+    try {
+        await fetchAPI(`/api/v1/projects/${projectId}`, {
+            method: 'DELETE'
+        });
+        showToast('Проект удалён', 'success');
+        await loadProjects();
+        loadDashboardStats();
+    } catch (err) {
+        showToast(err.message || 'Ошибка удаления проекта', 'error');
     }
 }
 
