@@ -523,15 +523,17 @@
      * Привязка событий
      */
     bindEvents() {
-      // Debounced обработчик ввода
+      // Debounced обработчик ввода - сразу показываем результаты поиска
       const handleInput = debounce((e) => {
         const query = e.target.value.trim();
         this.state.query = query;
 
         if (query.length >= this.config.minChars) {
-          this.fetchSuggestions(query);
+          // Выполняем полноценный поиск вместо подсказок
+          this.search(query);
         } else {
           this.suggestions.hide();
+          this.resultsContainer?.remove();
         }
       }, this.config.debounceMs);
 
