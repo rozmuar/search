@@ -540,7 +540,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             const token = localStorage.getItem('token');
             if (token) {
-                window.location.href = '/dashboard.html';
+                window.location.href = '/dashboard/';
             }
         });
 
@@ -637,7 +637,7 @@
                     localStorage.setItem('user', JSON.stringify(data.user));
                 }
                 
-                window.location.href = '/dashboard.html';
+                window.location.href = '/dashboard/';
                 
             } catch (err) {
                 let message = err.message;
@@ -694,7 +694,7 @@
                     localStorage.setItem('user', JSON.stringify(data.user));
                 }
                 
-                window.location.href = '/dashboard.html';
+                window.location.href = '/dashboard/';
                 
             } catch (err) {
                 let message = err.message;
