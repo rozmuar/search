@@ -448,7 +448,14 @@
                     <!-- Stats Card -->
                     <div class="card">
                         <div class="card-header">
-                            <h3 class="card-title">📊 Статистика (7 дней)</h3>
+                            <h3 class="card-title">📊 Статистика</h3>
+                            <div class="select-wrapper select-sm">
+                                <select id="projectStatsPeriod" onchange="loadProjectStatistics()">
+                                    <option value="7">7 дней</option>
+                                    <option value="30">30 дней</option>
+                                    <option value="0">Всё время</option>
+                                </select>
+                            </div>
                         </div>
                         <div class="card-body">
                             <div class="mini-stats-grid">

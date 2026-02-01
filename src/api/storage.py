@@ -243,9 +243,12 @@ class DataStore:
         
         pipe = self.redis.pipeline()
         
+        # Общий счётчик запросов (за всё время)
+        pipe.incr(f"analytics:{project_id}:total_queries")
+        
         # Счетчик запросов за день
         pipe.incr(f"analytics:{project_id}:queries:{day_key}")
-        pipe.expire(f"analytics:{project_id}:queries:{day_key}", 86400 * 30)  # 30 дней
+        pipe.expire(f"analytics:{project_id}:queries:{day_key}", 86400 * 365)  # Храним год
         
         # Счетчик по часам
         pipe.incr(f"analytics:{project_id}:queries:hourly:{hour_key}")
@@ -278,7 +281,7 @@ class DataStore:
         return result
     
     async def get_analytics(self, project_id: str, days: int = 7) -> Dict[str, Any]:
-        """Получение аналитики проекта"""
+        """Получение аналитики проекта. days=0 - за всё время"""
         now = datetime.utcnow()
         
         # Запросы по дням
@@ -287,20 +290,40 @@ class DataStore:
         total_queries = 0
         total_clicks = 0
         
-        for i in range(days):
-            day = (now - timedelta(days=i)).strftime("%Y-%m-%d")
+        if days == 0:
+            # За всё время - берём из общих счётчиков
+            total_q = await self.redis.get(f"analytics:{project_id}:total_queries")
+            total_queries = int(total_q) if total_q else 0
             
-            # Запросы
-            count = await self.redis.get(f"analytics:{project_id}:queries:{day}")
-            count = int(count) if count else 0
-            queries_by_day[day] = count
-            total_queries += count
+            total_c = await self.redis.get(f"analytics:{project_id}:total_clicks")
+            total_clicks = int(total_c) if total_c else 0
             
-            # Клики
-            clicks = await self.redis.get(f"analytics:{project_id}:clicks:{day}")
-            clicks = int(clicks) if clicks else 0
-            clicks_by_day[day] = clicks
-            total_clicks += clicks
+            # Всё равно собираем данные за последние 365 дней для графика
+            for i in range(365):
+                day = (now - timedelta(days=i)).strftime("%Y-%m-%d")
+                
+                count = await self.redis.get(f"analytics:{project_id}:queries:{day}")
+                if count:
+                    queries_by_day[day] = int(count)
+                
+                clicks = await self.redis.get(f"analytics:{project_id}:clicks:{day}")
+                if clicks:
+                    clicks_by_day[day] = int(clicks)
+        else:
+            for i in range(days):
+                day = (now - timedelta(days=i)).strftime("%Y-%m-%d")
+                
+                # Запросы
+                count = await self.redis.get(f"analytics:{project_id}:queries:{day}")
+                count = int(count) if count else 0
+                queries_by_day[day] = count
+                total_queries += count
+                
+                # Клики
+                clicks = await self.redis.get(f"analytics:{project_id}:clicks:{day}")
+                clicks = int(clicks) if clicks else 0
+                clicks_by_day[day] = clicks
+                total_clicks += clicks
         
         # Популярные запросы (топ-20)
         popular = await self.redis.zrevrange(
@@ -366,9 +389,12 @@ class DataStore:
         
         pipe = self.redis.pipeline()
         
+        # Общий счётчик кликов (за всё время)
+        pipe.incr(f"analytics:{project_id}:total_clicks")
+        
         # Счетчик кликов за день
         pipe.incr(f"analytics:{project_id}:clicks:{day_key}")
-        pipe.expire(f"analytics:{project_id}:clicks:{day_key}", 86400 * 30)
+        pipe.expire(f"analytics:{project_id}:clicks:{day_key}", 86400 * 365)  # Храним год
         
         # Популярные товары
         pipe.zincrby(f"analytics:{project_id}:popular_products", 1, product_id)

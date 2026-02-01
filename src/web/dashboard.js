@@ -772,8 +772,12 @@ async function saveSynonyms() {
 async function loadProjectStatistics() {
     if (!currentProject) return;
     
+    // Get selected period
+    const periodSelect = document.getElementById('projectStatsPeriod');
+    const days = periodSelect ? parseInt(periodSelect.value) : 7;
+    
     try {
-        const analytics = await fetchAPI(`/api/v1/projects/${currentProject.id}/analytics`);
+        const analytics = await fetchAPI(`/api/v1/projects/${currentProject.id}/analytics?days=${days}`);
         
         // Update mini stats
         const searches = analytics.total_queries || 0;
@@ -781,8 +785,8 @@ async function loadProjectStatistics() {
         const ctr = searches > 0 ? Math.round((clicks / searches) * 100) : 0;
         const avgTime = analytics.avg_response_time_ms || 0;
         
-        document.getElementById('projectAnalyticsSearches').textContent = searches;
-        document.getElementById('projectAnalyticsClicks').textContent = clicks;
+        document.getElementById('projectAnalyticsSearches').textContent = formatNumber(searches);
+        document.getElementById('projectAnalyticsClicks').textContent = formatNumber(clicks);
         document.getElementById('projectAnalyticsCTR').textContent = ctr + '%';
         document.getElementById('projectAnalyticsAvgTime').textContent = Math.round(avgTime) + 'ms';
         
@@ -846,6 +850,11 @@ async function loadProjectStatistics() {
         document.getElementById('projectPopularQueries').innerHTML = '<div class="loading-sm">Ошибка загрузки</div>';
         document.getElementById('projectPopularProducts').innerHTML = '<div class="loading-sm">Ошибка загрузки</div>';
     }
+}
+
+// Format number with thousands separator
+function formatNumber(num) {
+    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 }
 
 async function getProductById(projectId, productId) {

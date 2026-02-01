@@ -429,10 +429,10 @@ async def get_products(
 @app.get("/api/v1/projects/{project_id}/analytics")
 async def get_analytics(
     project_id: str,
-    days: int = Query(7, ge=1, le=30),
+    days: int = Query(7, ge=0, le=365),
     user: User = Depends(require_auth)
 ):
-    """Аналитика проекта"""
+    """Аналитика проекта. days=0 - за всё время"""
     project = await data_store.get_project(project_id)
     if not project or project.get("user_id") != user.id:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -893,11 +893,16 @@ class ClickTrack(BaseModel):
 @app.post("/api/v1/track/click")
 async def track_click(data: ClickTrack):
     """Трекинг клика по товару"""
+    print(f"[TRACK_CLICK] Received: api_key={data.api_key[:20]}..., product_id={data.product_id}, query={data.query}")
+    
     project = await data_store.get_project_by_api_key(data.api_key)
     if not project:
-        return {"success": False}
+        print(f"[TRACK_CLICK] Project not found for api_key")
+        return {"success": False, "error": "Invalid API key"}
     
+    print(f"[TRACK_CLICK] Project found: {project['id']}, logging click...")
     await data_store.log_click(project["id"], data.product_id, data.query)
+    print(f"[TRACK_CLICK] Click logged successfully")
     return {"success": True}
 
 
