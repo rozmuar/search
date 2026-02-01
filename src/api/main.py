@@ -259,6 +259,8 @@ async def load_feed(project_id: str, request: FeedLoadRequest, user: User = Depe
                     in_stock=p.get("in_stock", True),
                     category=p.get("category"),
                     brand=p.get("brand"),
+                    vendor_code=p.get("vendor_code"),
+                    params=p.get("params", {}),
                 )
                 products_list.append(product)
             except Exception as e:
@@ -385,6 +387,9 @@ async def search(
     
     # Получаем настройки поиска для связанных товаров
     related_items = []
+    related_field = None
+    field_value = None
+    
     if project and results.items:
         try:
             search_settings_str = project.get("search_settings", "{}")
@@ -396,11 +401,17 @@ async def search(
             if related_field and results.items:
                 # Берём первый товар из результатов
                 first_item = results.items[0]
-                field_value = first_item.get(related_field)
                 
-                # Если значение в params
-                if not field_value and "params" in first_item:
-                    field_value = first_item.get("params", {}).get(related_field)
+                # Проверяем формат params.НазваниеПараметра
+                if related_field.startswith("params."):
+                    actual_field = related_field[7:]  # убираем "params."
+                    field_value = first_item.get("params", {}).get(actual_field)
+                else:
+                    # Обычное поле
+                    field_value = first_item.get(related_field)
+                    # Если не нашли - пробуем в params
+                    if not field_value and "params" in first_item:
+                        field_value = first_item.get("params", {}).get(related_field)
                 
                 if field_value:
                     # Ищем товары с таким же параметром
@@ -568,26 +579,27 @@ async def get_feed_params(project_id: str, user: User = Depends(require_auth)):
     # Получаем пример товара чтобы извлечь параметры
     sample_keys = await redis_client.keys(f"products:{project_id}:*")
     
-    params = set(["brand", "category"])  # Базовые параметры
+    fields = set(["brand", "category"])  # Базовые параметры
     
     if sample_keys:
-        # Берём первые 10 товаров для анализа параметров
-        for key in sample_keys[:10]:
+        # Берём первые 20 товаров для анализа параметров
+        for key in sample_keys[:20]:
             product_data = await redis_client.get(key)
             if product_data:
                 try:
-                    product = json.loads(product_data)
+                    product = json.loads(product_data if isinstance(product_data, str) else product_data.decode())
                     # Добавляем все ключи товара как возможные параметры
                     for k in product.keys():
-                        if k not in ['id', 'name', 'description', 'url', 'image', 'price', 'old_price', 'in_stock']:
-                            params.add(k)
-                    # Если есть вложенные params
+                        if k not in ['id', 'name', 'description', 'url', 'image', 'images', 'price', 'old_price', 'in_stock']:
+                            fields.add(k)
+                    # Если есть вложенные params - добавляем их с префиксом
                     if 'params' in product and isinstance(product['params'], dict):
-                        params.update(product['params'].keys())
+                        for param_name in product['params'].keys():
+                            fields.add(f"params.{param_name}")
                 except:
                     pass
     
-    return {"params": sorted(list(params))}
+    return {"fields": sorted(list(fields))}
 
 
 # ============ PUBLIC WIDGET ENDPOINT ============

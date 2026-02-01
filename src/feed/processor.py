@@ -474,6 +474,8 @@ class FeedProcessor(IFeedProcessor):
                     quantity=int(raw["quantity"]) if raw.get("quantity") else None,
                     category=raw.get("category"),
                     brand=raw.get("brand"),
+                    vendor_code=raw.get("vendor_code"),
+                    params=raw.get("params", {}),
                     attributes=raw.get("attributes", {}),
                 )
                 

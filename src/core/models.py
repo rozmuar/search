@@ -106,6 +106,8 @@ class Product:
     category: Optional[str] = None
     categories: List[str] = field(default_factory=list)
     brand: Optional[str] = None
+    vendor_code: Optional[str] = None  # Артикул товара
+    params: Dict[str, str] = field(default_factory=dict)  # Параметры из фида
     attributes: Dict[str, Any] = field(default_factory=dict)
     
     # Вычисляемые поля

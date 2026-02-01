@@ -163,6 +163,10 @@ class SimpleSearchEngine:
         """Поиск товаров по конкретному полю (для связанных товаров)"""
         exclude_ids = exclude_ids or []
         
+        # Проверяем, это вложенное поле типа params.Цвет?
+        is_params_field = field.startswith("params.")
+        actual_field = field[7:] if is_params_field else field  # убираем "params."
+        
         # Получаем все ключи товаров проекта
         pattern = f"products:{project_id}:*"
         cursor = 0
@@ -183,12 +187,17 @@ class SimpleSearchEngine:
                     if product.get("id") in exclude_ids:
                         continue
                     
-                    # Проверяем поле
-                    product_value = product.get(field)
+                    product_value = None
                     
-                    # Если поле в params
-                    if not product_value and "params" in product:
-                        product_value = product.get("params", {}).get(field)
+                    if is_params_field:
+                        # Ищем в params
+                        product_value = product.get("params", {}).get(actual_field)
+                    else:
+                        # Ищем в основных полях
+                        product_value = product.get(field)
+                        # Если не нашли - пробуем в params
+                        if not product_value and "params" in product:
+                            product_value = product.get("params", {}).get(field)
                     
                     if product_value and str(product_value).lower() == str(value).lower():
                         matching_products.append(product)

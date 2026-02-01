@@ -156,6 +156,8 @@ class SimpleFeedScheduler:
                                     in_stock=p.get("in_stock", True),
                                     category=p.get("category"),
                                     brand=p.get("brand"),
+                                    vendor_code=p.get("vendor_code"),
+                                    params=p.get("params", {}),
                                 )
                                 products_list.append(product)
                             except:

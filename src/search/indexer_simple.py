@@ -37,6 +37,14 @@ class SimpleIndexer:
         for product in products:
             # Сохраняем товар
             product_key = f"products:{project_id}:{product.id}"
+            
+            # Получаем params если есть (из Product или словаря)
+            params = {}
+            if hasattr(product, 'params') and product.params:
+                params = product.params
+            elif hasattr(product, '__dict__') and 'params' in product.__dict__:
+                params = product.__dict__['params'] or {}
+            
             products_data[product_key] = json.dumps({
                 "id": product.id,
                 "name": product.name,
@@ -48,6 +56,8 @@ class SimpleIndexer:
                 "in_stock": product.in_stock,
                 "category": product.category,
                 "brand": product.brand,
+                "vendor_code": getattr(product, 'vendor_code', ''),
+                "params": params
             })
             
             # Получаем токены
@@ -130,6 +140,28 @@ class SimpleIndexer:
             cat_query = self.query_processor.process(product.category)
             for token in cat_query.tokens:
                 tokens_scores[token] = tokens_scores.get(token, 0) + 1.5
+        
+        # Артикул (вес 3.0 - важно для точного поиска)
+        vendor_code = getattr(product, 'vendor_code', '')
+        if vendor_code:
+            vc_query = self.query_processor.process(vendor_code)
+            for token in vc_query.tokens:
+                tokens_scores[token] = tokens_scores.get(token, 0) + 3.0
+        
+        # Параметры товара из фида (вес 2.0)
+        params = {}
+        if hasattr(product, 'params') and product.params:
+            params = product.params
+        elif hasattr(product, '__dict__') and 'params' in product.__dict__:
+            params = product.__dict__.get('params') or {}
+        
+        for param_name, param_value in params.items():
+            # Индексируем и название и значение параметра
+            if param_value:
+                param_text = f"{param_value}"
+                param_query = self.query_processor.process(param_text)
+                for token in param_query.tokens:
+                    tokens_scores[token] = tokens_scores.get(token, 0) + 2.0
         
         return tokens_scores
     
