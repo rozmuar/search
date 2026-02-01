@@ -167,6 +167,8 @@
             },
             body: clickBody,
             keepalive: true,
+            mode: 'cors',
+            credentials: 'omit'
           });
           return;
         }
@@ -186,11 +188,12 @@
           fetch(`${this.apiUrl}/analytics/event`, {
             method: 'POST',
             headers: {
-              'X-API-Key': this.apiKey,
               'Content-Type': 'application/json',
             },
             body: body,
             keepalive: true,
+            mode: 'cors',
+            credentials: 'omit'
           });
         }
       } catch (e) {
