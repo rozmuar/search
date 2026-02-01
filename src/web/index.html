@@ -141,6 +141,34 @@
         </div>
     </section>
 
+    <!-- Demo Section -->
+    <section id="demo" class="demo">
+        <div class="container">
+            <div class="text-center">
+                <span class="section-badge">Демо</span>
+                <h2 class="section-title">Попробуйте прямо сейчас</h2>
+                <p class="section-subtitle">
+                    Введите запрос и посмотрите, как работает умный поиск
+                </p>
+            </div>
+            
+            <div class="demo-container">
+                <div class="demo-widget">
+                    <span class="demo-label">🚀 Живой пример</span>
+                    <div class="demo-search-wrapper">
+                        <span class="demo-search-icon">🔍</span>
+                        <input type="text" id="demoSearchInput" class="demo-search-input" placeholder="Попробуйте: кроссовки, iphone, куртка..." autocomplete="off">
+                        <div class="demo-suggestions" id="demoSuggestions"></div>
+                    </div>
+                    <div class="demo-results" id="demoResults"></div>
+                    <div class="demo-hint">
+                        💡 Подсказки появляются мгновенно при вводе. Попробуйте <code>крос</code> или <code>iphone</code>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- Features Section -->
     <section id="features" class="features">
         <div class="container">
@@ -418,7 +446,7 @@
                 
                 <div class="pricing-card popular">
                     <div class="pricing-name">Бизнес</div>
-                    <div class="pricing-price">2,990₽ <span>/ мес</span></div>
+                    <div class="pricing-price">5,900₽ <span>/ мес</span></div>
                     <div class="pricing-desc">Для растущих магазинов</div>
                     <ul class="pricing-features">
                         <li><span class="check">✓</span> До 50,000 товаров</li>
@@ -542,6 +570,132 @@
                 header.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
             } else {
                 header.style.boxShadow = 'none';
+            }
+        });
+
+        // ==================== Demo Search ====================
+        const demoProducts = [
+            { id: 1, name: 'Кроссовки Nike Air Max', category: 'Обувь', price: 12990, oldPrice: 15990, emoji: '👟' },
+            { id: 2, name: 'Кроссовки Adidas Ultraboost', category: 'Обувь', price: 14990, oldPrice: 18990, emoji: '👟' },
+            { id: 3, name: 'Кроссовки New Balance 574', category: 'Обувь', price: 9990, oldPrice: 12990, emoji: '👟' },
+            { id: 4, name: 'iPhone 15 Pro Max 256GB', category: 'Смартфоны', price: 149990, oldPrice: 169990, emoji: '📱' },
+            { id: 5, name: 'iPhone 14 128GB', category: 'Смартфоны', price: 79990, oldPrice: 89990, emoji: '📱' },
+            { id: 6, name: 'Чехол для iPhone силиконовый', category: 'Аксессуары', price: 1990, oldPrice: 2490, emoji: '📱' },
+            { id: 7, name: 'Куртка зимняя мужская', category: 'Одежда', price: 8990, oldPrice: 12990, emoji: '🧥' },
+            { id: 8, name: 'Куртка демисезонная женская', category: 'Одежда', price: 6990, oldPrice: 9990, emoji: '🧥' },
+            { id: 9, name: 'Куртка детская утепленная', category: 'Детское', price: 4990, oldPrice: 6990, emoji: '🧥' },
+            { id: 10, name: 'Ноутбук MacBook Pro M3', category: 'Ноутбуки', price: 199990, oldPrice: 219990, emoji: '💻' },
+            { id: 11, name: 'Ноутбук ASUS ROG Gaming', category: 'Ноутбуки', price: 129990, oldPrice: 149990, emoji: '💻' },
+            { id: 12, name: 'Наушники AirPods Pro 2', category: 'Аксессуары', price: 24990, oldPrice: 29990, emoji: '🎧' },
+            { id: 13, name: 'Наушники Sony WH-1000XM5', category: 'Аксессуары', price: 32990, oldPrice: 39990, emoji: '🎧' },
+            { id: 14, name: 'Телевизор Samsung 55" OLED', category: 'Телевизоры', price: 89990, oldPrice: 109990, emoji: '📺' },
+            { id: 15, name: 'Смарт-часы Apple Watch Series 9', category: 'Гаджеты', price: 44990, oldPrice: 49990, emoji: '⌚' },
+        ];
+
+        const demoInput = document.getElementById('demoSearchInput');
+        const demoSuggestions = document.getElementById('demoSuggestions');
+        const demoResults = document.getElementById('demoResults');
+
+        function highlightText(text, query) {
+            if (!query) return text;
+            const regex = new RegExp(`(${query})`, 'gi');
+            return text.replace(regex, '<strong>$1</strong>');
+        }
+
+        function formatPrice(price) {
+            return price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' ₽';
+        }
+
+        function searchProducts(query) {
+            if (!query || query.length < 2) return [];
+            const lowerQuery = query.toLowerCase();
+            return demoProducts.filter(p => 
+                p.name.toLowerCase().includes(lowerQuery) || 
+                p.category.toLowerCase().includes(lowerQuery)
+            );
+        }
+
+        function showSuggestions(results, query) {
+            if (results.length === 0) {
+                demoSuggestions.classList.remove('active');
+                return;
+            }
+
+            const uniqueNames = [...new Set(results.map(p => p.name))].slice(0, 5);
+            
+            demoSuggestions.innerHTML = uniqueNames.map(name => {
+                const product = results.find(p => p.name === name);
+                return `
+                    <div class="demo-suggestion-item" data-query="${name}">
+                        <span class="icon">${product.emoji}</span>
+                        <span class="text">${highlightText(name, query)}</span>
+                        <span class="category">${product.category}</span>
+                    </div>
+                `;
+            }).join('');
+
+            demoSuggestions.classList.add('active');
+
+            // Add click handlers
+            demoSuggestions.querySelectorAll('.demo-suggestion-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const selectedQuery = item.dataset.query;
+                    demoInput.value = selectedQuery;
+                    demoSuggestions.classList.remove('active');
+                    showResults(searchProducts(selectedQuery), selectedQuery);
+                });
+            });
+        }
+
+        function showResults(results, query) {
+            if (results.length === 0) {
+                demoResults.classList.remove('active');
+                return;
+            }
+
+            demoResults.innerHTML = `
+                <div class="demo-results-title">
+                    Найдено <span>${results.length}</span> товаров за <span>0.023 сек</span>
+                </div>
+                <div class="demo-results-grid">
+                    ${results.slice(0, 6).map(p => `
+                        <div class="demo-product-card">
+                            <div class="demo-product-image">${p.emoji}</div>
+                            <div class="demo-product-name">${highlightText(p.name, query)}</div>
+                            <div class="demo-product-price">
+                                ${formatPrice(p.price)}
+                                <span class="demo-product-old-price">${formatPrice(p.oldPrice)}</span>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+            demoResults.classList.add('active');
+        }
+
+        demoInput.addEventListener('input', (e) => {
+            const query = e.target.value.trim();
+            const results = searchProducts(query);
+            showSuggestions(results, query);
+            
+            if (query.length >= 2) {
+                showResults(results, query);
+            } else {
+                demoResults.classList.remove('active');
+            }
+        });
+
+        demoInput.addEventListener('focus', () => {
+            const query = demoInput.value.trim();
+            if (query.length >= 2) {
+                const results = searchProducts(query);
+                showSuggestions(results, query);
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.demo-widget')) {
+                demoSuggestions.classList.remove('active');
             }
         });
     </script>
