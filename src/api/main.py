@@ -376,11 +376,11 @@ async def search(
     took_ms = (time.time() - start_time) * 1000
     
     # Логируем для аналитики
-    await data_store.log_search(actual_project_id, q, len(results), took_ms)
+    await data_store.log_search(actual_project_id, q, results.total, took_ms)
     
     return {
-        "items": results,
-        "total": len(results),
+        "items": results.items,
+        "total": results.total,
         "query": q,
         "meta": {
             "took_ms": round(took_ms, 2),
