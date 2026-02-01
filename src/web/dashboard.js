@@ -526,8 +526,21 @@ async function loadSearchSettings() {
         // Load current settings first
         const settings = await fetchAPI(`/api/v1/projects/${currentProject.id}/search-settings`);
         console.log('Search settings loaded:', settings);
+        console.log('relatedProductsFields type:', typeof settings.relatedProductsFields);
+        console.log('relatedProductsFields value:', settings.relatedProductsFields);
         
-        selectedFields = settings.relatedProductsFields || 
+        // Поддержка разных форматов (массив или JSON-строка)
+        let rawFields = settings.relatedProductsFields;
+        if (typeof rawFields === 'string') {
+            try {
+                rawFields = JSON.parse(rawFields);
+            } catch (e) {
+                console.log('Failed to parse relatedProductsFields:', e);
+                rawFields = null;
+            }
+        }
+        
+        selectedFields = Array.isArray(rawFields) ? rawFields : 
                         (settings.relatedProductsField ? [settings.relatedProductsField] : []);
         console.log('Selected fields to check:', selectedFields);
         
