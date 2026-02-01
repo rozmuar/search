@@ -38,7 +38,7 @@ RUN python -c "import jwt; print('PyJWT OK')"
 # Проверка что приложение импортируется
 RUN python -c "from src.api.main import app; print('App import OK')"
 
-# Supervisor config
+# Supervisor config - логи uvicorn в stdout для docker logs
 RUN echo "[supervisord]\n\
 nodaemon=true\n\
 \n\
@@ -46,12 +46,20 @@ nodaemon=true\n\
 command=/usr/sbin/nginx -g 'daemon off;'\n\
 autostart=true\n\
 autorestart=true\n\
+stdout_logfile=/dev/stdout\n\
+stdout_logfile_maxbytes=0\n\
+stderr_logfile=/dev/stderr\n\
+stderr_logfile_maxbytes=0\n\
 \n\
 [program:uvicorn]\n\
-command=uvicorn src.api.main:app --host 127.0.0.1 --port 8000\n\
+command=uvicorn src.api.main:app --host 127.0.0.1 --port 8000 --log-level info\n\
 autostart=true\n\
 autorestart=true\n\
 directory=/app\n\
+stdout_logfile=/dev/stdout\n\
+stdout_logfile_maxbytes=0\n\
+stderr_logfile=/dev/stderr\n\
+stderr_logfile_maxbytes=0\n\
 " > /etc/supervisor/conf.d/app.conf
 
 # Порты
