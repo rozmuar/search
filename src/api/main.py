@@ -841,11 +841,20 @@ async def get_widget_config(api_key: str):
         raise HTTPException(status_code=404, detail="Invalid API key")
     
     settings = project.get("widget_settings", "{}")
+    logger.info(f"[get_widget_config] Raw settings type: {type(settings)}, value: {settings}")
+    
     try:
-        widget_settings = json.loads(settings) if isinstance(settings, str) else settings
-    except:
+        if isinstance(settings, dict):
+            widget_settings = settings
+        elif isinstance(settings, str):
+            widget_settings = json.loads(settings)
+        else:
+            widget_settings = {}
+    except Exception as e:
+        logger.error(f"[get_widget_config] Error parsing settings: {e}")
         widget_settings = {}
     
+    logger.info(f"[get_widget_config] Returning: {widget_settings}")
     return widget_settings
 
 
