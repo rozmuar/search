@@ -250,10 +250,10 @@
     render(suggestions) {
       let html = '';
 
-      // Поисковые подсказки
+      // Поисковые подсказки (максимум 3)
       if (suggestions.queries && suggestions.queries.length > 0) {
         html += '<div class="search-widget-suggestions-section">';
-        html += suggestions.queries.map((item, index) => `
+        html += suggestions.queries.slice(0, 3).map((item, index) => `
           <div class="search-widget-suggestion-item" data-type="query" data-index="${index}" data-value="${escapeHtml(item.text)}">
             <svg class="search-widget-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="11" cy="11" r="8"></circle>
