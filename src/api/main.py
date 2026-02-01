@@ -347,11 +347,17 @@ async def get_analytics(
 @app.get("/api/v1/projects/{project_id}/index-stats")
 async def get_index_stats(
     project_id: str,
-    user: User = Depends(require_auth)
+    api_key: Optional[str] = Query(None, description="API ключ"),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ):
     """Диагностика индекса - сколько товаров и токенов проиндексировано"""
-    project = await data_store.get_project(project_id)
-    if not project or project.get("user_id") != user.id:
+    # Авторизация по API ключу
+    effective_api_key = x_api_key or api_key
+    if not effective_api_key:
+        raise HTTPException(status_code=401, detail="API key required")
+    
+    project = await data_store.get_project_by_api_key(effective_api_key)
+    if not project or project.get("id") != project_id:
         raise HTTPException(status_code=404, detail="Project not found")
     
     # Количество товаров в Redis
