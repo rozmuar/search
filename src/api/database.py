@@ -2,6 +2,7 @@
 PostgreSQL Database - надежное хранение пользователей, проектов, API ключей
 """
 import asyncpg
+import asyncio
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 import json
@@ -14,19 +15,29 @@ class Database:
     def __init__(self):
         self.pool: Optional[asyncpg.Pool] = None
     
-    async def connect(self):
-        """Создание пула подключений"""
-        self.pool = await asyncpg.create_pool(
-            host=os.getenv("POSTGRES_HOST", "localhost"),
-            port=int(os.getenv("POSTGRES_PORT", 5432)),
-            user=os.getenv("POSTGRES_USER", "search"),
-            password=os.getenv("POSTGRES_PASSWORD", "searchpro_secret_2024"),
-            database=os.getenv("POSTGRES_DB", "search_service"),
-            min_size=2,
-            max_size=10
-        )
-        # Создаем таблицы если не существуют
-        await self._init_tables()
+    async def connect(self, max_retries: int = 5, retry_delay: int = 3):
+        """Создание пула подключений с retry"""
+        for attempt in range(max_retries):
+            try:
+                self.pool = await asyncpg.create_pool(
+                    host=os.getenv("POSTGRES_HOST", "localhost"),
+                    port=int(os.getenv("POSTGRES_PORT", 5432)),
+                    user=os.getenv("POSTGRES_USER", "search"),
+                    password=os.getenv("POSTGRES_PASSWORD", "searchpro_secret_2024"),
+                    database=os.getenv("POSTGRES_DB", "search_service"),
+                    min_size=2,
+                    max_size=10
+                )
+                # Создаем таблицы если не существуют
+                await self._init_tables()
+                print(f"✓ PostgreSQL connected on attempt {attempt + 1}")
+                return
+            except Exception as e:
+                print(f"PostgreSQL connection attempt {attempt + 1}/{max_retries} failed: {e}")
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(retry_delay)
+                else:
+                    raise Exception(f"Failed to connect to PostgreSQL after {max_retries} attempts: {e}")
     
     async def disconnect(self):
         """Закрытие пула подключений"""
