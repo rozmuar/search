@@ -131,7 +131,8 @@ function closeSidebar() {
 async function loadProjects() {
     try {
         const response = await fetchAPI('/api/v1/projects');
-        projects = response || [];
+        // API returns {projects: [...]} or just array
+        projects = Array.isArray(response) ? response : (response.projects || []);
         
         renderProjectsList();
         renderDashboardProjects();
