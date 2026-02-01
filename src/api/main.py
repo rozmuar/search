@@ -18,6 +18,7 @@ from ..search.indexer_simple import SimpleIndexer
 from ..search.engine_simple import SimpleSearchEngine
 from .auth import decode_token, UserCreate, UserLogin, User
 from .storage import DataStore
+from .database import db
 from ..feed.parser import FeedParser, FeedManager
 from ..feed.scheduler import start_feed_scheduler, stop_feed_scheduler
 from ..core.models import Product
@@ -36,6 +37,10 @@ feed_scheduler = None
 async def lifespan(app: FastAPI):
     """Инициализация и очистка ресурсов"""
     global redis_client, search_engine, indexer, data_store, feed_manager, feed_scheduler
+    
+    # Подключение к PostgreSQL
+    await db.connect()
+    print("✓ PostgreSQL connected")
     
     # Подключение к Redis
     redis_host = os.environ.get("REDIS_HOST", "localhost")
@@ -59,7 +64,7 @@ async def lifespan(app: FastAPI):
     # Запуск планировщика автообновления фидов
     feed_scheduler = await start_feed_scheduler(redis_client, feed_manager, data_store, indexer)
     
-    print("✓ Search service initialized (full version)")
+    print("✓ Search service initialized (full version with PostgreSQL)")
     
     yield
     
@@ -67,6 +72,7 @@ async def lifespan(app: FastAPI):
     await stop_feed_scheduler()
     
     # Закрытие соединений
+    await db.disconnect()
     await redis_client.close()
     print("✓ Connections closed")
 

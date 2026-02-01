@@ -1,4 +1,22 @@
 services:
+  # PostgreSQL для хранения пользователей и проектов
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=search
+      - POSTGRES_PASSWORD=searchpro_secret_2024
+      - POSTGRES_DB=search_service
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U search -d search_service"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   # Redis для индексов и кэша
   redis:
     image: redis:7-alpine
@@ -24,11 +42,18 @@ services:
       - DEBUG=false
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=search
+      - POSTGRES_PASSWORD=searchpro_secret_2024
+      - POSTGRES_DB=search_service
     volumes:
       - ./src:/app/src
       - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
       redis:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
 
 volumes:
