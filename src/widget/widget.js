@@ -633,6 +633,15 @@
         if (data.suggestions) {
           console.log('[SearchWidget] Queries:', data.suggestions.queries?.length);
           console.log('[SearchWidget] Products:', data.suggestions.products?.length);
+          
+          // Сортировка товаров: сначала в наличии
+          if (data.suggestions.products && data.suggestions.products.length > 0) {
+            data.suggestions.products.sort((a, b) => {
+              const aInStock = a.in_stock ? 1 : 0;
+              const bInStock = b.in_stock ? 1 : 0;
+              return bInStock - aInStock;
+            });
+          }
         }
         
         this.suggestions.show(data.suggestions || data);
@@ -690,6 +699,15 @@
         });
 
         this.state.results = data.items || [];
+        
+        // Сортировка: сначала товары в наличии
+        this.state.results.sort((a, b) => {
+          const aInStock = a.in_stock ? 1 : 0;
+          const bInStock = b.in_stock ? 1 : 0;
+          return bInStock - aInStock;
+        });
+        data.items = this.state.results;
+        
         this.state.loading = false;
 
         this.emit('search', { query, results: data });
