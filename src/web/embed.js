@@ -654,9 +654,9 @@
         return bInStock - aInStock;
       });
 
-      // В dropdown показываем только первые 8 товаров
-      const dropdownItems = items.slice(0, 8);
-      const hasMore = total > 8;
+      // В dropdown показываем только первые 20 товаров
+      const dropdownItems = items.slice(0, 20);
+      const hasMore = total > 20;
 
       let html = `
         <div class="search-widget-results-dropdown">
