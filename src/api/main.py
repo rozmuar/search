@@ -456,8 +456,20 @@ async def search(
             
             # Поддержка и старого формата (relatedProductsField) и нового (relatedProductsFields)
             related_fields = search_settings.get("relatedProductsFields", [])
+            
+            # Если related_fields - строка JSON, парсим
+            if isinstance(related_fields, str):
+                try:
+                    related_fields = json.loads(related_fields)
+                except:
+                    related_fields = []
+            
             if not related_fields and search_settings.get("relatedProductsField"):
                 related_fields = [search_settings.get("relatedProductsField")]
+            
+            # Убедимся что это список строк
+            if not isinstance(related_fields, list):
+                related_fields = []
             
             related_limit = search_settings.get("relatedProductsLimit", 4)
             
@@ -466,6 +478,10 @@ async def search(
                 exclude_ids = [item["id"] for item in results.items[:5]]
                 
                 for related_field in related_fields:
+                    # Пропускаем если не строка
+                    if not isinstance(related_field, str):
+                        continue
+                    
                     # Проверяем формат params.НазваниеПараметра
                     if related_field.startswith("params."):
                         actual_field = related_field[7:]
