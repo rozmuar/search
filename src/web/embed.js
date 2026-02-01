@@ -805,7 +805,6 @@
         if (loadingEl) loadingEl.textContent = 'Ошибка загрузки товаров';
       }
     }
-    }
 
     renderPopupPage() {
       const grid = document.getElementById('search-popup-grid');
