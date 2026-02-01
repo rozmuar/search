@@ -2299,6 +2299,145 @@ body {
     font-size: 1.25rem;
 }
 
+/* ========== PROJECT STATISTICS ========== */
+.mini-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+}
+
+.mini-stat {
+    text-align: center;
+    padding: 12px;
+    background: var(--gray-50);
+    border-radius: var(--radius);
+}
+
+.mini-stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--gray-900);
+}
+
+.mini-stat-label {
+    font-size: 0.75rem;
+    color: var(--gray-500);
+    margin-top: 4px;
+}
+
+.compact-list {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.compact-list-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.compact-list-item:last-child {
+    border-bottom: none;
+}
+
+.compact-list-rank {
+    width: 24px;
+    height: 24px;
+    background: var(--gray-100);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--gray-600);
+    margin-right: 12px;
+}
+
+.compact-list-rank.top {
+    background: var(--primary);
+    color: #fff;
+}
+
+.compact-list-text {
+    flex: 1;
+    font-size: 0.875rem;
+    color: var(--gray-800);
+}
+
+.compact-list-count {
+    font-size: 0.75rem;
+    color: var(--gray-500);
+    background: var(--gray-100);
+    padding: 2px 8px;
+    border-radius: 10px;
+}
+
+.popular-products-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 16px;
+}
+
+.popular-product-card {
+    display: flex;
+    flex-direction: column;
+    background: var(--gray-50);
+    border-radius: var(--radius);
+    padding: 12px;
+    transition: all 0.2s ease;
+}
+
+.popular-product-card:hover {
+    background: #fff;
+    box-shadow: var(--shadow-md);
+}
+
+.popular-product-image {
+    width: 100%;
+    height: 100px;
+    object-fit: contain;
+    background: #fff;
+    border-radius: 6px;
+    margin-bottom: 8px;
+}
+
+.popular-product-name {
+    font-size: 0.8125rem;
+    color: var(--gray-800);
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin-bottom: 4px;
+}
+
+.popular-product-clicks {
+    font-size: 0.75rem;
+    color: var(--primary);
+    font-weight: 600;
+}
+
+.loading-sm {
+    padding: 20px;
+    text-align: center;
+    color: var(--gray-400);
+    font-size: 0.875rem;
+}
+
+@media (max-width: 768px) {
+    .mini-stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .popular-products-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
 /* ========== FEED GUIDE ========== */
 .modal-lg {
     max-width: 800px;

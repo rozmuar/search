@@ -432,6 +432,9 @@ async function openProjectDetail(projectId) {
     
     // Load synonyms
     await loadSynonyms();
+    
+    // Load project statistics
+    await loadProjectStatistics();
 }
 
 async function loadProjectFeedStatus() {
@@ -763,6 +766,97 @@ async function saveSynonyms() {
         method: 'PUT',
         body: JSON.stringify({ synonyms: synonymGroups })
     });
+}
+
+// ==================== PROJECT STATISTICS ====================
+async function loadProjectStatistics() {
+    if (!currentProject) return;
+    
+    try {
+        const analytics = await fetchAPI(`/api/v1/projects/${currentProject.id}/analytics`);
+        
+        // Update mini stats
+        const searches = analytics.total_queries || 0;
+        const clicks = analytics.total_clicks || 0;
+        const ctr = searches > 0 ? Math.round((clicks / searches) * 100) : 0;
+        const avgTime = analytics.avg_response_time_ms || 0;
+        
+        document.getElementById('projectAnalyticsSearches').textContent = searches;
+        document.getElementById('projectAnalyticsClicks').textContent = clicks;
+        document.getElementById('projectAnalyticsCTR').textContent = ctr + '%';
+        document.getElementById('projectAnalyticsAvgTime').textContent = Math.round(avgTime) + 'ms';
+        
+        // Update popular queries list
+        const queriesEl = document.getElementById('projectPopularQueries');
+        const queries = analytics.popular_queries || [];
+        
+        if (queries.length === 0) {
+            queriesEl.innerHTML = '<div class="loading-sm">Нет данных о запросах</div>';
+        } else {
+            queriesEl.innerHTML = queries.slice(0, 5).map((q, i) => `
+                <div class="compact-list-item">
+                    <span class="compact-list-rank ${i < 3 ? 'top' : ''}">${i + 1}</span>
+                    <span class="compact-list-text">${escapeHtml(q.query)}</span>
+                    <span class="compact-list-count">${q.count}</span>
+                </div>
+            `).join('');
+        }
+        
+        // Update popular products
+        const productsEl = document.getElementById('projectPopularProducts');
+        const popularProducts = analytics.popular_products || [];
+        
+        if (popularProducts.length === 0) {
+            productsEl.innerHTML = '<div class="loading-sm">Нет данных о популярных товарах</div>';
+        } else {
+            // Load product details for popular products
+            const productCards = await Promise.all(
+                popularProducts.slice(0, 6).map(async (p) => {
+                    try {
+                        // Try to get product info from products endpoint
+                        const product = await getProductById(currentProject.id, p.product_id);
+                        if (product) {
+                            return `
+                                <div class="popular-product-card">
+                                    ${product.image ? `<img src="${escapeHtml(product.image)}" class="popular-product-image" alt="" onerror="this.style.display='none'">` : ''}
+                                    <div class="popular-product-name">${escapeHtml(product.name || p.product_id)}</div>
+                                    <div class="popular-product-clicks">${p.clicks} кликов</div>
+                                </div>
+                            `;
+                        }
+                    } catch (e) {}
+                    
+                    return `
+                        <div class="popular-product-card">
+                            <div class="popular-product-name">ID: ${escapeHtml(p.product_id)}</div>
+                            <div class="popular-product-clicks">${p.clicks} кликов</div>
+                        </div>
+                    `;
+                })
+            );
+            productsEl.innerHTML = productCards.join('');
+        }
+        
+    } catch (err) {
+        console.error('Error loading project statistics:', err);
+        document.getElementById('projectAnalyticsSearches').textContent = '0';
+        document.getElementById('projectAnalyticsClicks').textContent = '0';
+        document.getElementById('projectAnalyticsCTR').textContent = '0%';
+        document.getElementById('projectAnalyticsAvgTime').textContent = '0ms';
+        document.getElementById('projectPopularQueries').innerHTML = '<div class="loading-sm">Ошибка загрузки</div>';
+        document.getElementById('projectPopularProducts').innerHTML = '<div class="loading-sm">Ошибка загрузки</div>';
+    }
+}
+
+async function getProductById(projectId, productId) {
+    try {
+        // First try to get from cached products
+        const products = await fetchAPI(`/api/v1/projects/${projectId}/products?limit=1000`);
+        const product = products.find(p => p.id === productId);
+        return product || null;
+    } catch (e) {
+        return null;
+    }
 }
 
 async function loadProjectFeed() {

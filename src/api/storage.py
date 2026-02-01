@@ -283,14 +283,24 @@ class DataStore:
         
         # Запросы по дням
         queries_by_day = {}
+        clicks_by_day = {}
         total_queries = 0
+        total_clicks = 0
         
         for i in range(days):
             day = (now - timedelta(days=i)).strftime("%Y-%m-%d")
+            
+            # Запросы
             count = await self.redis.get(f"analytics:{project_id}:queries:{day}")
             count = int(count) if count else 0
             queries_by_day[day] = count
             total_queries += count
+            
+            # Клики
+            clicks = await self.redis.get(f"analytics:{project_id}:clicks:{day}")
+            clicks = int(clicks) if clicks else 0
+            clicks_by_day[day] = clicks
+            total_clicks += clicks
         
         # Популярные запросы (топ-20)
         popular = await self.redis.zrevrange(
@@ -305,6 +315,32 @@ class DataStore:
             count = int(item[1])
             popular_queries.append({"query": query, "count": count})
         
+        # Популярные товары (топ-20)
+        popular_products_raw = await self.redis.zrevrange(
+            f"analytics:{project_id}:popular_products",
+            0, 19,
+            withscores=True
+        )
+        
+        popular_products = []
+        for item in popular_products_raw:
+            product_id = item[0].decode() if isinstance(item[0], bytes) else item[0]
+            clicks = int(item[1])
+            popular_products.append({"product_id": product_id, "clicks": clicks})
+        
+        # Запросы приводящие к кликам (топ-10)
+        converting_raw = await self.redis.zrevrange(
+            f"analytics:{project_id}:converting_queries",
+            0, 9,
+            withscores=True
+        )
+        
+        converting_queries = []
+        for item in converting_raw:
+            query = item[0].decode() if isinstance(item[0], bytes) else item[0]
+            clicks = int(item[1])
+            converting_queries.append({"query": query, "clicks": clicks})
+        
         # Среднее время ответа
         times = await self.redis.lrange(f"analytics:{project_id}:response_times", 0, -1)
         avg_response_time = 0
@@ -314,8 +350,12 @@ class DataStore:
         
         return {
             "total_queries": total_queries,
+            "total_clicks": total_clicks,
             "queries_by_day": queries_by_day,
+            "clicks_by_day": clicks_by_day,
             "popular_queries": popular_queries,
+            "popular_products": popular_products,
+            "converting_queries": converting_queries,
             "avg_response_time_ms": round(avg_response_time, 2)
         }
     
