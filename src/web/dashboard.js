@@ -50,6 +50,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadProjects();
     loadDashboardStats();
     initCharts();
+    
+    // Handle initial URL hash
+    handleHashChange();
+    
+    // Listen for hash changes
+    window.addEventListener('hashchange', handleHashChange);
 });
 
 // ==================== USER UI ====================
@@ -71,10 +77,48 @@ function setupNavigation() {
             e.preventDefault();
             const section = item.dataset.section;
             if (section) {
-                showSection(section);
+                navigateTo(section);
             }
         });
     });
+}
+
+// URL-based navigation
+function navigateTo(sectionId, params = {}) {
+    let hash = `#${sectionId}`;
+    
+    // Add params if any (e.g., project ID)
+    const paramStr = Object.entries(params)
+        .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+        .join('&');
+    if (paramStr) {
+        hash += `?${paramStr}`;
+    }
+    
+    window.location.hash = hash;
+}
+
+function handleHashChange() {
+    const hash = window.location.hash.slice(1) || 'dashboard';
+    const [sectionId, paramStr] = hash.split('?');
+    
+    // Parse params
+    const params = {};
+    if (paramStr) {
+        paramStr.split('&').forEach(p => {
+            const [k, v] = p.split('=');
+            params[k] = decodeURIComponent(v);
+        });
+    }
+    
+    // Handle special routes
+    if (sectionId === 'project' && params.id) {
+        // Load specific project
+        openProjectDetail(params.id);
+        return;
+    }
+    
+    showSection(sectionId);
 }
 
 function showSection(sectionId) {
@@ -95,9 +139,14 @@ function showSection(sectionId) {
         'products': 'Товары',
         'analytics': 'Аналитика',
         'widget': 'Виджет',
-        'embed': 'Встраивание'
+        'embed': 'Встраивание',
+        'project-detail': 'Проект',
+        'feed-guide': 'Формат фида'
     };
     document.getElementById('pageTitle').textContent = titles[sectionId] || 'Дашборд';
+    
+    // Update browser title
+    document.title = `${titles[sectionId] || 'Дашборд'} — SearchPro`;
     
     // Section-specific actions
     if (sectionId === 'products') {
@@ -335,8 +384,18 @@ async function deleteProject(projectId) {
 let apiKeyVisible = false;
 
 async function openProjectDetail(projectId) {
+    // If called from click, update URL
+    if (!window.location.hash.includes(`project?id=${projectId}`)) {
+        window.location.hash = `project?id=${projectId}`;
+        return; // handleHashChange will call this function again
+    }
+    
     const project = projects.find(p => p.id === projectId);
-    if (!project) return;
+    if (!project) {
+        // Project not found, go to projects list
+        navigateTo('projects');
+        return;
+    }
     
     currentProject = project;
     
