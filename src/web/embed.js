@@ -588,6 +588,7 @@
 
     async search(query, options = {}) {
       try {
+        console.log('[SearchWidget] Searching for:', query);
         this.state.loading = true;
         this.state.query = query;
         this.input.value = query;
@@ -598,6 +599,8 @@
           filters: { ...this.state.filters, ...options.filters },
         });
 
+        console.log('[SearchWidget] Search results:', data.total, 'items');
+        
         this.state.results = data.items || data.products || [];
         this.state.loading = false;
 
@@ -610,8 +613,12 @@
           });
         }
 
-        if (this.config.results.enabled && this.config.resultsSelector) {
+        // Показываем результаты в dropdown или в указанном контейнере
+        if (this.config.resultsSelector) {
           this.renderResults(data);
+        } else {
+          // Показываем результаты в suggestions dropdown
+          this.showResultsInDropdown(data);
         }
 
         return data;
@@ -622,6 +629,58 @@
         this.emit('error', { error, context: 'search' });
         throw error;
       }
+    }
+
+    showResultsInDropdown(data) {
+      const items = data.items || data.products || [];
+      console.log('[SearchWidget] Showing', items.length, 'results in dropdown');
+      
+      if (items.length === 0) {
+        this.suggestions.element.innerHTML = `
+          <div class="search-widget-no-results">
+            <p>По запросу "<strong>${escapeHtml(this.state.query)}</strong>" ничего не найдено</p>
+          </div>
+        `;
+        this.suggestions.element.style.display = 'block';
+        this.suggestions.visible = true;
+        return;
+      }
+
+      let html = `
+        <div class="search-widget-results-dropdown">
+          <div class="search-widget-results-header">
+            Найдено: ${data.total || items.length} товаров
+          </div>
+          <div class="search-widget-products-grid">
+      `;
+
+      items.forEach((item, index) => {
+        const price = item.price ? formatPrice(item.price, this.config.currency) : '';
+        const oldPrice = item.old_price ? formatPrice(item.old_price, this.config.currency) : '';
+        const inStock = item.in_stock !== false;
+        
+        html += `
+          <a href="${item.url || '#'}" class="search-widget-product-card ${!inStock ? 'out-of-stock' : ''}" data-id="${item.id}" data-index="${index}">
+            <div class="search-widget-product-image">
+              <img src="${item.image || ''}" alt="${escapeHtml(item.name || '')}" loading="lazy" onerror="this.style.display='none'">
+            </div>
+            <div class="search-widget-product-info">
+              <div class="search-widget-product-name">${escapeHtml(item.name || '')}</div>
+              <div class="search-widget-product-price">
+                ${oldPrice ? `<span class="old-price">${oldPrice}</span>` : ''}
+                <span class="current-price">${price}</span>
+              </div>
+              ${!inStock ? '<div class="search-widget-out-of-stock">Нет в наличии</div>' : ''}
+            </div>
+          </a>
+        `;
+      });
+
+      html += '</div></div>';
+
+      this.suggestions.element.innerHTML = html;
+      this.suggestions.element.style.display = 'block';
+      this.suggestions.visible = true;
     }
 
     renderResults(data) {
@@ -999,6 +1058,98 @@
         .search-widget-no-results h3 {
           margin: 0 0 8px;
           color: var(--search-text-color);
+        }
+
+        /* Results in dropdown */
+        .search-widget-results-dropdown {
+          padding: 8px 0;
+        }
+
+        .search-widget-results-dropdown .search-widget-results-header {
+          padding: 8px 16px;
+          font-size: 12px;
+          color: #666;
+          border-bottom: 1px solid var(--search-border-color);
+        }
+
+        .search-widget-products-grid {
+          max-height: 400px;
+          overflow-y: auto;
+        }
+
+        .search-widget-product-card {
+          display: flex;
+          align-items: center;
+          padding: 12px 16px;
+          text-decoration: none;
+          color: var(--search-text-color);
+          border-bottom: 1px solid #f0f0f0;
+          transition: background 0.1s;
+        }
+
+        .search-widget-product-card:hover {
+          background: #f5f5f5;
+        }
+
+        .search-widget-product-card:last-child {
+          border-bottom: none;
+        }
+
+        .search-widget-product-card.out-of-stock {
+          opacity: 0.6;
+        }
+
+        .search-widget-product-card .search-widget-product-image {
+          width: 60px;
+          height: 60px;
+          margin-right: 12px;
+          flex-shrink: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .search-widget-product-card .search-widget-product-image img {
+          max-width: 100%;
+          max-height: 100%;
+          object-fit: contain;
+        }
+
+        .search-widget-product-card .search-widget-product-info {
+          flex: 1;
+          min-width: 0;
+        }
+
+        .search-widget-product-card .search-widget-product-name {
+          font-size: 14px;
+          font-weight: 500;
+          margin-bottom: 4px;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        }
+
+        .search-widget-product-card .search-widget-product-price {
+          font-size: 14px;
+        }
+
+        .search-widget-product-card .old-price {
+          text-decoration: line-through;
+          color: #999;
+          margin-right: 8px;
+          font-size: 12px;
+        }
+
+        .search-widget-product-card .current-price {
+          font-weight: bold;
+          color: var(--search-primary-color);
+        }
+
+        .search-widget-product-card .search-widget-out-of-stock {
+          font-size: 11px;
+          color: #dc3545;
+          margin-top: 2px;
         }
       `;
 
