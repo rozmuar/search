@@ -29,7 +29,7 @@
       limit: 10,
       showProducts: true,
       showCategories: true,
-      productLimit: 4,
+      productLimit: 8,
     },
     
     results: {

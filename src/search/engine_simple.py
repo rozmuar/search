@@ -173,7 +173,7 @@ class SimpleSearchEngine:
         if include_products:
             # Если есть подсказки - ищем по первой, иначе ищем по оригинальному запросу
             search_query = suggestions[0] if suggestions else prefix
-            result = await self.search(project_id, search_query, limit=4)
+            result = await self.search(project_id, search_query, limit=8)
             products = result.items
         
         return SuggestResult(
