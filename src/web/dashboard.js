@@ -827,9 +827,13 @@ async function loadProjectProducts(projectId) {
             document.getElementById('productsTable').style.display = 'block';
             document.getElementById('feedStats').style.display = 'grid';
             
-            // Update stats
-            const categories = new Set(products.map(p => p.category).filter(Boolean));
-            const inStock = products.filter(p => p.available !== false).length;
+            // Update stats (учитываем оба формата: available и in_stock)
+            const categories = new Set(products.map(p => p.category || p.category_name).filter(Boolean));
+            const inStock = products.filter(p => {
+                if (p.available !== undefined) return p.available;
+                if (p.in_stock !== undefined) return p.in_stock;
+                return true;
+            }).length;
             
             document.getElementById('feedTotalProducts').textContent = products.length;
             document.getElementById('feedCategories').textContent = categories.size;
@@ -854,26 +858,34 @@ function renderProducts() {
     const end = start + productsPerPage;
     const pageProducts = products.slice(start, end);
     
-    container.innerHTML = pageProducts.map(p => `
-        <tr>
-            <td>
-                <div class="product-cell">
-                    ${p.picture ? 
-                        `<img src="${escapeHtml(p.picture)}" class="product-image" alt="" onerror="this.style.display='none'">` :
-                        `<div class="product-image-placeholder">📦</div>`
-                    }
-                    <span class="product-name">${escapeHtml(p.name || p.title || 'Без названия')}</span>
-                </div>
-            </td>
-            <td class="product-category">${escapeHtml(p.category || '—')}</td>
-            <td class="product-price">${formatPrice(p.price)} ₽</td>
-            <td>
-                <span class="badge ${p.available !== false ? 'badge-success' : 'badge-danger'}">
-                    ${p.available !== false ? 'В наличии' : 'Нет'}
-                </span>
-            </td>
-        </tr>
-    `).join('');
+    container.innerHTML = pageProducts.map(p => {
+        // Поддержка разных форматов полей
+        const image = p.picture || p.image || (p.images && p.images[0]) || '';
+        const name = p.name || p.title || 'Без названия';
+        const category = p.category || p.category_name || '';
+        const inStock = p.available !== undefined ? p.available : (p.in_stock !== undefined ? p.in_stock : true);
+        
+        return `
+            <tr>
+                <td>
+                    <div class="product-cell">
+                        ${image ? 
+                            `<img src="${escapeHtml(image)}" class="product-image" alt="" onerror="this.style.display='none'">` :
+                            `<div class="product-image-placeholder">📦</div>`
+                        }
+                        <span class="product-name">${escapeHtml(name)}</span>
+                    </div>
+                </td>
+                <td class="product-category">${escapeHtml(category || '—')}</td>
+                <td class="product-price">${formatPrice(p.price)} ₽</td>
+                <td>
+                    <span class="badge ${inStock ? 'badge-success' : 'badge-danger'}">
+                        ${inStock ? 'В наличии' : 'Нет'}
+                    </span>
+                </td>
+            </tr>
+        `;
+    }).join('');
     
     // Update count
     document.getElementById('productsCount').textContent = `${products.length} товаров`;
