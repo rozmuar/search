@@ -342,6 +342,50 @@ async def get_analytics(
     return analytics
 
 
+# ============ INDEX DIAGNOSTICS ============
+
+@app.get("/api/v1/projects/{project_id}/index-stats")
+async def get_index_stats(
+    project_id: str,
+    user: User = Depends(require_auth)
+):
+    """Диагностика индекса - сколько товаров и токенов проиндексировано"""
+    project = await data_store.get_project(project_id)
+    if not project or project.get("user_id") != user.id:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    # Количество товаров в Redis
+    product_keys = await redis_client.keys(f"products:{project_id}:*")
+    products_count = len(product_keys)
+    
+    # Количество токенов в инвертированном индексе
+    inv_keys = await redis_client.keys(f"idx:{project_id}:inv:*")
+    tokens_count = len(inv_keys)
+    
+    # Количество уникальных товаров в индексе
+    unique_products = set()
+    for key in inv_keys[:100]:  # Проверяем первые 100 токенов
+        product_ids = await redis_client.zrange(key, 0, -1)
+        for pid in product_ids:
+            pid_str = pid.decode() if isinstance(pid, bytes) else pid
+            unique_products.add(pid_str)
+    
+    # Примеры токенов
+    sample_tokens = []
+    for key in inv_keys[:20]:
+        token = key.decode() if isinstance(key, bytes) else key
+        token = token.replace(f"idx:{project_id}:inv:", "")
+        count = await redis_client.zcard(key)
+        sample_tokens.append({"token": token, "products_count": count})
+    
+    return {
+        "products_in_redis": products_count,
+        "tokens_in_index": tokens_count,
+        "unique_products_in_sample": len(unique_products),
+        "sample_tokens": sorted(sample_tokens, key=lambda x: x["products_count"], reverse=True)[:20]
+    }
+
+
 # ============ SEARCH ENDPOINT ============
 
 @app.get("/api/v1/search")
@@ -349,7 +393,7 @@ async def search(
     q: str = Query(..., min_length=1, description="Поисковый запрос"),
     project_id: Optional[str] = Query(None, description="ID проекта"),
     api_key: Optional[str] = Query(None, description="API ключ"),
-    limit: int = Query(10, ge=1, le=100),
+    limit: int = Query(50, ge=1, le=100),
     min_price: Optional[float] = None,
     max_price: Optional[float] = None,
     in_stock: Optional[bool] = None,

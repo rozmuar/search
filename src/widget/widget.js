@@ -34,7 +34,7 @@
     
     results: {
       enabled: true,
-      limit: 20,
+      limit: 50,
       showFilters: true,
       showSorting: true,
       highlightMatches: true,
