@@ -264,21 +264,28 @@ async def load_feed(
     user: User = Depends(require_auth)
 ):
     """Загрузка фида проекта. URL можно передать в body или использовать сохранённый в проекте."""
+    logger.info(f"[load_feed] Starting for project {project_id}, url param: {url}")
+    
     project = await data_store.get_project(project_id)
     if not project or project.get("user_id") != user.id:
+        logger.warning(f"[load_feed] Project not found or access denied: {project_id}")
         raise HTTPException(status_code=404, detail="Project not found")
     
     # URL из запроса или из проекта
     feed_url = url if url else project.get("feed_url")
+    logger.info(f"[load_feed] Feed URL: {feed_url}")
     
     if not feed_url:
+        logger.warning(f"[load_feed] No feed URL for project {project_id}")
         raise HTTPException(status_code=400, detail="Feed URL not provided. Set feed URL in project settings first.")
     
     # Сохраняем URL фида в проект
     await data_store.update_project(project_id, {"feed_url": feed_url})
     
     # Загружаем фид
+    logger.info(f"[load_feed] Calling feed_manager.load_feed...")
     result = await feed_manager.load_feed(project_id, feed_url)
+    logger.info(f"[load_feed] Result: success={result.get('success')}, error={result.get('error')}")
     
     if result["success"]:
         # Сохраняем товары
