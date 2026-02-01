@@ -529,12 +529,13 @@ async function loadSearchSettings() {
         
         selectedFields = settings.relatedProductsFields || 
                         (settings.relatedProductsField ? [settings.relatedProductsField] : []);
+        console.log('Selected fields to check:', selectedFields);
         
         if (settings.relatedProductsLimit) {
             limitInput.value = settings.relatedProductsLimit;
         }
     } catch (err) {
-        console.log('No search settings yet');
+        console.log('No search settings yet:', err);
     }
     
     try {
@@ -555,8 +556,10 @@ async function loadSearchSettings() {
             });
             
             // Render checkboxes
+            console.log('Rendering checkboxes, selectedFields:', selectedFields);
             container.innerHTML = sortedFields.map(field => {
                 const checked = selectedFields.includes(field) ? 'checked' : '';
+                console.log(`Field ${field}, checked: ${checked}`);
                 return `
                     <label class="checkbox-item">
                         <input type="checkbox" name="relatedField" value="${field}" ${checked} onchange="markSearchSettingsChanged()">
