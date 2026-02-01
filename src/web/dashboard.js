@@ -1336,3 +1336,19 @@ function toggleUserMenu() {
     // Could show dropdown with settings, profile, etc.
     console.log('Toggle user menu');
 }
+
+// ==================== FEED GUIDE ====================
+function showFeedGuide() {
+    document.getElementById('feedGuideModal').classList.add('active');
+}
+
+function closeFeedGuide() {
+    document.getElementById('feedGuideModal').classList.remove('active');
+}
+
+function copyFeedExample() {
+    const code = document.getElementById('feedExampleCode').textContent;
+    navigator.clipboard.writeText(code).then(() => {
+        showToast('Пример скопирован', 'success');
+    });
+}

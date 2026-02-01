@@ -2133,6 +2133,113 @@ body {
     font-size: 1.25rem;
 }
 
+/* ========== FEED GUIDE ========== */
+.modal-lg {
+    max-width: 800px;
+}
+
+.feed-guide {
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.guide-intro {
+    font-size: 1rem;
+    color: var(--gray-600);
+    line-height: 1.7;
+    margin-bottom: 24px;
+    padding: 16px;
+    background: var(--gray-50);
+    border-radius: var(--radius);
+}
+
+.feed-guide h4 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gray-800);
+    margin: 24px 0 12px;
+}
+
+.feed-guide h4:first-of-type {
+    margin-top: 0;
+}
+
+.guide-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+    margin-bottom: 16px;
+}
+
+.guide-table th,
+.guide-table td {
+    padding: 10px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.guide-table th {
+    background: var(--gray-50);
+    font-weight: 600;
+    color: var(--gray-700);
+}
+
+.guide-table code {
+    background: var(--gray-100);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.8125rem;
+    color: var(--primary);
+}
+
+.guide-tips {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.guide-tips li {
+    position: relative;
+    padding: 8px 0 8px 24px;
+    color: var(--gray-600);
+    font-size: 0.9375rem;
+}
+
+.guide-tips li::before {
+    content: "✓";
+    position: absolute;
+    left: 0;
+    color: var(--success);
+    font-weight: 600;
+}
+
+.cms-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.cms-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    color: var(--gray-700);
+    text-decoration: none;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+}
+
+.cms-link:hover {
+    background: #fff;
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
 /* ========== RESPONSIVE ========== */
 @media (max-width: 1400px) {
     .stats-grid {

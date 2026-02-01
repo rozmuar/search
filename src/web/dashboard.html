@@ -862,7 +862,10 @@
                 <div class="form-group">
                     <label class="form-label">URL фида (необязательно)</label>
                     <input type="url" class="form-input" id="projectFeedUrl" placeholder="https://example.com/feed.xml">
-                    <small class="form-hint">Фид можно добавить позже</small>
+                    <small class="form-hint">
+                        Фид можно добавить позже. 
+                        <a href="#" onclick="event.preventDefault(); showFeedGuide()">Как создать фид?</a>
+                    </small>
                 </div>
             </div>
             <div class="modal-footer">
@@ -876,6 +879,155 @@
     <div class="toast" id="toast">
         <span class="toast-icon" id="toastIcon">✓</span>
         <span id="toastMessage">Сообщение</span>
+    </div>
+
+    <!-- Feed Guide Modal -->
+    <div class="modal" id="feedGuideModal">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h3 class="modal-title">📄 Как создать фид для SearchPro</h3>
+                <button class="modal-close" onclick="closeFeedGuide()">×</button>
+            </div>
+            <div class="modal-body feed-guide">
+                <p class="guide-intro">
+                    SearchPro поддерживает фиды в формате <strong>YML (Яндекс.Маркет)</strong> — 
+                    это XML-файл с описанием ваших товаров. Большинство CMS (1С-Битрикс, OpenCart, WooCommerce и др.) 
+                    умеют генерировать такие фиды автоматически.
+                </p>
+
+                <h4>📋 Минимальная структура фида</h4>
+                <div class="code-block">
+                    <div class="code-block-header">
+                        <span class="code-block-title">XML (YML)</span>
+                        <button class="btn-copy" onclick="copyFeedExample()">📋 Копировать</button>
+                    </div>
+                    <pre id="feedExampleCode"><code>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;yml_catalog date="2024-01-01"&gt;
+  &lt;shop&gt;
+    &lt;name&gt;Название магазина&lt;/name&gt;
+    &lt;company&gt;Компания&lt;/company&gt;
+    &lt;url&gt;https://example.com&lt;/url&gt;
+    
+    &lt;categories&gt;
+      &lt;category id="1"&gt;Электроника&lt;/category&gt;
+      &lt;category id="2" parentId="1"&gt;Смартфоны&lt;/category&gt;
+    &lt;/categories&gt;
+    
+    &lt;offers&gt;
+      &lt;offer id="12345" available="true"&gt;
+        &lt;name&gt;iPhone 15 Pro 256GB&lt;/name&gt;
+        &lt;url&gt;https://example.com/product/12345&lt;/url&gt;
+        &lt;price&gt;129990&lt;/price&gt;
+        &lt;oldprice&gt;149990&lt;/oldprice&gt;
+        &lt;currencyId&gt;RUB&lt;/currencyId&gt;
+        &lt;categoryId&gt;2&lt;/categoryId&gt;
+        &lt;picture&gt;https://example.com/images/12345.jpg&lt;/picture&gt;
+        &lt;vendor&gt;Apple&lt;/vendor&gt;
+        &lt;description&gt;Описание товара...&lt;/description&gt;
+      &lt;/offer&gt;
+    &lt;/offers&gt;
+  &lt;/shop&gt;
+&lt;/yml_catalog&gt;</code></pre>
+                </div>
+
+                <h4>📌 Обязательные поля товара</h4>
+                <table class="guide-table">
+                    <thead>
+                        <tr>
+                            <th>Поле</th>
+                            <th>Описание</th>
+                            <th>Пример</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>id</code></td>
+                            <td>Уникальный ID товара</td>
+                            <td>12345</td>
+                        </tr>
+                        <tr>
+                            <td><code>name</code></td>
+                            <td>Название товара</td>
+                            <td>iPhone 15 Pro</td>
+                        </tr>
+                        <tr>
+                            <td><code>url</code></td>
+                            <td>Ссылка на страницу товара</td>
+                            <td>https://site.ru/product/123</td>
+                        </tr>
+                        <tr>
+                            <td><code>price</code></td>
+                            <td>Цена товара</td>
+                            <td>129990</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h4>📌 Рекомендуемые поля</h4>
+                <table class="guide-table">
+                    <thead>
+                        <tr>
+                            <th>Поле</th>
+                            <th>Описание</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>picture</code></td>
+                            <td>URL изображения товара (можно несколько)</td>
+                        </tr>
+                        <tr>
+                            <td><code>description</code></td>
+                            <td>Описание товара (улучшает качество поиска)</td>
+                        </tr>
+                        <tr>
+                            <td><code>vendor</code></td>
+                            <td>Производитель/бренд</td>
+                        </tr>
+                        <tr>
+                            <td><code>categoryId</code></td>
+                            <td>ID категории из раздела categories</td>
+                        </tr>
+                        <tr>
+                            <td><code>oldprice</code></td>
+                            <td>Старая цена (для отображения скидки)</td>
+                        </tr>
+                        <tr>
+                            <td><code>available</code></td>
+                            <td>Наличие: true/false</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h4>💡 Советы</h4>
+                <ul class="guide-tips">
+                    <li>Размещайте фид на вашем сервере и укажите прямую ссылку</li>
+                    <li>Обновляйте фид при изменении каталога (минимум раз в день)</li>
+                    <li>Используйте кодировку UTF-8</li>
+                    <li>Заполняйте description — это улучшает релевантность поиска</li>
+                    <li>Максимальный размер фида: 50 МБ</li>
+                </ul>
+
+                <h4>🔗 Готовые решения для CMS</h4>
+                <div class="cms-links">
+                    <a href="https://marketplace.1c-bitrix.ru/solutions/export/" target="_blank" class="cms-link">
+                        <span>1С-Битрикс</span>
+                    </a>
+                    <a href="https://wordpress.org/plugins/yml-for-yandex-market/" target="_blank" class="cms-link">
+                        <span>WooCommerce</span>
+                    </a>
+                    <a href="https://www.opencart.com/index.php?route=marketplace/extension&filter_search=yandex%20market" target="_blank" class="cms-link">
+                        <span>OpenCart</span>
+                    </a>
+                    <a href="https://github.com/yandex-market/yml" target="_blank" class="cms-link">
+                        <span>Документация YML</span>
+                    </a>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="closeFeedGuide()">Понятно</button>
+            </div>
+        </div>
     </div>
 
     <script src="dashboard.js"></script>
