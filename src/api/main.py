@@ -42,7 +42,7 @@ feed_scheduler = None
 
 
 async def restore_products_from_backup(indexer_instance):
-    """Восстановление товаров из PostgreSQL если Redis пустой или нет индекса"""
+    """Восстановление товаров и аналитики из PostgreSQL если Redis пустой или нет индекса"""
     try:
         # Получаем все проекты
         from .database import db
@@ -71,6 +71,14 @@ async def restore_products_from_backup(indexer_instance):
                     logger.info(f"Rebuilt index for {count} products in project {project_id}")
             else:
                 logger.info(f"Project {project_id} has {len(product_keys)} products and {len(index_keys)} index keys - OK")
+            
+            # Проверяем и восстанавливаем аналитику
+            analytics_keys = await redis_client.keys(f"analytics:{project_id}:*")
+            if not analytics_keys:
+                logger.info(f"Restoring analytics for project {project_id} from PostgreSQL...")
+                success = await db.restore_analytics_to_redis(project_id, redis_client)
+                if success:
+                    logger.info(f"Restored analytics for project {project_id}")
                 
     except Exception as e:
         logger.error(f"Failed to restore products from backup: {e}")

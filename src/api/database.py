@@ -103,6 +103,65 @@ class Database:
                 
                 CREATE INDEX IF NOT EXISTS idx_products_project_id ON products(project_id);
             ''')
+            
+            # Таблицы для аналитики
+            await conn.execute('''
+                -- Ежедневная статистика
+                CREATE TABLE IF NOT EXISTS analytics_daily (
+                    id SERIAL PRIMARY KEY,
+                    project_id VARCHAR(32) REFERENCES projects(id) ON DELETE CASCADE,
+                    date DATE NOT NULL,
+                    queries_count INTEGER DEFAULT 0,
+                    clicks_count INTEGER DEFAULT 0,
+                    UNIQUE(project_id, date)
+                );
+                
+                CREATE INDEX IF NOT EXISTS idx_analytics_daily_project_date ON analytics_daily(project_id, date);
+                
+                -- Общие счётчики
+                CREATE TABLE IF NOT EXISTS analytics_totals (
+                    project_id VARCHAR(32) PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
+                    total_queries BIGINT DEFAULT 0,
+                    total_clicks BIGINT DEFAULT 0,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                
+                -- Популярные запросы
+                CREATE TABLE IF NOT EXISTS analytics_popular_queries (
+                    id SERIAL PRIMARY KEY,
+                    project_id VARCHAR(32) REFERENCES projects(id) ON DELETE CASCADE,
+                    query TEXT NOT NULL,
+                    count INTEGER DEFAULT 0,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(project_id, query)
+                );
+                
+                CREATE INDEX IF NOT EXISTS idx_analytics_popular_queries_project ON analytics_popular_queries(project_id);
+                
+                -- Популярные товары (по кликам)
+                CREATE TABLE IF NOT EXISTS analytics_popular_products (
+                    id SERIAL PRIMARY KEY,
+                    project_id VARCHAR(32) REFERENCES projects(id) ON DELETE CASCADE,
+                    product_id VARCHAR(255) NOT NULL,
+                    clicks INTEGER DEFAULT 0,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(project_id, product_id)
+                );
+                
+                CREATE INDEX IF NOT EXISTS idx_analytics_popular_products_project ON analytics_popular_products(project_id);
+                
+                -- Конвертирующие запросы (запросы с кликами)
+                CREATE TABLE IF NOT EXISTS analytics_converting_queries (
+                    id SERIAL PRIMARY KEY,
+                    project_id VARCHAR(32) REFERENCES projects(id) ON DELETE CASCADE,
+                    query TEXT NOT NULL,
+                    clicks INTEGER DEFAULT 0,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(project_id, query)
+                );
+                
+                CREATE INDEX IF NOT EXISTS idx_analytics_converting_queries_project ON analytics_converting_queries(project_id);
+            ''')
     
     # ========== USERS ==========
     
@@ -347,6 +406,186 @@ class Database:
                 SELECT COUNT(*) FROM products WHERE project_id = $1
             ''', project_id)
             return result or 0
+    
+    # ========== ANALYTICS BACKUP ==========
+    
+    async def increment_daily_queries(self, project_id: str, date: str, count: int = 1):
+        """Увеличить счётчик запросов за день"""
+        async with self.pool.acquire() as conn:
+            await conn.execute('''
+                INSERT INTO analytics_daily (project_id, date, queries_count)
+                VALUES ($1, $2, $3)
+                ON CONFLICT (project_id, date) 
+                DO UPDATE SET queries_count = analytics_daily.queries_count + $3
+            ''', project_id, date, count)
+    
+    async def increment_daily_clicks(self, project_id: str, date: str, count: int = 1):
+        """Увеличить счётчик кликов за день"""
+        async with self.pool.acquire() as conn:
+            await conn.execute('''
+                INSERT INTO analytics_daily (project_id, date, clicks_count)
+                VALUES ($1, $2, $3)
+                ON CONFLICT (project_id, date) 
+                DO UPDATE SET clicks_count = analytics_daily.clicks_count + $3
+            ''', project_id, date, count)
+    
+    async def increment_total_queries(self, project_id: str, count: int = 1):
+        """Увеличить общий счётчик запросов"""
+        async with self.pool.acquire() as conn:
+            await conn.execute('''
+                INSERT INTO analytics_totals (project_id, total_queries, updated_at)
+                VALUES ($1, $2, CURRENT_TIMESTAMP)
+                ON CONFLICT (project_id) 
+                DO UPDATE SET total_queries = analytics_totals.total_queries + $2,
+                              updated_at = CURRENT_TIMESTAMP
+            ''', project_id, count)
+    
+    async def increment_total_clicks(self, project_id: str, count: int = 1):
+        """Увеличить общий счётчик кликов"""
+        async with self.pool.acquire() as conn:
+            await conn.execute('''
+                INSERT INTO analytics_totals (project_id, total_clicks, updated_at)
+                VALUES ($1, $2, CURRENT_TIMESTAMP)
+                ON CONFLICT (project_id) 
+                DO UPDATE SET total_clicks = analytics_totals.total_clicks + $2,
+                              updated_at = CURRENT_TIMESTAMP
+            ''', project_id, count)
+    
+    async def increment_popular_query(self, project_id: str, query: str, count: int = 1):
+        """Увеличить счётчик популярного запроса"""
+        async with self.pool.acquire() as conn:
+            await conn.execute('''
+                INSERT INTO analytics_popular_queries (project_id, query, count, updated_at)
+                VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+                ON CONFLICT (project_id, query) 
+                DO UPDATE SET count = analytics_popular_queries.count + $3,
+                              updated_at = CURRENT_TIMESTAMP
+            ''', project_id, query, count)
+    
+    async def increment_popular_product(self, project_id: str, product_id: str, clicks: int = 1):
+        """Увеличить счётчик кликов по товару"""
+        async with self.pool.acquire() as conn:
+            await conn.execute('''
+                INSERT INTO analytics_popular_products (project_id, product_id, clicks, updated_at)
+                VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+                ON CONFLICT (project_id, product_id) 
+                DO UPDATE SET clicks = analytics_popular_products.clicks + $3,
+                              updated_at = CURRENT_TIMESTAMP
+            ''', project_id, product_id, clicks)
+    
+    async def increment_converting_query(self, project_id: str, query: str, clicks: int = 1):
+        """Увеличить счётчик конвертирующего запроса"""
+        async with self.pool.acquire() as conn:
+            await conn.execute('''
+                INSERT INTO analytics_converting_queries (project_id, query, clicks, updated_at)
+                VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+                ON CONFLICT (project_id, query) 
+                DO UPDATE SET clicks = analytics_converting_queries.clicks + $3,
+                              updated_at = CURRENT_TIMESTAMP
+            ''', project_id, query, clicks)
+    
+    async def get_analytics_backup(self, project_id: str, days: int = 7) -> Dict[str, Any]:
+        """Получение аналитики из PostgreSQL"""
+        async with self.pool.acquire() as conn:
+            # Общие счётчики
+            totals = await conn.fetchrow('''
+                SELECT total_queries, total_clicks FROM analytics_totals WHERE project_id = $1
+            ''', project_id)
+            
+            total_queries = totals['total_queries'] if totals else 0
+            total_clicks = totals['total_clicks'] if totals else 0
+            
+            # Статистика по дням
+            if days > 0:
+                daily_rows = await conn.fetch('''
+                    SELECT date, queries_count, clicks_count 
+                    FROM analytics_daily 
+                    WHERE project_id = $1 AND date >= CURRENT_DATE - $2::INTEGER
+                    ORDER BY date DESC
+                ''', project_id, days)
+            else:
+                daily_rows = await conn.fetch('''
+                    SELECT date, queries_count, clicks_count 
+                    FROM analytics_daily 
+                    WHERE project_id = $1
+                    ORDER BY date DESC
+                ''', project_id)
+            
+            queries_by_day = {}
+            clicks_by_day = {}
+            for row in daily_rows:
+                day_str = row['date'].strftime('%Y-%m-%d')
+                queries_by_day[day_str] = row['queries_count']
+                clicks_by_day[day_str] = row['clicks_count']
+            
+            # Популярные запросы
+            popular_queries = await conn.fetch('''
+                SELECT query, count FROM analytics_popular_queries 
+                WHERE project_id = $1 ORDER BY count DESC LIMIT 20
+            ''', project_id)
+            
+            # Популярные товары
+            popular_products = await conn.fetch('''
+                SELECT product_id, clicks FROM analytics_popular_products 
+                WHERE project_id = $1 ORDER BY clicks DESC LIMIT 20
+            ''', project_id)
+            
+            # Конвертирующие запросы
+            converting_queries = await conn.fetch('''
+                SELECT query, clicks FROM analytics_converting_queries 
+                WHERE project_id = $1 ORDER BY clicks DESC LIMIT 10
+            ''', project_id)
+            
+            return {
+                "total_queries": total_queries,
+                "total_clicks": total_clicks,
+                "queries_by_day": queries_by_day,
+                "clicks_by_day": clicks_by_day,
+                "popular_queries": [{"query": r['query'], "count": r['count']} for r in popular_queries],
+                "popular_products": [{"product_id": r['product_id'], "clicks": r['clicks']} for r in popular_products],
+                "converting_queries": [{"query": r['query'], "clicks": r['clicks']} for r in converting_queries]
+            }
+    
+    async def restore_analytics_to_redis(self, project_id: str, redis_client) -> bool:
+        """Восстановление аналитики из PostgreSQL в Redis"""
+        try:
+            analytics = await self.get_analytics_backup(project_id, days=0)
+            
+            pipe = redis_client.pipeline()
+            
+            # Общие счётчики
+            if analytics['total_queries']:
+                pipe.set(f"analytics:{project_id}:total_queries", analytics['total_queries'])
+            if analytics['total_clicks']:
+                pipe.set(f"analytics:{project_id}:total_clicks", analytics['total_clicks'])
+            
+            # Ежедневная статистика
+            for day, count in analytics['queries_by_day'].items():
+                pipe.set(f"analytics:{project_id}:queries:{day}", count)
+                pipe.expire(f"analytics:{project_id}:queries:{day}", 86400 * 365)
+            
+            for day, count in analytics['clicks_by_day'].items():
+                pipe.set(f"analytics:{project_id}:clicks:{day}", count)
+                pipe.expire(f"analytics:{project_id}:clicks:{day}", 86400 * 365)
+            
+            # Популярные запросы
+            for q in analytics['popular_queries']:
+                pipe.zadd(f"analytics:{project_id}:popular_queries", {q['query']: q['count']})
+            
+            # Популярные товары
+            for p in analytics['popular_products']:
+                pipe.zadd(f"analytics:{project_id}:popular_products", {p['product_id']: p['clicks']})
+            
+            # Конвертирующие запросы
+            for q in analytics['converting_queries']:
+                pipe.zadd(f"analytics:{project_id}:converting_queries", {q['query']: q['clicks']})
+            
+            await pipe.execute()
+            return True
+            
+        except Exception as e:
+            print(f"Failed to restore analytics: {e}")
+            return False
 
 
 # Глобальный экземпляр базы данных

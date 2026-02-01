@@ -230,6 +230,8 @@ class DataStore:
     
     async def log_search(self, project_id: str, query: str, results_count: int, took_ms: float):
         """Логирование поискового запроса"""
+        from .database import db
+        
         now = datetime.utcnow()
         day_key = now.strftime("%Y-%m-%d")
         hour_key = now.strftime("%Y-%m-%d-%H")
@@ -263,6 +265,15 @@ class DataStore:
         pipe.ltrim(f"analytics:{project_id}:response_times", 0, 999)  # Последние 1000
         
         await pipe.execute()
+        
+        # Бэкап в PostgreSQL (асинхронно, не блокируем)
+        try:
+            await db.increment_daily_queries(project_id, day_key)
+            await db.increment_total_queries(project_id)
+            if results_count > 0:
+                await db.increment_popular_query(project_id, normalized_query)
+        except Exception as e:
+            pass  # Не блокируем если PostgreSQL недоступен
     
     async def get_popular_queries(self, project_id: str, limit: int = 5) -> List[Dict[str, Any]]:
         """Получение популярных запросов для показа при фокусе на поле поиска"""
@@ -384,6 +395,8 @@ class DataStore:
     
     async def log_click(self, project_id: str, product_id: str, query: str):
         """Логирование клика по товару"""
+        from .database import db
+        
         now = datetime.utcnow()
         day_key = now.strftime("%Y-%m-%d")
         
@@ -400,6 +413,17 @@ class DataStore:
         pipe.zincrby(f"analytics:{project_id}:popular_products", 1, product_id)
         
         # Запросы приводящие к кликам
-        pipe.zincrby(f"analytics:{project_id}:converting_queries", 1, query.lower())
+        normalized_query = query.lower().strip()
+        pipe.zincrby(f"analytics:{project_id}:converting_queries", 1, normalized_query)
         
         await pipe.execute()
+        
+        # Бэкап в PostgreSQL
+        try:
+            await db.increment_daily_clicks(project_id, day_key)
+            await db.increment_total_clicks(project_id)
+            await db.increment_popular_product(project_id, product_id)
+            if normalized_query:
+                await db.increment_converting_query(project_id, normalized_query)
+        except Exception as e:
+            pass  # Не блокируем если PostgreSQL недоступен
