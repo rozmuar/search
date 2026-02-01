@@ -298,15 +298,23 @@
 
     bindEvents() {
       const items = this.element.querySelectorAll('.search-widget-suggestion-item');
+      console.log('[SearchWidget] Binding events to', items.length, 'suggestion items');
       
       items.forEach((item, index) => {
         item.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
           const type = item.dataset.type;
+          const value = item.dataset.value;
+          console.log('[SearchWidget] Suggestion clicked:', type, value);
           
           if (type === 'query') {
-            e.preventDefault();
-            this.widget.selectSuggestion(item.dataset.value);
+            this.widget.selectSuggestion(value);
           } else if (type === 'product') {
+            const url = item.dataset.url;
+            if (url) {
+              window.location.href = url;
+            }
             this.widget.trackClick(item.dataset.id, index);
           }
         });
@@ -554,10 +562,11 @@
     }
 
     selectSuggestion(value) {
+      console.log('[SearchWidget] selectSuggestion called with:', value);
       this.input.value = value;
       this.state.query = value;
       this.suggestions.hide();
-      this.performSearch();
+      this.search(value);
     }
 
     async performSearch() {
