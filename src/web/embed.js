@@ -152,14 +152,36 @@
 
     trackEvent(eventType, data) {
       try {
+        // Для кликов используем специальный endpoint
+        if (eventType === 'click') {
+          const clickBody = JSON.stringify({
+            api_key: this.apiKey,
+            product_id: data.product_id,
+            query: data.query || ''
+          });
+          
+          fetch(`${this.apiUrl}/track/click`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: clickBody,
+            keepalive: true,
+          });
+          return;
+        }
+        
+        // Для остальных событий
         const body = JSON.stringify({
           type: eventType,
+          api_key: this.apiKey,
           ...data,
           timestamp: Date.now(),
         });
         
         if (navigator.sendBeacon) {
-          navigator.sendBeacon(`${this.apiUrl}/analytics/event`, body);
+          const blob = new Blob([body], { type: 'application/json' });
+          navigator.sendBeacon(`${this.apiUrl}/analytics/event`, blob);
         } else {
           fetch(`${this.apiUrl}/analytics/event`, {
             method: 'POST',

@@ -15,8 +15,14 @@ class FeedParser:
     @staticmethod
     async def fetch_feed(url: str, timeout: int = 300) -> str:
         """Загрузка фида по URL (таймаут 5 минут для больших фидов)"""
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, timeout=aiohttp.ClientTimeout(total=timeout)) as response:
+        connector = aiohttp.TCPConnector(force_close=True)
+        async with aiohttp.ClientSession(connector=connector) as session:
+            async with session.get(
+                url, 
+                timeout=aiohttp.ClientTimeout(total=timeout),
+                allow_redirects=True,
+                max_redirects=10
+            ) as response:
                 if response.status != 200:
                     raise Exception(f"Failed to fetch feed: HTTP {response.status}")
                 return await response.text()
