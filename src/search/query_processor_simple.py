@@ -69,12 +69,29 @@ class SimpleQueryProcessor:
     
     def tokenize(self, query: str) -> List[str]:
         """Разбиение на токены с удалением стоп-слов"""
-        raw_tokens = re.split(r'[\s\-]+', query)
+        # Сначала разбиваем по пробелам
+        raw_tokens = query.split()
         
-        tokens = [
-            t for t in raw_tokens 
-            if t and t not in self.stopwords and len(t) > 1
-        ]
+        tokens = []
+        for t in raw_tokens:
+            if not t or t in self.stopwords:
+                continue
+            
+            # Добавляем оригинальный токен (с дефисом если есть)
+            if len(t) > 1:
+                tokens.append(t)
+            
+            # Если содержит дефис - добавляем также части и слитную версию
+            if '-' in t:
+                parts = t.split('-')
+                # Слитная версия без дефиса
+                joined = ''.join(parts)
+                if len(joined) > 1 and joined not in tokens:
+                    tokens.append(joined)
+                # Отдельные части если значимые
+                for part in parts:
+                    if len(part) > 1 and part not in self.stopwords and part not in tokens:
+                        tokens.append(part)
         
         return tokens
 

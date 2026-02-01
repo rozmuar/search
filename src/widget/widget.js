@@ -575,10 +575,12 @@
       // Фокус - показываем популярные запросы если поле пустое
       this.input.addEventListener('focus', () => {
         const query = this.input.value.trim();
+        console.log('[SearchWidget] Focus event, query:', query, 'minChars:', this.config.minChars);
         if (query.length >= this.config.minChars) {
           this.fetchSuggestions(query);
         } else {
           // Показываем популярные запросы
+          console.log('[SearchWidget] Fetching popular queries...');
           this.fetchPopularQueries();
         }
       });
@@ -589,7 +591,9 @@
      */
     async fetchPopularQueries() {
       try {
+        console.log('[SearchWidget] Calling getPopular...');
         const data = await this.api.getPopular(5);
+        console.log('[SearchWidget] Popular data received:', data);
         
         if (data.queries && data.queries.length > 0) {
           // Форматируем для показа
