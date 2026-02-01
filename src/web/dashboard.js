@@ -150,7 +150,7 @@ async function loadProjects() {
 
 function renderProjectsList() {
     const container = document.getElementById('projectsList');
-    if (projects.length === 0) {
+    if (!Array.isArray(projects) || projects.length === 0) {
         container.innerHTML = '';
         return;
     }
@@ -176,7 +176,7 @@ function renderProjectsList() {
 function renderDashboardProjects() {
     const container = document.getElementById('dashboardProjectsList');
     
-    if (projects.length === 0) {
+    if (!Array.isArray(projects) || projects.length === 0) {
         container.innerHTML = `
             <div class="empty-state" style="border: none; margin: 20px;">
                 <div class="empty-icon">📁</div>
@@ -278,14 +278,15 @@ async function loadDashboardStats() {
     let totalSearches = 0;
     let totalClicks = 0;
     
-    projects.forEach(p => {
+    const projectsList = Array.isArray(projects) ? projects : [];
+    projectsList.forEach(p => {
         totalProducts += p.products_count || 0;
         totalSearches += p.searches_count || 0;
     });
     
     const ctr = totalSearches > 0 ? Math.round((totalClicks / totalSearches) * 100) : 0;
     
-    animateNumber('statProjects', projects.length);
+    animateNumber('statProjects', projectsList.length);
     animateNumber('statProducts', totalProducts);
     animateNumber('statSearches', totalSearches);
     document.getElementById('statCTR').textContent = ctr + '%';
