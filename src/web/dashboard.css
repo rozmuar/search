@@ -2426,6 +2426,17 @@ body {
     text-decoration: underline;
 }
 
+.guide-subtitle {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--gray-700);
+    margin: 24px 0 12px;
+}
+
+.guide-subtitle:first-of-type {
+    margin-top: 0;
+}
+
 .guide-steps {
     margin: 0;
     padding-left: 24px;
