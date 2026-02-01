@@ -19,6 +19,7 @@ from ..search.engine_simple import SimpleSearchEngine
 from .auth import decode_token, UserCreate, UserLogin, User
 from .storage import DataStore
 from ..feed.parser import FeedParser, FeedManager
+from ..core.models import Product
 
 
 # Глобальные объекты
@@ -226,8 +227,30 @@ async def load_feed(project_id: str, user: User = Depends(require_auth)):
         # Сохраняем товары
         await data_store.save_products(project_id, result["products"])
         
+        # Конвертируем dict в Product для индексатора
+        products_list = []
+        for p in result["products"]:
+            try:
+                product = Product(
+                    id=str(p.get("id", "")),
+                    name=p.get("name", ""),
+                    url=p.get("url", ""),
+                    description=p.get("description"),
+                    image=p.get("image"),
+                    images=p.get("images", []),
+                    price=float(p.get("price", 0) or 0),
+                    old_price=float(p.get("old_price") or 0) if p.get("old_price") else None,
+                    in_stock=p.get("in_stock", True),
+                    category=p.get("category"),
+                    brand=p.get("brand"),
+                )
+                products_list.append(product)
+            except Exception as e:
+                print(f"Error converting product {p.get('id')}: {e}")
+                continue
+        
         # Индексируем товары для поиска
-        await indexer.index_products(project_id, result["products"])
+        await indexer.index_products(project_id, products_list)
         
         return {
             "success": True,
