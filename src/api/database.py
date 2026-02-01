@@ -78,6 +78,17 @@ class Database:
                     END IF;
                 END $$;
             ''')
+            
+            # Миграция: добавляем synonyms если не существует
+            await conn.execute('''
+                DO $$ 
+                BEGIN 
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='projects' AND column_name='synonyms') THEN
+                        ALTER TABLE projects ADD COLUMN synonyms JSONB DEFAULT '[]';
+                    END IF;
+                END $$;
+            ''')
     
     # ========== USERS ==========
     
@@ -159,7 +170,7 @@ class Database:
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow('''
                 SELECT p.id, p.user_id, p.name, p.domain, p.feed_url, p.status,
-                       p.products_count, p.widget_settings, p.search_settings, p.created_at, a.key as api_key
+                       p.products_count, p.widget_settings, p.search_settings, p.synonyms, p.created_at, a.key as api_key
                 FROM projects p
                 LEFT JOIN api_keys a ON a.project_id = p.id
                 WHERE p.id = $1
@@ -171,6 +182,8 @@ class Database:
                 result['widget_settings'] = json.dumps(result['widget_settings'])
             if result.get('search_settings'):
                 result['search_settings'] = json.dumps(result['search_settings'])
+            if result.get('synonyms'):
+                result['synonyms'] = result['synonyms']  # JSONB уже dict/list
             return result
     
     async def get_project_by_api_key(self, api_key: str) -> Optional[Dict]:
@@ -178,7 +191,7 @@ class Database:
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow('''
                 SELECT p.id, p.user_id, p.name, p.domain, p.feed_url, p.status,
-                       p.products_count, p.widget_settings, p.search_settings, p.created_at, a.key as api_key
+                       p.products_count, p.widget_settings, p.search_settings, p.synonyms, p.created_at, a.key as api_key
                 FROM api_keys a
                 JOIN projects p ON p.id = a.project_id
                 WHERE a.key = $1
@@ -217,7 +230,7 @@ class Database:
     async def update_project(self, project_id: str, updates: Dict[str, Any]) -> Optional[Dict]:
         """Обновление проекта"""
         # Фильтруем разрешенные поля
-        allowed_fields = ['name', 'domain', 'feed_url', 'status', 'products_count', 'widget_settings', 'search_settings']
+        allowed_fields = ['name', 'domain', 'feed_url', 'status', 'products_count', 'widget_settings', 'search_settings', 'synonyms']
         filtered = {k: v for k, v in updates.items() if k in allowed_fields}
         
         if not filtered:
@@ -228,14 +241,14 @@ class Database:
         values = []
         for i, (key, value) in enumerate(filtered.items(), 1):
             set_parts.append(f"{key} = ${i}")
-            # Для JSONB полей конвертируем dict в JSON строку
-            if key in ('widget_settings', 'search_settings'):
-                if isinstance(value, dict):
+            # Для JSONB полей конвертируем dict/list в JSON строку
+            if key in ('widget_settings', 'search_settings', 'synonyms'):
+                if isinstance(value, (dict, list)):
                     values.append(json.dumps(value))
                 elif isinstance(value, str):
                     values.append(value)
                 else:
-                    values.append(json.dumps({}))
+                    values.append(json.dumps({} if key != 'synonyms' else []))
             else:
                 values.append(value)
         

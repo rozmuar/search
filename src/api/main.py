@@ -582,15 +582,14 @@ async def get_synonyms(project_id: str, user: User = Depends(require_auth)):
     if not project or project.get("user_id") != user.id:
         raise HTTPException(status_code=404, detail="Project not found")
     
-    # Синонимы хранятся в Redis
-    synonyms_key = f"synonyms:{project_id}"
-    synonyms_data = await redis_client.get(synonyms_key)
+    # Синонимы хранятся в PostgreSQL, Redis - кэш
+    synonyms = project.get("synonyms", [])
     
-    if synonyms_data:
-        try:
-            return {"synonyms": json.loads(synonyms_data)}
-        except:
-            pass
+    # Если в БД есть данные - вернём их
+    if synonyms:
+        # Обновляем кэш в Redis
+        await redis_client.set(f"synonyms:{project_id}", json.dumps(synonyms))
+        return {"synonyms": synonyms}
     
     return {"synonyms": []}
 
@@ -613,7 +612,10 @@ async def update_synonyms(project_id: str, data: dict, user: User = Depends(requ
     
     synonyms = data.get("synonyms", [])
     
-    # Сохраняем в Redis
+    # Сохраняем в PostgreSQL
+    await data_store.update_project(project_id, {"synonyms": synonyms})
+    
+    # Обновляем кэш в Redis
     synonyms_key = f"synonyms:{project_id}"
     await redis_client.set(synonyms_key, json.dumps(synonyms))
     
