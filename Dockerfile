@@ -10,12 +10,14 @@ RUN apt-get update && apt-get install -y \
     openssl \
     && rm -rf /var/lib/apt/lists/*
 
-# Генерация self-signed SSL сертификата
-RUN mkdir -p /etc/nginx/ssl && \
-    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-    -keyout /etc/nginx/ssl/server.key \
-    -out /etc/nginx/ssl/server.crt \
-    -subj "/CN=searchpro/O=SearchPro/C=RU"
+# Создание директорий для SSL и certbot
+RUN mkdir -p /etc/nginx/ssl /var/www/certbot
+
+# Генерация self-signed SSL сертификата (fallback, будет заменён Let's Encrypt)
+RUN openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+    -keyout /etc/nginx/ssl/privkey.pem \
+    -out /etc/nginx/ssl/fullchain.pem \
+    -subj "/CN=dr-robot.ru/O=SearchPro/C=RU"
 
 # Копирование зависимостей
 COPY requirements-basic.txt .
