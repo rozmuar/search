@@ -293,7 +293,7 @@ function showCreateProjectModal() {
     document.getElementById('createProjectModal').classList.add('active');
     document.getElementById('projectName').value = '';
     document.getElementById('projectDomain').value = '';
-    document.getElementById('projectFeedUrl').value = '';
+    document.getElementById('projectFeedUrlInput').value = '';
     document.getElementById('projectName').focus();
 }
 
@@ -304,7 +304,7 @@ function closeCreateProjectModal() {
 async function createProject() {
     const name = document.getElementById('projectName').value.trim();
     const domain = document.getElementById('projectDomain').value.trim();
-    const feedUrl = document.getElementById('projectFeedUrl').value.trim();
+    const feedUrl = document.getElementById('projectFeedUrlInput').value.trim();
     
     if (!name) {
         showToast('Введите название проекта', 'error');
@@ -350,7 +350,7 @@ function editProject(projectId) {
     document.getElementById('createProjectModal').classList.add('active');
     document.getElementById('projectName').value = project.name || '';
     document.getElementById('projectDomain').value = project.domain || '';
-    document.getElementById('projectFeedUrl').value = project.feed_url || '';
+    document.getElementById('projectFeedUrlInput').value = project.feed_url || '';
     document.getElementById('projectName').focus();
 }
 
