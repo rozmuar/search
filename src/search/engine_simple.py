@@ -72,6 +72,21 @@ class SimpleSearchEngine:
             search_query.tokens
         )
         
+        # Если мало результатов, пробуем с другой раскладкой
+        if len(product_scores) < limit and search_query.layout_variants:
+            for variant in search_query.layout_variants:
+                variant_tokens = self.query_processor.tokenize(variant)
+                if variant_tokens:
+                    variant_scores = await self._search_inverted_index(
+                        project_id,
+                        variant_tokens
+                    )
+                    # Объединяем результаты (с меньшим весом для раскладки)
+                    for pid, score in variant_scores.items():
+                        if pid not in product_scores:
+                            product_scores[pid] = score * 0.9  # Немного снижаем релевантность
+                        # Если уже есть - не перезаписываем
+        
         # Если мало результатов, пробуем n-gram поиск
         if len(product_scores) < limit:
             ngram_scores = await self._search_ngram_index(
