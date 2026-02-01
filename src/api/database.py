@@ -54,6 +54,7 @@ class Database:
                     status VARCHAR(20) DEFAULT 'active',
                     products_count INTEGER DEFAULT 0,
                     widget_settings JSONB DEFAULT '{}',
+                    search_settings JSONB DEFAULT '{}',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
                 
@@ -65,6 +66,17 @@ class Database:
                 
                 CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects(user_id);
                 CREATE INDEX IF NOT EXISTS idx_api_keys_project_id ON api_keys(project_id);
+            ''')
+            
+            # Миграция: добавляем search_settings если не существует
+            await conn.execute('''
+                DO $$ 
+                BEGIN 
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='projects' AND column_name='search_settings') THEN
+                        ALTER TABLE projects ADD COLUMN search_settings JSONB DEFAULT '{}';
+                    END IF;
+                END $$;
             ''')
     
     # ========== USERS ==========
