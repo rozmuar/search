@@ -1354,6 +1354,73 @@ body {
     cursor: pointer;
 }
 
+/* Synonyms */
+.synonyms-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.synonym-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+}
+
+.synonym-words {
+    flex: 1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.synonym-word {
+    padding: 4px 10px;
+    background: var(--primary);
+    color: #fff;
+    border-radius: 12px;
+    font-size: 0.875rem;
+}
+
+.synonym-delete-btn {
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: var(--gray-200);
+    color: var(--gray-600);
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.synonym-delete-btn:hover {
+    background: var(--danger);
+    color: #fff;
+}
+
+.synonym-input-row {
+    display: flex;
+    gap: 12px;
+}
+
+.synonym-input-row .form-input {
+    flex: 1;
+}
+
+.synonym-add-form {
+    padding-top: 16px;
+    border-top: 1px solid var(--gray-200);
+}
+
 .form-row {
     display: grid;
     grid-template-columns: 1fr 1fr;

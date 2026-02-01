@@ -429,6 +429,9 @@ async function openProjectDetail(projectId) {
     
     // Load search settings
     await loadSearchSettings();
+    
+    // Load synonyms
+    await loadSynonyms();
 }
 
 async function loadProjectFeedStatus() {
@@ -645,6 +648,121 @@ async function saveSearchSettings() {
         statusEl.textContent = 'Ошибка сохранения';
         showToast('Ошибка сохранения настроек', 'error');
     }
+}
+
+// ==================== SYNONYMS ====================
+let synonymGroups = [];
+
+async function loadSynonyms() {
+    if (!currentProject) return;
+    
+    const listEl = document.getElementById('synonymsList');
+    if (!listEl) return;
+    
+    listEl.innerHTML = '<div class="form-hint">Загрузка...</div>';
+    
+    try {
+        const data = await fetchAPI(`/api/v1/projects/${currentProject.id}/synonyms`);
+        synonymGroups = data.synonyms || [];
+        renderSynonyms();
+    } catch (err) {
+        console.log('No synonyms yet');
+        synonymGroups = [];
+        renderSynonyms();
+    }
+}
+
+function renderSynonyms() {
+    const listEl = document.getElementById('synonymsList');
+    if (!listEl) return;
+    
+    if (synonymGroups.length === 0) {
+        listEl.innerHTML = '<div class="form-hint">Синонимы не добавлены</div>';
+        return;
+    }
+    
+    listEl.innerHTML = synonymGroups.map((group, index) => `
+        <div class="synonym-group" data-index="${index}">
+            <div class="synonym-words">${group.map(w => `<span class="synonym-word">${escapeHtml(w)}</span>`).join('')}</div>
+            <button class="synonym-delete-btn" onclick="deleteSynonymGroup(${index})" title="Удалить">✕</button>
+        </div>
+    `).join('');
+}
+
+async function addSynonymGroup() {
+    if (!currentProject) return;
+    
+    const input = document.getElementById('newSynonymInput');
+    const statusEl = document.getElementById('synonymsStatus');
+    const value = input.value.trim();
+    
+    if (!value) return;
+    
+    // Парсим слова (разделитель - запятая)
+    const words = value.split(',').map(w => w.trim().toLowerCase()).filter(w => w.length > 0);
+    
+    if (words.length < 2) {
+        showToast('Введите минимум 2 слова через запятую', 'error');
+        return;
+    }
+    
+    // Проверяем что такой группы еще нет
+    const isDuplicate = synonymGroups.some(group => 
+        words.some(w => group.includes(w))
+    );
+    
+    if (isDuplicate) {
+        showToast('Одно из слов уже есть в другой группе синонимов', 'error');
+        return;
+    }
+    
+    statusEl.textContent = 'Сохранение...';
+    
+    try {
+        synonymGroups.push(words);
+        await saveSynonyms();
+        
+        input.value = '';
+        renderSynonyms();
+        statusEl.textContent = '✓ Добавлено';
+        showToast('Группа синонимов добавлена', 'success');
+        
+        setTimeout(() => { statusEl.textContent = ''; }, 2000);
+    } catch (err) {
+        synonymGroups.pop();
+        statusEl.textContent = 'Ошибка';
+        showToast('Ошибка сохранения синонимов', 'error');
+    }
+}
+
+async function deleteSynonymGroup(index) {
+    if (!currentProject) return;
+    
+    const statusEl = document.getElementById('synonymsStatus');
+    const removed = synonymGroups.splice(index, 1);
+    
+    statusEl.textContent = 'Удаление...';
+    
+    try {
+        await saveSynonyms();
+        renderSynonyms();
+        statusEl.textContent = '✓ Удалено';
+        showToast('Группа синонимов удалена', 'success');
+        
+        setTimeout(() => { statusEl.textContent = ''; }, 2000);
+    } catch (err) {
+        synonymGroups.splice(index, 0, ...removed);
+        renderSynonyms();
+        statusEl.textContent = 'Ошибка';
+        showToast('Ошибка удаления синонимов', 'error');
+    }
+}
+
+async function saveSynonyms() {
+    await fetchAPI(`/api/v1/projects/${currentProject.id}/synonyms`, {
+        method: 'PUT',
+        body: JSON.stringify({ synonyms: synonymGroups })
+    });
 }
 
 async function loadProjectFeed() {

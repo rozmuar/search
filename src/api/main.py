@@ -575,6 +575,51 @@ async def update_search_settings(project_id: str, settings: dict, user: User = D
     return settings
 
 
+@app.get("/api/v1/projects/{project_id}/synonyms")
+async def get_synonyms(project_id: str, user: User = Depends(require_auth)):
+    """Получение синонимов для проекта"""
+    project = await data_store.get_project(project_id)
+    if not project or project.get("user_id") != user.id:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    # Синонимы хранятся в Redis
+    synonyms_key = f"synonyms:{project_id}"
+    synonyms_data = await redis_client.get(synonyms_key)
+    
+    if synonyms_data:
+        try:
+            return {"synonyms": json.loads(synonyms_data)}
+        except:
+            pass
+    
+    return {"synonyms": []}
+
+
+@app.put("/api/v1/projects/{project_id}/synonyms")
+async def update_synonyms(project_id: str, data: dict, user: User = Depends(require_auth)):
+    """Обновление синонимов для проекта
+    
+    Пример data:
+    {
+        "synonyms": [
+            ["масло", "смазка", "oil"],
+            ["автомобиль", "машина", "авто", "car"]
+        ]
+    }
+    """
+    project = await data_store.get_project(project_id)
+    if not project or project.get("user_id") != user.id:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    synonyms = data.get("synonyms", [])
+    
+    # Сохраняем в Redis
+    synonyms_key = f"synonyms:{project_id}"
+    await redis_client.set(synonyms_key, json.dumps(synonyms))
+    
+    return {"synonyms": synonyms}
+
+
 @app.get("/api/v1/projects/{project_id}/feed-params")
 async def get_feed_params(project_id: str, user: User = Depends(require_auth)):
     """Получение списка параметров из фида для настройки поиска"""

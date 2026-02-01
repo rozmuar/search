@@ -66,10 +66,16 @@ class SimpleSearchEngine:
                 took_ms=int((time.time() - start_time) * 1000)
             )
         
+        # Загружаем синонимы проекта
+        synonyms = await self._load_synonyms(project_id)
+        
+        # Расширяем токены синонимами
+        expanded_tokens = self._expand_with_synonyms(search_query.tokens, synonyms)
+        
         # Поиск по инвертированному индексу
         product_scores = await self._search_inverted_index(
             project_id,
-            search_query.tokens
+            expanded_tokens
         )
         
         # Если мало результатов, пробуем с другой раскладкой
@@ -355,3 +361,37 @@ class SimpleSearchEngine:
                 items.append(product)
         
         return items
+    
+    async def _load_synonyms(self, project_id: str) -> List[List[str]]:
+        """Загрузка синонимов проекта"""
+        try:
+            synonyms_key = f"synonyms:{project_id}"
+            synonyms_data = await self.redis.get(synonyms_key)
+            
+            if synonyms_data:
+                data = synonyms_data.decode() if isinstance(synonyms_data, bytes) else synonyms_data
+                return json.loads(data)
+        except Exception as e:
+            print(f"Error loading synonyms: {e}")
+        
+        return []
+    
+    def _expand_with_synonyms(self, tokens: List[str], synonyms: List[List[str]]) -> List[str]:
+        """Расширяет токены синонимами"""
+        if not synonyms:
+            return tokens
+        
+        expanded = list(tokens)  # Копия оригинальных токенов
+        
+        for token in tokens:
+            token_lower = token.lower()
+            # Ищем токен в группах синонимов
+            for group in synonyms:
+                if token_lower in [w.lower() for w in group]:
+                    # Добавляем все синонимы из группы
+                    for synonym in group:
+                        if synonym.lower() not in [t.lower() for t in expanded]:
+                            expanded.append(synonym.lower())
+                    break
+        
+        return expanded

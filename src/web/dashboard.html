@@ -385,6 +385,37 @@
                     </div>
                 </div>
 
+                <!-- Synonyms Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">📝 Синонимы для поиска</h3>
+                    </div>
+                    <div class="card-body">
+                        <p class="form-hint" style="margin-bottom: 16px;">Добавьте группы синонимов. Поиск по любому слову из группы найдёт товары со всеми словами группы.</p>
+                        
+                        <div id="synonymsList" class="synonyms-list">
+                            <!-- Синонимы будут добавлены через JS -->
+                        </div>
+                        
+                        <div class="synonym-add-form">
+                            <div class="form-group">
+                                <label class="form-label">Новая группа синонимов</label>
+                                <div class="synonym-input-row">
+                                    <input type="text" id="newSynonymInput" class="form-input" 
+                                           placeholder="масло, смазка, oil" 
+                                           onkeypress="if(event.key==='Enter') addSynonymGroup()">
+                                    <button class="btn btn-primary" onclick="addSynonymGroup()">Добавить</button>
+                                </div>
+                                <p class="form-hint">Введите слова через запятую</p>
+                            </div>
+                        </div>
+                        
+                        <div class="form-actions" style="margin-top: 16px;">
+                            <span class="form-hint" id="synonymsStatus"></span>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Quick Actions -->
                 <div class="card">
                     <div class="card-header">
