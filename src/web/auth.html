@@ -3,136 +3,707 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Вход - Search Service</title>
-    <link rel="stylesheet" href="styles.css">
+    <title>Вход — SearchPro</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #4F46E5;
+            --primary-light: #818CF8;
+            --primary-dark: #3730A3;
+            --success: #10B981;
+            --danger: #EF4444;
+            --gray-50: #F9FAFB;
+            --gray-100: #F3F4F6;
+            --gray-200: #E5E7EB;
+            --gray-300: #D1D5DB;
+            --gray-400: #9CA3AF;
+            --gray-500: #6B7280;
+            --gray-600: #4B5563;
+            --gray-700: #374151;
+            --gray-800: #1F2937;
+            --gray-900: #111827;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .auth-wrapper {
+            display: flex;
+            width: 100%;
+            min-height: 100vh;
+        }
+
+        /* Left side - Branding */
+        .auth-brand {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 60px;
+            color: #fff;
+        }
+
+        .brand-logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 48px;
+        }
+
+        .brand-logo-icon {
+            width: 56px;
+            height: 56px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.75rem;
+        }
+
+        .brand-logo-text {
+            font-size: 1.75rem;
+            font-weight: 700;
+        }
+
+        .brand-title {
+            font-size: 3rem;
+            font-weight: 700;
+            line-height: 1.2;
+            margin-bottom: 24px;
+        }
+
+        .brand-subtitle {
+            font-size: 1.25rem;
+            opacity: 0.9;
+            line-height: 1.6;
+            max-width: 480px;
+        }
+
+        .brand-features {
+            margin-top: 48px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .brand-feature {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            font-size: 1rem;
+        }
+
+        .brand-feature-icon {
+            width: 40px;
+            height: 40px;
+            background: rgba(255,255,255,0.15);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.125rem;
+        }
+
+        /* Right side - Form */
+        .auth-form-side {
+            width: 100%;
+            max-width: 520px;
+            background: #fff;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 60px;
+        }
+
+        .auth-card {
+            width: 100%;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        .auth-header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .auth-title {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--gray-900);
+            margin-bottom: 8px;
+        }
+
+        .auth-subtitle {
+            color: var(--gray-500);
+            font-size: 0.9375rem;
+        }
+
+        /* Tabs */
+        .auth-tabs {
+            display: flex;
+            background: var(--gray-100);
+            border-radius: 12px;
+            padding: 4px;
+            margin-bottom: 32px;
+        }
+
+        .auth-tab {
+            flex: 1;
+            padding: 12px 20px;
+            border: none;
+            background: transparent;
+            border-radius: 10px;
+            font-size: 0.9375rem;
+            font-weight: 600;
+            color: var(--gray-600);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .auth-tab:hover {
+            color: var(--gray-800);
+        }
+
+        .auth-tab.active {
+            background: #fff;
+            color: var(--gray-900);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        /* Forms */
+        .auth-form {
+            display: none;
+        }
+
+        .auth-form.active {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--gray-700);
+            margin-bottom: 8px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid var(--gray-300);
+            border-radius: 10px;
+            font-size: 0.9375rem;
+            color: var(--gray-900);
+            transition: all 0.2s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        .form-input::placeholder {
+            color: var(--gray-400);
+        }
+
+        .password-wrapper {
+            position: relative;
+        }
+
+        .password-toggle {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--gray-400);
+            cursor: pointer;
+            padding: 4px;
+            font-size: 1.125rem;
+        }
+
+        .password-toggle:hover {
+            color: var(--gray-600);
+        }
+
+        /* Alert */
+        .alert {
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 0.875rem;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .alert.show {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .alert-error {
+            background: #FEE2E2;
+            color: #991B1B;
+            border: 1px solid #FECACA;
+        }
+
+        .alert-success {
+            background: #D1FAE5;
+            color: #065F46;
+            border: 1px solid #A7F3D0;
+        }
+
+        /* Button */
+        .btn {
+            width: 100%;
+            padding: 14px 24px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(79, 70, 229, 0.4);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Links */
+        .form-footer {
+            text-align: center;
+            margin-top: 24px;
+        }
+
+        .form-link {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.875rem;
+        }
+
+        .form-link:hover {
+            text-decoration: underline;
+        }
+
+        .divider {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin: 24px 0;
+            color: var(--gray-400);
+            font-size: 0.875rem;
+        }
+
+        .divider::before,
+        .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--gray-200);
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .auth-brand {
+                display: none;
+            }
+            
+            .auth-form-side {
+                max-width: 100%;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .auth-form-side {
+                padding: 32px 24px;
+            }
+            
+            .auth-title {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
 </head>
-<body class="auth-page">
-    <div class="auth-container">
-        <div class="auth-card">
-            <div class="auth-header">
-                <a href="/" class="auth-logo">
-                    <span class="logo-icon">🔍</span>
-                    <span>Search Service</span>
-                </a>
-                <p class="auth-subtitle">Умный поиск для вашего магазина</p>
+<body>
+    <div class="auth-wrapper">
+        <!-- Brand Side -->
+        <div class="auth-brand">
+            <a href="/" class="brand-logo">
+                <div class="brand-logo-icon">🔍</div>
+                <span class="brand-logo-text">SearchPro</span>
+            </a>
+            
+            <h1 class="brand-title">Умный поиск<br>для вашего магазина</h1>
+            <p class="brand-subtitle">Повысьте конверсию с помощью интеллектуального поиска. Поддержка фидов Яндекс.Маркет, быстрая интеграция.</p>
+            
+            <div class="brand-features">
+                <div class="brand-feature">
+                    <div class="brand-feature-icon">⚡</div>
+                    <span>Быстрый поиск за миллисекунды</span>
+                </div>
+                <div class="brand-feature">
+                    <div class="brand-feature-icon">📊</div>
+                    <span>Детальная аналитика запросов</span>
+                </div>
+                <div class="brand-feature">
+                    <div class="brand-feature-icon">🎨</div>
+                    <span>Настраиваемый виджет</span>
+                </div>
+                <div class="brand-feature">
+                    <div class="brand-feature-icon">📦</div>
+                    <span>Автоматическая загрузка из фида</span>
+                </div>
             </div>
+        </div>
 
-            <!-- Табы -->
-            <div class="auth-tabs">
-                <button class="auth-tab active" data-form="login">Вход</button>
-                <button class="auth-tab" data-form="register">Регистрация</button>
+        <!-- Form Side -->
+        <div class="auth-form-side">
+            <div class="auth-card">
+                <div class="auth-header">
+                    <h2 class="auth-title">Добро пожаловать</h2>
+                    <p class="auth-subtitle">Войдите или создайте аккаунт</p>
+                </div>
+
+                <!-- Tabs -->
+                <div class="auth-tabs">
+                    <button class="auth-tab active" data-form="login">Вход</button>
+                    <button class="auth-tab" data-form="register">Регистрация</button>
+                </div>
+
+                <!-- Login Form -->
+                <form id="loginForm" class="auth-form active">
+                    <div class="alert alert-error" id="loginError">
+                        <span>⚠️</span>
+                        <span id="loginErrorText"></span>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="loginEmail">Email</label>
+                        <input 
+                            type="email" 
+                            id="loginEmail" 
+                            class="form-input" 
+                            placeholder="name@example.com"
+                            required
+                            autocomplete="email"
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="loginPassword">Пароль</label>
+                        <div class="password-wrapper">
+                            <input 
+                                type="password" 
+                                id="loginPassword" 
+                                class="form-input" 
+                                placeholder="••••••••"
+                                required
+                                autocomplete="current-password"
+                            >
+                            <button type="button" class="password-toggle" onclick="togglePassword('loginPassword')">👁️</button>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" id="loginBtn">
+                        <span id="loginBtnText">Войти</span>
+                    </button>
+
+                    <div class="form-footer">
+                        <a href="#" class="form-link">Забыли пароль?</a>
+                    </div>
+                </form>
+
+                <!-- Register Form -->
+                <form id="registerForm" class="auth-form">
+                    <div class="alert alert-error" id="registerError">
+                        <span>⚠️</span>
+                        <span id="registerErrorText"></span>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="registerName">Имя</label>
+                        <input 
+                            type="text" 
+                            id="registerName" 
+                            class="form-input" 
+                            placeholder="Ваше имя"
+                            required
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="registerEmail">Email</label>
+                        <input 
+                            type="email" 
+                            id="registerEmail" 
+                            class="form-input" 
+                            placeholder="name@example.com"
+                            required
+                            autocomplete="email"
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="registerPassword">Пароль</label>
+                        <div class="password-wrapper">
+                            <input 
+                                type="password" 
+                                id="registerPassword" 
+                                class="form-input" 
+                                placeholder="Минимум 6 символов"
+                                minlength="6"
+                                required
+                                autocomplete="new-password"
+                            >
+                            <button type="button" class="password-toggle" onclick="togglePassword('registerPassword')">👁️</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="registerPasswordConfirm">Подтвердите пароль</label>
+                        <div class="password-wrapper">
+                            <input 
+                                type="password" 
+                                id="registerPasswordConfirm" 
+                                class="form-input" 
+                                placeholder="Повторите пароль"
+                                minlength="6"
+                                required
+                                autocomplete="new-password"
+                            >
+                            <button type="button" class="password-toggle" onclick="togglePassword('registerPasswordConfirm')">👁️</button>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" id="registerBtn">
+                        <span id="registerBtnText">Создать аккаунт</span>
+                    </button>
+                </form>
             </div>
-
-            <!-- Форма входа -->
-            <form id="loginForm" class="auth-form active">
-                <div id="loginError" class="alert alert-error" style="display: none;"></div>
-                
-                <div class="form-group">
-                    <label for="loginEmail">Email</label>
-                    <input 
-                        type="email" 
-                        id="loginEmail" 
-                        class="form-control" 
-                        placeholder="your@email.com"
-                        required
-                    >
-                </div>
-
-                <div class="form-group">
-                    <label for="loginPassword">Пароль</label>
-                    <div class="password-input">
-                        <input 
-                            type="password" 
-                            id="loginPassword" 
-                            class="form-control" 
-                            placeholder="••••••••"
-                            required
-                        >
-                        <button type="button" class="toggle-password">👁️</button>
-                    </div>
-                </div>
-
-                <button type="submit" class="btn-primary btn-block">
-                    Войти
-                </button>
-
-                <div class="auth-links">
-                    <a href="#">Забыли пароль?</a>
-                </div>
-            </form>
-
-            <!-- Форма регистрации -->
-            <form id="registerForm" class="auth-form">
-                <div id="registerError" class="alert alert-error" style="display: none;"></div>
-                
-                <div class="form-group">
-                    <label for="registerName">Имя</label>
-                    <input 
-                        type="text" 
-                        id="registerName" 
-                        class="form-control" 
-                        placeholder="Ваше имя"
-                        required
-                    >
-                </div>
-
-                <div class="form-group">
-                    <label for="registerEmail">Email</label>
-                    <input 
-                        type="email" 
-                        id="registerEmail" 
-                        class="form-control" 
-                        placeholder="your@email.com"
-                        required
-                    >
-                </div>
-
-                <div class="form-group">
-                    <label for="registerPassword">Пароль</label>
-                    <div class="password-input">
-                        <input 
-                            type="password" 
-                            id="registerPassword" 
-                            class="form-control" 
-                            placeholder="Минимум 6 символов"
-                            minlength="6"
-                            required
-                        >
-                        <button type="button" class="toggle-password">👁️</button>
-                    </div>
-                    <div class="password-strength">
-                        <div class="strength-bar"></div>
-                    </div>
-                    <span class="strength-text"></span>
-                </div>
-
-                <div class="form-group">
-                    <label for="registerPasswordConfirm">Подтвердите пароль</label>
-                    <div class="password-input">
-                        <input 
-                            type="password" 
-                            id="registerPasswordConfirm" 
-                            class="form-control" 
-                            placeholder="Повторите пароль"
-                            required
-                        >
-                        <button type="button" class="toggle-password">👁️</button>
-                    </div>
-                </div>
-
-                <button type="submit" class="btn-primary btn-block">
-                    Зарегистрироваться
-                </button>
-
-                <p class="auth-terms">
-                    Регистрируясь, вы соглашаетесь с 
-                    <a href="#">условиями использования</a>
-                </p>
-            </form>
         </div>
     </div>
 
-    <script src="api.js"></script>
-    <script src="auth.js"></script>
+    <script>
+        const API_BASE = '';
+
+        // Check if already logged in
+        document.addEventListener('DOMContentLoaded', () => {
+            const token = localStorage.getItem('token');
+            if (token) {
+                window.location.href = '/dashboard.html';
+            }
+        });
+
+        // Tab switching
+        document.querySelectorAll('.auth-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const formType = tab.dataset.form;
+                
+                document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                document.querySelectorAll('.auth-form').forEach(form => {
+                    form.classList.toggle('active', form.id === `${formType}Form`);
+                });
+                
+                // Clear errors
+                hideError('login');
+                hideError('register');
+            });
+        });
+
+        // Toggle password visibility
+        function togglePassword(inputId) {
+            const input = document.getElementById(inputId);
+            const btn = input.nextElementSibling;
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                btn.textContent = '🙈';
+            } else {
+                input.type = 'password';
+                btn.textContent = '👁️';
+            }
+        }
+
+        // Show error
+        function showError(form, message) {
+            const alert = document.getElementById(`${form}Error`);
+            const text = document.getElementById(`${form}ErrorText`);
+            text.textContent = message;
+            alert.classList.add('show');
+        }
+
+        // Hide error
+        function hideError(form) {
+            const alert = document.getElementById(`${form}Error`);
+            alert.classList.remove('show');
+        }
+
+        // Set loading state
+        function setLoading(form, loading) {
+            const btn = document.getElementById(`${form}Btn`);
+            const text = document.getElementById(`${form}BtnText`);
+            
+            btn.disabled = loading;
+            
+            if (loading) {
+                text.innerHTML = '<div class="spinner"></div>';
+            } else {
+                text.textContent = form === 'login' ? 'Войти' : 'Создать аккаунт';
+            }
+        }
+
+        // Login form
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            hideError('login');
+            
+            const email = document.getElementById('loginEmail').value.trim();
+            const password = document.getElementById('loginPassword').value;
+            
+            if (!email || !password) {
+                showError('login', 'Заполните все поля');
+                return;
+            }
+            
+            setLoading('login', true);
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.detail || 'Ошибка входа');
+                }
+                
+                localStorage.setItem('token', data.access_token);
+                if (data.user) {
+                    localStorage.setItem('user', JSON.stringify(data.user));
+                }
+                
+                window.location.href = '/dashboard.html';
+                
+            } catch (err) {
+                let message = err.message;
+                if (message.includes('Invalid') || message.includes('password')) {
+                    message = 'Неверный email или пароль';
+                }
+                showError('login', message);
+                setLoading('login', false);
+            }
+        });
+
+        // Register form
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            hideError('register');
+            
+            const name = document.getElementById('registerName').value.trim();
+            const email = document.getElementById('registerEmail').value.trim();
+            const password = document.getElementById('registerPassword').value;
+            const passwordConfirm = document.getElementById('registerPasswordConfirm').value;
+            
+            if (!name || !email || !password || !passwordConfirm) {
+                showError('register', 'Заполните все поля');
+                return;
+            }
+            
+            if (password !== passwordConfirm) {
+                showError('register', 'Пароли не совпадают');
+                return;
+            }
+            
+            if (password.length < 6) {
+                showError('register', 'Пароль должен быть минимум 6 символов');
+                return;
+            }
+            
+            setLoading('register', true);
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/auth/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password, name })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.detail || 'Ошибка регистрации');
+                }
+                
+                localStorage.setItem('token', data.access_token);
+                if (data.user) {
+                    localStorage.setItem('user', JSON.stringify(data.user));
+                }
+                
+                window.location.href = '/dashboard.html';
+                
+            } catch (err) {
+                let message = err.message;
+                if (message.includes('exists') || message.includes('already')) {
+                    message = 'Этот email уже зарегистрирован';
+                }
+                showError('register', message);
+                setLoading('register', false);
+            }
+        });
+    </script>
 </body>
 </html>

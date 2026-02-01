@@ -4,14 +4,14 @@
 
 const API = {
     baseUrl: '',  // Пустой - используем относительные пути
-    token: localStorage.getItem('authToken'),
+    token: localStorage.getItem('token'),
     user: JSON.parse(localStorage.getItem('user') || 'null'),
 
     // Установка токена
     setAuth(token, user) {
         this.token = token;
         this.user = user;
-        localStorage.setItem('authToken', token);
+        localStorage.setItem('token', token);
         localStorage.setItem('user', JSON.stringify(user));
     },
 
@@ -19,7 +19,7 @@ const API = {
     clearAuth() {
         this.token = null;
         this.user = null;
-        localStorage.removeItem('authToken');
+        localStorage.removeItem('token');
         localStorage.removeItem('user');
     },
 

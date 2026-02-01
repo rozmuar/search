@@ -26,7 +26,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Load user
     try {
-        const response = await fetch(`${API_BASE}/api/auth/me`, {
+        const response = await fetch(`${API_BASE}/api/v1/auth/me`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         
@@ -130,7 +130,7 @@ function closeSidebar() {
 // ==================== PROJECTS ====================
 async function loadProjects() {
     try {
-        const response = await fetchAPI('/api/projects');
+        const response = await fetchAPI('/api/v1/projects');
         projects = response || [];
         
         renderProjectsList();
@@ -255,7 +255,7 @@ async function createProject() {
         const data = { name, domain };
         if (feedUrl) data.feed_url = feedUrl;
         
-        await fetchAPI('/api/projects', {
+        await fetchAPI('/api/v1/projects', {
             method: 'POST',
             body: JSON.stringify(data)
         });
@@ -299,7 +299,7 @@ async function loadTopQueries() {
     try {
         // Try to get analytics from first project
         if (projects.length > 0) {
-            const analytics = await fetchAPI(`/api/analytics/${projects[0].id}`);
+            const analytics = await fetchAPI(`/api/v1/projects/${projects[0].id}/analytics`);
             const queries = analytics.popular_queries || [];
             
             if (queries.length === 0) {
@@ -454,7 +454,7 @@ async function loadProjectProducts(projectId) {
         }
         
         // Load products
-        const response = await fetchAPI(`/api/products/${projectId}`);
+        const response = await fetchAPI(`/api/v1/projects/${projectId}/products`);
         products = response.products || response || [];
         
         if (products.length > 0) {
@@ -585,7 +585,7 @@ async function loadFeed() {
     updateFeedStatus('warning', 'Загрузка...');
     
     try {
-        await fetchAPI(`/api/feed/${projectId}/load`, {
+        await fetchAPI(`/api/v1/projects/${projectId}/feed/load`, {
             method: 'POST',
             body: JSON.stringify({ url })
         });
@@ -637,13 +637,13 @@ async function loadAnalytics() {
         let analytics;
         
         if (projectId) {
-            analytics = await fetchAPI(`/api/analytics/${projectId}`);
+            analytics = await fetchAPI(`/api/v1/projects/${projectId}/analytics`);
         } else if (projects.length > 0) {
             // Aggregate all projects
             analytics = { total_searches: 0, total_clicks: 0, popular_queries: [] };
             for (const p of projects) {
                 try {
-                    const a = await fetchAPI(`/api/analytics/${p.id}`);
+                    const a = await fetchAPI(`/api/v1/projects/${p.id}/analytics`);
                     analytics.total_searches += a.total_searches || 0;
                     analytics.total_clicks += a.total_clicks || 0;
                 } catch (e) {}
@@ -790,7 +790,7 @@ async function saveWidgetSettings() {
     };
     
     try {
-        await fetchAPI(`/api/projects/${projectId}/widget`, {
+        await fetchAPI(`/api/v1/projects/${projectId}/widget`, {
             method: 'PUT',
             body: JSON.stringify(settings)
         });
@@ -872,7 +872,7 @@ async function testSearch() {
     
     try {
         const project = projects.find(p => p.id === projectId);
-        const response = await fetch(`${API_BASE}/api/search/${project.api_key}?q=${encodeURIComponent(query)}`);
+        const response = await fetch(`${API_BASE}/api/v1/search?api_key=${project.api_key}&q=${encodeURIComponent(query)}`);
         const data = await response.json();
         
         const results = data.results || [];
