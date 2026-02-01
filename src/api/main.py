@@ -260,42 +260,45 @@ async def regenerate_api_key(project_id: str, user: User = Depends(require_auth)
 class FeedLoadRequest(BaseModel):
     url: Optional[str] = None
 
-@app.post("/api/v1/projects/{project_id}/feed/load")
-async def load_feed(
-    project_id: str, 
-    request: Optional[FeedLoadRequest] = None,
-    user: User = Depends(require_auth)
-):
-    """Загрузка фида проекта. URL можно передать в body или использовать сохранённый в проекте."""
-    url = request.url if request else None
-    logger.info(f"[load_feed] Starting for project {project_id}, url param: {url}")
-    
-    project = await data_store.get_project(project_id)
-    if not project or project.get("user_id") != user.id:
-        logger.warning(f"[load_feed] Project not found or access denied: {project_id}")
-        raise HTTPException(status_code=404, detail="Project not found")
-    
-    # URL из запроса или из проекта
-    feed_url = url if url else project.get("feed_url")
-    logger.info(f"[load_feed] Feed URL: {feed_url}")
-    
-    if not feed_url:
-        logger.warning(f"[load_feed] No feed URL for project {project_id}")
-        raise HTTPException(status_code=400, detail="Feed URL not provided. Set feed URL in project settings first.")
-    
-    # Сохраняем URL фида в проект
-    await data_store.update_project(project_id, {"feed_url": feed_url})
-    
-    # Загружаем фид
-    logger.info(f"[load_feed] Calling feed_manager.load_feed...")
-    result = await feed_manager.load_feed(project_id, feed_url)
-    logger.info(f"[load_feed] Result: success={result.get('success')}, error={result.get('error')}")
-    
-    if result["success"]:
+
+# Фоновые задачи загрузки фидов
+feed_loading_tasks = {}
+
+
+async def background_feed_load(project_id: str, feed_url: str):
+    """Фоновая загрузка и индексация фида"""
+    try:
+        # Обновляем статус - начало загрузки
+        await redis_client.hset(f"project:{project_id}:feed", mapping={
+            "status": "downloading",
+            "progress": "0",
+            "message": "Загрузка фида..."
+        })
+        
+        logger.info(f"[background_feed_load] Downloading feed for {project_id}: {feed_url}")
+        
+        # Загружаем и парсим фид
+        result = await feed_manager.load_feed(project_id, feed_url)
+        
+        if not result["success"]:
+            await redis_client.hset(f"project:{project_id}:feed", mapping={
+                "status": "error",
+                "progress": "0",
+                "message": result.get("error", "Ошибка загрузки")
+            })
+            return
+        
+        # Обновляем статус - индексация
+        await redis_client.hset(f"project:{project_id}:feed", mapping={
+            "status": "indexing",
+            "progress": "50",
+            "message": f"Индексация {result['products_count']} товаров..."
+        })
+        
         # Сохраняем товары
         await data_store.save_products(project_id, result["products"])
         
-        # Конвертируем dict в Product для индексатора
+        # Конвертируем и индексируем
         products_list = []
         for p in result["products"]:
             try:
@@ -316,20 +319,75 @@ async def load_feed(
                 )
                 products_list.append(product)
             except Exception as e:
-                print(f"Error converting product {p.get('id')}: {e}")
+                logger.error(f"Error converting product {p.get('id')}: {e}")
                 continue
         
-        # Индексируем товары для поиска
         await indexer.index_products(project_id, products_list)
         
-        return {
-            "success": True,
-            "products_count": result["products_count"],
-            "categories_count": result["categories_count"],
-            "message": f"Loaded {result['products_count']} products"
-        }
-    else:
-        raise HTTPException(status_code=400, detail=result.get("error", "Failed to load feed"))
+        # Готово
+        from datetime import datetime
+        await redis_client.hset(f"project:{project_id}:feed", mapping={
+            "status": "success",
+            "progress": "100",
+            "message": f"Загружено {result['products_count']} товаров",
+            "products_count": str(result["products_count"]),
+            "categories_count": str(result["categories_count"]),
+            "last_update": datetime.utcnow().isoformat()
+        })
+        
+        logger.info(f"[background_feed_load] Completed for {project_id}: {result['products_count']} products")
+        
+    except Exception as e:
+        logger.error(f"[background_feed_load] Error for {project_id}: {e}")
+        await redis_client.hset(f"project:{project_id}:feed", mapping={
+            "status": "error",
+            "progress": "0",
+            "message": str(e)
+        })
+    finally:
+        # Удаляем задачу из списка
+        if project_id in feed_loading_tasks:
+            del feed_loading_tasks[project_id]
+
+
+@app.post("/api/v1/projects/{project_id}/feed/load")
+async def load_feed(
+    project_id: str, 
+    request: Optional[FeedLoadRequest] = None,
+    user: User = Depends(require_auth)
+):
+    """Запуск фоновой загрузки фида"""
+    import asyncio
+    
+    url = request.url if request else None
+    logger.info(f"[load_feed] Starting for project {project_id}, url param: {url}")
+    
+    project = await data_store.get_project(project_id)
+    if not project or project.get("user_id") != user.id:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    # Проверяем, не идёт ли уже загрузка
+    if project_id in feed_loading_tasks:
+        return {"success": True, "status": "already_loading", "message": "Загрузка уже идёт"}
+    
+    # URL из запроса или из проекта
+    feed_url = url if url else project.get("feed_url")
+    
+    if not feed_url:
+        raise HTTPException(status_code=400, detail="Feed URL not provided")
+    
+    # Сохраняем URL фида в проект
+    await data_store.update_project(project_id, {"feed_url": feed_url})
+    
+    # Запускаем фоновую задачу
+    task = asyncio.create_task(background_feed_load(project_id, feed_url))
+    feed_loading_tasks[project_id] = task
+    
+    return {
+        "success": True,
+        "status": "started",
+        "message": "Загрузка фида запущена"
+    }
 
 
 @app.get("/api/v1/projects/{project_id}/feed/status")

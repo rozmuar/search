@@ -779,6 +779,9 @@ async function loadProjectFeed() {
     const btnSpinner = btn.querySelector('.btn-spinner');
     const progressContainer = document.getElementById('feedProgressContainer');
     const statusBadge = document.getElementById('projectFeedStatus');
+    const progressFill = document.getElementById('feedProgressFill');
+    const progressPercent = document.getElementById('feedProgressPercent');
+    const progressText = document.getElementById('feedProgressText');
     
     // Show loading state
     btn.disabled = true;
@@ -788,74 +791,84 @@ async function loadProjectFeed() {
     statusBadge.className = 'feed-status-badge loading';
     statusBadge.innerHTML = '<span class="status-dot"></span><span>Загрузка...</span>';
     
-    // Simulate progress
-    let progress = 0;
-    const progressFill = document.getElementById('feedProgressFill');
-    const progressPercent = document.getElementById('feedProgressPercent');
-    const progressText = document.getElementById('feedProgressText');
-    
-    const progressInterval = setInterval(() => {
-        if (progress < 90) {
-            progress += Math.random() * 15;
-            progress = Math.min(progress, 90);
-            progressFill.style.width = progress + '%';
-            progressPercent.textContent = Math.round(progress) + '%';
-            
-            if (progress < 30) {
-                progressText.textContent = 'Загрузка фида...';
-            } else if (progress < 60) {
-                progressText.textContent = 'Парсинг товаров...';
-            } else {
-                progressText.textContent = 'Индексация...';
-            }
-        }
-    }, 300);
-    
     try {
-        const startTime = Date.now();
-        const result = await fetchAPI(`/api/v1/projects/${currentProject.id}/feed/load`, {
+        // Запускаем фоновую загрузку
+        await fetchAPI(`/api/v1/projects/${currentProject.id}/feed/load`, {
             method: 'POST'
         });
         
-        clearInterval(progressInterval);
+        // Polling статуса каждые 2 секунды
+        const pollStatus = async () => {
+            try {
+                const status = await fetchAPI(`/api/v1/projects/${currentProject.id}/feed/status`);
+                
+                const progress = parseInt(status.progress) || 0;
+                progressFill.style.width = progress + '%';
+                progressPercent.textContent = progress + '%';
+                progressText.textContent = status.message || 'Загрузка...';
+                
+                if (status.status === 'downloading') {
+                    statusBadge.innerHTML = '<span class="status-dot"></span><span>Загрузка...</span>';
+                } else if (status.status === 'indexing') {
+                    statusBadge.innerHTML = '<span class="status-dot"></span><span>Индексация...</span>';
+                } else if (status.status === 'success') {
+                    // Готово!
+                    progressFill.style.width = '100%';
+                    progressPercent.textContent = '100%';
+                    progressText.textContent = status.message || 'Готово!';
+                    
+                    statusBadge.className = 'feed-status-badge success';
+                    statusBadge.innerHTML = '<span class="status-dot"></span><span>Загружен</span>';
+                    
+                    const productsCount = parseInt(status.products_count) || 0;
+                    const categoriesCount = parseInt(status.categories_count) || 0;
+                    
+                    // Update stats
+                    document.getElementById('projectStatProducts').textContent = productsCount;
+                    document.getElementById('projectStatCategories').textContent = categoriesCount;
+                    
+                    setTimeout(() => {
+                        progressContainer.style.display = 'none';
+                        btn.disabled = false;
+                        btnText.style.display = 'inline';
+                        btnSpinner.style.display = 'none';
+                        showToast(`Загружено ${productsCount} товаров`, 'success');
+                        loadProjects();
+                    }, 500);
+                    return; // Stop polling
+                    
+                } else if (status.status === 'error') {
+                    // Ошибка
+                    statusBadge.className = 'feed-status-badge error';
+                    statusBadge.innerHTML = '<span class="status-dot"></span><span>Ошибка</span>';
+                    progressContainer.style.display = 'none';
+                    btn.disabled = false;
+                    btnText.style.display = 'inline';
+                    btnSpinner.style.display = 'none';
+                    showToast(status.message || 'Ошибка загрузки фида', 'error');
+                    return; // Stop polling
+                }
+                
+                // Продолжаем polling
+                setTimeout(pollStatus, 2000);
+                
+            } catch (err) {
+                console.error('Poll status error:', err);
+                setTimeout(pollStatus, 2000);
+            }
+        };
         
-        // Complete progress
-        progressFill.style.width = '100%';
-        progressPercent.textContent = '100%';
-        progressText.textContent = 'Готово!';
-        
-        // Update project in local array
-        const projectIndex = projects.findIndex(p => p.id === currentProject.id);
-        if (projectIndex !== -1) {
-            projects[projectIndex].products_count = result.products_count;
-            projects[projectIndex].categories_count = result.categories_count;
-            currentProject = projects[projectIndex];
-        }
-        
-        // Show success
-        setTimeout(() => {
-            progressContainer.style.display = 'none';
-            loadProjectFeedStatus();
-            showToast(`Загружено ${result.products_count} товаров`, 'success');
-            
-            // Update stats
-            document.getElementById('projectStatProducts').textContent = result.products_count;
-            document.getElementById('projectStatCategories').textContent = result.categories_count || 0;
-            
-            // Reload projects to update counts
-            loadProjects();
-        }, 500);
+        // Начинаем polling
+        setTimeout(pollStatus, 1000);
         
     } catch (err) {
-        clearInterval(progressInterval);
         progressContainer.style.display = 'none';
         statusBadge.className = 'feed-status-badge error';
         statusBadge.innerHTML = '<span class="status-dot"></span><span>Ошибка</span>';
-        showToast(err.message || 'Ошибка загрузки фида', 'error');
-    } finally {
         btn.disabled = false;
         btnText.style.display = 'inline';
         btnSpinner.style.display = 'none';
+        showToast(err.message || 'Ошибка загрузки фида', 'error');
     }
 }
 
@@ -1289,23 +1302,50 @@ async function loadFeed() {
     updateFeedStatus('warning', 'Загрузка...');
     
     try {
+        // Запускаем фоновую загрузку
         await fetchAPI(`/api/v1/projects/${projectId}/feed/load`, {
             method: 'POST',
             body: JSON.stringify({ url })
         });
         
-        showToast('Фид успешно загружен', 'success');
-        updateFeedStatus('success', 'Фид загружен');
-        document.getElementById('refreshFeedBtn').style.display = 'block';
+        // Polling статуса
+        const pollStatus = async () => {
+            try {
+                const status = await fetchAPI(`/api/v1/projects/${projectId}/feed/status`);
+                
+                if (status.status === 'downloading') {
+                    updateFeedStatus('warning', 'Загрузка фида...');
+                } else if (status.status === 'indexing') {
+                    updateFeedStatus('warning', 'Индексация...');
+                } else if (status.status === 'success') {
+                    updateFeedStatus('success', status.message || 'Готово!');
+                    btn.disabled = false;
+                    btn.textContent = 'Загрузить';
+                    document.getElementById('refreshFeedBtn').style.display = 'block';
+                    showToast(`Загружено ${status.products_count || 0} товаров`, 'success');
+                    await loadProjects();
+                    await loadProjectProducts(projectId);
+                    return; // Stop polling
+                } else if (status.status === 'error') {
+                    updateFeedStatus('error', status.message || 'Ошибка');
+                    btn.disabled = false;
+                    btn.textContent = 'Загрузить';
+                    showToast(status.message || 'Ошибка загрузки', 'error');
+                    return; // Stop polling
+                }
+                
+                // Continue polling
+                setTimeout(pollStatus, 2000);
+            } catch (err) {
+                setTimeout(pollStatus, 2000);
+            }
+        };
         
-        // Reload projects and products
-        await loadProjects();
-        await loadProjectProducts(projectId);
+        setTimeout(pollStatus, 1000);
         
     } catch (err) {
         showToast(err.message || 'Ошибка загрузки фида', 'error');
         updateFeedStatus('error', 'Ошибка загрузки');
-    } finally {
         btn.disabled = false;
         btn.textContent = 'Загрузить';
     }
