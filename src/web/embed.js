@@ -632,8 +632,9 @@
     }
 
     showResultsInDropdown(data) {
-      const items = data.items || data.products || [];
-      console.log('[SearchWidget] Showing', items.length, 'results in dropdown');
+      let items = data.items || data.products || [];
+      const total = data.total || items.length;
+      console.log('[SearchWidget] Showing', items.length, 'results in dropdown, total:', total);
       
       if (items.length === 0) {
         this.suggestions.element.innerHTML = `
@@ -646,15 +647,26 @@
         return;
       }
 
+      // Сортировка: сначала в наличии
+      items = [...items].sort((a, b) => {
+        const aInStock = a.in_stock !== false ? 1 : 0;
+        const bInStock = b.in_stock !== false ? 1 : 0;
+        return bInStock - aInStock;
+      });
+
+      // В dropdown показываем только первые 8 товаров
+      const dropdownItems = items.slice(0, 8);
+      const hasMore = total > 8;
+
       let html = `
         <div class="search-widget-results-dropdown">
           <div class="search-widget-results-header">
-            Найдено: ${data.total || items.length} товаров
+            Найдено: ${total} товаров
           </div>
-          <div class="search-widget-products-grid">
+          <div class="search-widget-products-list">
       `;
 
-      items.forEach((item, index) => {
+      dropdownItems.forEach((item, index) => {
         const price = item.price ? formatPrice(item.price, this.config.currency) : '';
         const oldPrice = item.old_price ? formatPrice(item.old_price, this.config.currency) : '';
         const inStock = item.in_stock !== false;
@@ -676,11 +688,165 @@
         `;
       });
 
-      html += '</div></div>';
+      html += '</div>';
+      
+      // Кнопка "Показать все"
+      if (hasMore) {
+        html += `
+          <div class="search-widget-show-all">
+            <button class="search-widget-show-all-btn" data-query="${escapeHtml(this.state.query)}" data-total="${total}">
+              Показать все ${total} товаров
+            </button>
+          </div>
+        `;
+      }
+      
+      html += '</div>';
 
       this.suggestions.element.innerHTML = html;
       this.suggestions.element.style.display = 'block';
       this.suggestions.visible = true;
+      
+      // Сохраняем все результаты для popup
+      this.lastSearchResults = { items, total, query: this.state.query };
+      
+      // Привязываем событие на кнопку "Показать все"
+      const showAllBtn = this.suggestions.element.querySelector('.search-widget-show-all-btn');
+      if (showAllBtn) {
+        showAllBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          this.showAllResultsPopup();
+        });
+      }
+    }
+
+    showAllResultsPopup() {
+      const { items, total, query } = this.lastSearchResults || {};
+      if (!items || items.length === 0) return;
+      
+      this.suggestions.hide();
+      
+      // Создаём popup
+      const popup = document.createElement('div');
+      popup.className = 'search-widget-popup-overlay';
+      popup.innerHTML = `
+        <div class="search-widget-popup">
+          <div class="search-widget-popup-header">
+            <h3>Результаты поиска: "${escapeHtml(query)}"</h3>
+            <span class="search-widget-popup-count">Найдено: ${total} товаров</span>
+            <button class="search-widget-popup-close">&times;</button>
+          </div>
+          <div class="search-widget-popup-content">
+            <div class="search-widget-popup-grid" id="search-popup-grid"></div>
+          </div>
+          <div class="search-widget-popup-pagination" id="search-popup-pagination"></div>
+        </div>
+      `;
+      
+      document.body.appendChild(popup);
+      
+      // Пагинация
+      this.popupCurrentPage = 1;
+      this.popupItemsPerPage = 20;
+      this.popupItems = items;
+      
+      this.renderPopupPage();
+      
+      // Закрытие popup
+      popup.querySelector('.search-widget-popup-close').addEventListener('click', () => {
+        popup.remove();
+      });
+      
+      popup.addEventListener('click', (e) => {
+        if (e.target === popup) {
+          popup.remove();
+        }
+      });
+      
+      // ESC для закрытия
+      const escHandler = (e) => {
+        if (e.key === 'Escape') {
+          popup.remove();
+          document.removeEventListener('keydown', escHandler);
+        }
+      };
+      document.addEventListener('keydown', escHandler);
+    }
+
+    renderPopupPage() {
+      const grid = document.getElementById('search-popup-grid');
+      const pagination = document.getElementById('search-popup-pagination');
+      if (!grid || !pagination) return;
+      
+      const start = (this.popupCurrentPage - 1) * this.popupItemsPerPage;
+      const end = start + this.popupItemsPerPage;
+      const pageItems = this.popupItems.slice(start, end);
+      const totalPages = Math.ceil(this.popupItems.length / this.popupItemsPerPage);
+      
+      // Рендер товаров
+      grid.innerHTML = pageItems.map((item, index) => {
+        const price = item.price ? formatPrice(item.price, this.config.currency) : '';
+        const oldPrice = item.old_price ? formatPrice(item.old_price, this.config.currency) : '';
+        const inStock = item.in_stock !== false;
+        
+        return `
+          <a href="${item.url || '#'}" class="search-widget-popup-card ${!inStock ? 'out-of-stock' : ''}">
+            <div class="search-widget-popup-card-image">
+              <img src="${item.image || ''}" alt="${escapeHtml(item.name || '')}" loading="lazy" onerror="this.style.display='none'">
+            </div>
+            <div class="search-widget-popup-card-info">
+              <div class="search-widget-popup-card-name">${escapeHtml(item.name || '')}</div>
+              <div class="search-widget-popup-card-price">
+                ${oldPrice ? `<span class="old-price">${oldPrice}</span>` : ''}
+                <span class="current-price">${price}</span>
+              </div>
+              ${!inStock ? '<div class="search-widget-out-of-stock">Нет в наличии</div>' : ''}
+            </div>
+          </a>
+        `;
+      }).join('');
+      
+      // Рендер пагинации
+      if (totalPages > 1) {
+        let paginationHtml = '<div class="search-widget-pagination-buttons">';
+        
+        // Кнопка "Назад"
+        paginationHtml += `<button class="search-widget-page-btn" data-page="prev" ${this.popupCurrentPage === 1 ? 'disabled' : ''}>←</button>`;
+        
+        // Номера страниц
+        for (let i = 1; i <= totalPages; i++) {
+          if (i === 1 || i === totalPages || (i >= this.popupCurrentPage - 2 && i <= this.popupCurrentPage + 2)) {
+            paginationHtml += `<button class="search-widget-page-btn ${i === this.popupCurrentPage ? 'active' : ''}" data-page="${i}">${i}</button>`;
+          } else if (i === this.popupCurrentPage - 3 || i === this.popupCurrentPage + 3) {
+            paginationHtml += '<span class="search-widget-page-dots">...</span>';
+          }
+        }
+        
+        // Кнопка "Вперёд"
+        paginationHtml += `<button class="search-widget-page-btn" data-page="next" ${this.popupCurrentPage === totalPages ? 'disabled' : ''}>→</button>`;
+        
+        paginationHtml += '</div>';
+        pagination.innerHTML = paginationHtml;
+        
+        // События пагинации
+        pagination.querySelectorAll('.search-widget-page-btn').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            const page = btn.dataset.page;
+            if (page === 'prev' && this.popupCurrentPage > 1) {
+              this.popupCurrentPage--;
+            } else if (page === 'next' && this.popupCurrentPage < totalPages) {
+              this.popupCurrentPage++;
+            } else if (page !== 'prev' && page !== 'next') {
+              this.popupCurrentPage = parseInt(page);
+            }
+            this.renderPopupPage();
+            grid.scrollTop = 0;
+          });
+        });
+      } else {
+        pagination.innerHTML = '';
+      }
     }
 
     renderResults(data) {
@@ -1062,19 +1228,19 @@
 
         /* Results in dropdown */
         .search-widget-results-dropdown {
-          padding: 8px 0;
+          padding: 0;
         }
 
         .search-widget-results-dropdown .search-widget-results-header {
-          padding: 8px 16px;
-          font-size: 12px;
+          padding: 12px 16px;
+          font-size: 13px;
           color: #666;
+          background: #f9f9f9;
           border-bottom: 1px solid var(--search-border-color);
         }
 
-        .search-widget-products-grid {
-          max-height: 400px;
-          overflow-y: auto;
+        .search-widget-products-list {
+          max-height: none;
         }
 
         .search-widget-product-card {
@@ -1150,6 +1316,227 @@
           font-size: 11px;
           color: #dc3545;
           margin-top: 2px;
+        }
+
+        /* Show all button */
+        .search-widget-show-all {
+          padding: 12px 16px;
+          background: #f9f9f9;
+          border-top: 1px solid var(--search-border-color);
+        }
+
+        .search-widget-show-all-btn {
+          width: 100%;
+          padding: 12px 20px;
+          background: var(--search-primary-color);
+          color: #fff;
+          border: none;
+          border-radius: var(--search-border-radius);
+          font-size: 14px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: background 0.2s;
+        }
+
+        .search-widget-show-all-btn:hover {
+          background: #0056b3;
+        }
+
+        /* Popup overlay */
+        .search-widget-popup-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.6);
+          z-index: 10000;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 20px;
+        }
+
+        .search-widget-popup {
+          background: #fff;
+          border-radius: 12px;
+          width: 100%;
+          max-width: 900px;
+          max-height: 90vh;
+          display: flex;
+          flex-direction: column;
+          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .search-widget-popup-header {
+          display: flex;
+          align-items: center;
+          padding: 16px 20px;
+          border-bottom: 1px solid var(--search-border-color);
+          flex-shrink: 0;
+        }
+
+        .search-widget-popup-header h3 {
+          margin: 0;
+          font-size: 18px;
+          flex: 1;
+        }
+
+        .search-widget-popup-count {
+          color: #666;
+          font-size: 14px;
+          margin-right: 16px;
+        }
+
+        .search-widget-popup-close {
+          background: none;
+          border: none;
+          font-size: 28px;
+          cursor: pointer;
+          color: #999;
+          padding: 0;
+          line-height: 1;
+          transition: color 0.2s;
+        }
+
+        .search-widget-popup-close:hover {
+          color: #333;
+        }
+
+        .search-widget-popup-content {
+          flex: 1;
+          overflow-y: auto;
+          padding: 20px;
+        }
+
+        .search-widget-popup-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+          gap: 16px;
+        }
+
+        .search-widget-popup-card {
+          display: flex;
+          flex-direction: column;
+          text-decoration: none;
+          color: var(--search-text-color);
+          border: 1px solid #eee;
+          border-radius: 8px;
+          overflow: hidden;
+          transition: box-shadow 0.2s, transform 0.2s;
+        }
+
+        .search-widget-popup-card:hover {
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+          transform: translateY(-2px);
+        }
+
+        .search-widget-popup-card.out-of-stock {
+          opacity: 0.6;
+        }
+
+        .search-widget-popup-card-image {
+          height: 150px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: #f9f9f9;
+          padding: 10px;
+        }
+
+        .search-widget-popup-card-image img {
+          max-width: 100%;
+          max-height: 100%;
+          object-fit: contain;
+        }
+
+        .search-widget-popup-card-info {
+          padding: 12px;
+        }
+
+        .search-widget-popup-card-name {
+          font-size: 13px;
+          font-weight: 500;
+          margin-bottom: 8px;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+          line-height: 1.3;
+        }
+
+        .search-widget-popup-card-price {
+          font-size: 14px;
+        }
+
+        .search-widget-popup-card-price .old-price {
+          text-decoration: line-through;
+          color: #999;
+          margin-right: 6px;
+          font-size: 12px;
+        }
+
+        .search-widget-popup-card-price .current-price {
+          font-weight: bold;
+          color: var(--search-primary-color);
+        }
+
+        /* Pagination */
+        .search-widget-popup-pagination {
+          padding: 16px 20px;
+          border-top: 1px solid var(--search-border-color);
+          flex-shrink: 0;
+        }
+
+        .search-widget-pagination-buttons {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          gap: 4px;
+        }
+
+        .search-widget-page-btn {
+          min-width: 36px;
+          height: 36px;
+          padding: 0 12px;
+          background: #fff;
+          border: 1px solid #ddd;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 14px;
+          transition: all 0.2s;
+        }
+
+        .search-widget-page-btn:hover:not(:disabled) {
+          background: #f5f5f5;
+          border-color: #ccc;
+        }
+
+        .search-widget-page-btn.active {
+          background: var(--search-primary-color);
+          border-color: var(--search-primary-color);
+          color: #fff;
+        }
+
+        .search-widget-page-btn:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+
+        .search-widget-page-dots {
+          padding: 0 8px;
+          color: #999;
+        }
+
+        @media (max-width: 768px) {
+          .search-widget-popup {
+            max-height: 100vh;
+            border-radius: 0;
+          }
+
+          .search-widget-popup-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
         }
       `;
 
