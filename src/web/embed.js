@@ -160,6 +160,8 @@
             query: data.query || ''
           });
           
+          console.log('[SearchWidget] Tracking click:', data.product_id, 'query:', data.query);
+          
           fetch(`${this.apiUrl}/track/click`, {
             method: 'POST',
             headers: {
@@ -169,6 +171,10 @@
             keepalive: true,
             mode: 'cors',
             credentials: 'omit'
+          }).then(r => r.json()).then(res => {
+            console.log('[SearchWidget] Click tracked:', res);
+          }).catch(err => {
+            console.error('[SearchWidget] Click tracking error:', err);
           });
           return;
         }
@@ -192,7 +198,7 @@
           credentials: 'omit'
         });
       } catch (e) {
-        // Ignore analytics errors
+        console.error('[SearchWidget] trackEvent error:', e);
       }
     }
   }
@@ -334,11 +340,15 @@
           if (type === 'query') {
             this.widget.selectSuggestion(value);
           } else if (type === 'product') {
+            // Сначала отправляем клик, потом переходим
+            this.widget.trackClick(item.dataset.id, index);
             const url = item.dataset.url;
             if (url) {
-              window.location.href = url;
+              // Небольшая задержка чтобы запрос успел отправиться
+              setTimeout(() => {
+                window.location.href = url;
+              }, 50);
             }
-            this.widget.trackClick(item.dataset.id, index);
           }
         });
 
@@ -982,8 +992,20 @@
       container.innerHTML = html;
 
       container.querySelectorAll('.search-widget-result-card').forEach((card, index) => {
-        card.addEventListener('click', () => {
+        card.addEventListener('click', (e) => {
+          // Предотвращаем переход по ссылке
+          e.preventDefault();
+          
+          // Сначала отправляем клик
           this.trackClick(card.dataset.id, index);
+          
+          // Потом переходим по ссылке
+          const link = card.querySelector('a');
+          if (link && link.href) {
+            setTimeout(() => {
+              window.location.href = link.href;
+            }, 50);
+          }
         });
       });
     }
