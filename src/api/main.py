@@ -416,7 +416,15 @@ async def suggest(
     if not actual_project_id:
         actual_project_id = "demo"
     
-    suggestions = await search_engine.suggest(q, actual_project_id, limit)
+    result = await search_engine.suggest(actual_project_id, q, limit)
+    
+    # Форматируем для виджета
+    suggestions = {
+        "queries": [{"text": s, "highlight": s} for s in (result.suggestions or [])],
+        "categories": [],
+        "products": result.products or []
+    }
+    
     return {"suggestions": suggestions}
 
 

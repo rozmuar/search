@@ -108,6 +108,7 @@
     constructor(apiUrl, apiKey) {
       this.apiUrl = apiUrl;
       this.apiKey = apiKey;
+      console.log('[SearchWidget] API initialized:', { apiUrl, apiKey: apiKey.substring(0, 10) + '...' });
     }
 
     async search(query, options = {}) {
@@ -119,9 +120,12 @@
         ...options.filters,
       });
 
-      const response = await fetch(`${this.apiUrl}/search?${params}`, {
+      const url = `${this.apiUrl}/search?${params}`;
+      console.log('[SearchWidget] Search request:', url);
+
+      const response = await fetch(url, {
         headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
+          'X-API-Key': this.apiKey,
           'Content-Type': 'application/json',
         },
       });
@@ -130,7 +134,15 @@
         throw new Error(`Search failed: ${response.status}`);
       }
 
-      return response.json();
+      const data = await response.json();
+      console.log('[SearchWidget] Search response:', {
+        query,
+        total: data.total,
+        items: data.items?.length,
+        project_id: data.meta?.project_id
+      });
+      
+      return data;
     }
 
     async suggest(prefix, options = {}) {
@@ -141,9 +153,12 @@
         include_categories: options.includeCategories !== false,
       });
 
-      const response = await fetch(`${this.apiUrl}/suggest?${params}`, {
+      const url = `${this.apiUrl}/suggest?${params}`;
+      console.log('[SearchWidget] Suggest request:', url);
+
+      const response = await fetch(url, {
         headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
+          'X-API-Key': this.apiKey,
           'Content-Type': 'application/json',
         },
       });
@@ -152,7 +167,14 @@
         throw new Error(`Suggest failed: ${response.status}`);
       }
 
-      return response.json();
+      const data = await response.json();
+      console.log('[SearchWidget] Suggest response:', {
+        query: prefix,
+        suggestions: data.suggestions?.queries?.length || 0,
+        products: data.suggestions?.products?.length || 0
+      });
+
+      return data;
     }
 
     trackEvent(eventType, data) {
@@ -484,6 +506,7 @@
           includeCategories: this.config.suggestions.showCategories,
         });
 
+        console.log('[SearchWidget] Showing suggestions:', data);
         this.suggestions.show(data.suggestions || data);
         this.emit('suggest', { prefix, suggestions: data });
         
