@@ -769,10 +769,10 @@
       };
       document.addEventListener('keydown', escHandler);
       
-      // Загружаем ВСЕ товары с большим лимитом
+      // Загружаем ВСЕ товары (limit=-1)
       try {
         const data = await this.api.search(query, {
-          limit: 500, // Загружаем до 500 товаров
+          limit: -1, // Загружаем все товары
         });
         
         let items = data.items || data.products || [];

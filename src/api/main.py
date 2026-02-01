@@ -399,7 +399,7 @@ async def search(
     q: str = Query(..., min_length=1, description="Поисковый запрос"),
     project_id: Optional[str] = Query(None, description="ID проекта"),
     api_key: Optional[str] = Query(None, description="API ключ"),
-    limit: int = Query(50, ge=1, le=500),
+    limit: int = Query(50, ge=-1, le=10000, description="Лимит результатов (-1 = все)"),
     min_price: Optional[float] = None,
     max_price: Optional[float] = None,
     in_stock: Optional[bool] = None,
@@ -439,10 +439,13 @@ async def search(
         filters["category"] = category
     
     # Выполняем поиск
+    # limit=-1 означает все результаты
+    actual_limit = 10000 if limit == -1 else limit
+    
     results = await search_engine.search(
         query=q,
         project_id=actual_project_id,
-        limit=limit,
+        limit=actual_limit,
         filters=filters
     )
     
