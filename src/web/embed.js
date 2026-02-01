@@ -173,7 +173,7 @@
           return;
         }
         
-        // Для остальных событий
+        // Для остальных событий - используем fetch без credentials
         const body = JSON.stringify({
           type: eventType,
           api_key: this.apiKey,
@@ -181,21 +181,16 @@
           timestamp: Date.now(),
         });
         
-        if (navigator.sendBeacon) {
-          const blob = new Blob([body], { type: 'application/json' });
-          navigator.sendBeacon(`${this.apiUrl}/analytics/event`, blob);
-        } else {
-          fetch(`${this.apiUrl}/analytics/event`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: body,
-            keepalive: true,
-            mode: 'cors',
-            credentials: 'omit'
-          });
-        }
+        fetch(`${this.apiUrl}/analytics/event`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: body,
+          keepalive: true,
+          mode: 'cors',
+          credentials: 'omit'
+        });
       } catch (e) {
         // Ignore analytics errors
       }
