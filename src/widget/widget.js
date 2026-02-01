@@ -1,5 +1,6 @@
 /**
  * Search Widget - JavaScript виджет для внешнего поиска
+ * Version: 1.0.3
  * 
  * Использование:
  * <script src="https://cdn.search-service.com/widget.js"></script>
@@ -16,7 +17,8 @@
 
   // ==================== Конфигурация ====================
   
-  const VERSION = '1.0.0';
+  const VERSION = '1.0.3';
+  console.log('[SearchWidget] Loading version', VERSION);
   
   const DEFAULT_CONFIG = {
     apiUrl: 'https://dr-robot.ru/api/v1',
