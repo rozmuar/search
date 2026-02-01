@@ -3,380 +3,486 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - Search Service</title>
-    <link rel="stylesheet" href="styles.css">
+    <title>Личный кабинет — SearchPro</title>
     <link rel="stylesheet" href="dashboard.css">
 </head>
-<body class="dashboard-page">
-    <!-- Sidebar -->
-    <aside class="sidebar">
-        <div class="sidebar-header">
-            <a href="index.html" class="logo">
-                <span class="logo-icon">🔍</span>
-                <span class="logo-text">Search Service</span>
-            </a>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <a href="/" class="logo">🔍 SearchPro</a>
+            <div class="user-menu">
+                <span class="user-email" id="userEmail">user@example.com</span>
+                <button class="btn-logout" onclick="logout()">Выйти</button>
+            </div>
         </div>
+    </header>
 
-        <nav class="sidebar-nav">
-            <a href="#overview" class="nav-item active" data-section="overview">
-                <span class="nav-icon">📊</span>
-                <span>Обзор</span>
-            </a>
-            <a href="#projects" class="nav-item" data-section="projects">
-                <span class="nav-icon">📁</span>
-                <span>Мои проекты</span>
-            </a>
-            <a href="#search-test" class="nav-item" data-section="search-test">
-                <span class="nav-icon">🔍</span>
-                <span>Тест поиска</span>
-            </a>
-            <a href="#analytics" class="nav-item" data-section="analytics">
-                <span class="nav-icon">📈</span>
-                <span>Аналитика</span>
-            </a>
-            <a href="#settings" class="nav-item" data-section="settings">
-                <span class="nav-icon">⚙️</span>
-                <span>Настройки</span>
-            </a>
-            <a href="http://localhost:8000/docs" target="_blank" class="nav-item">
-                <span class="nav-icon">📚</span>
-                <span>API Docs</span>
-            </a>
-        </nav>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <nav class="sidebar-nav">
+                <a href="#" class="nav-item active" data-section="projects">
+                    <span class="nav-icon">📁</span>
+                    <span>Проекты</span>
+                </a>
+                <a href="#" class="nav-item" data-section="products">
+                    <span class="nav-icon">📦</span>
+                    <span>Товары</span>
+                </a>
+                <a href="#" class="nav-item" data-section="analytics">
+                    <span class="nav-icon">📊</span>
+                    <span>Аналитика</span>
+                </a>
+                <a href="#" class="nav-item" data-section="widget">
+                    <span class="nav-icon">🎨</span>
+                    <span>Виджет</span>
+                </a>
+                <a href="#" class="nav-item" data-section="embed">
+                    <span class="nav-icon">📝</span>
+                    <span>Встраивание</span>
+                </a>
+            </nav>
+        </aside>
 
-        <div class="sidebar-footer">
-            <div class="user-info">
-                <div class="user-avatar">👤</div>
-                <div class="user-details">
-                    <div class="user-name">John Doe</div>
-                    <div class="user-email">john@example.com</div>
-                </div>
-            </div>
-            <button class="btn-logout" onclick="logout()">Выйти</button>
-        </div>
-    </aside>
-
-    <!-- Main Content -->
-    <main class="main-content">
-        <!-- Header -->
-        <header class="dashboard-header">
-            <h1 id="pageTitle">Обзор</h1>
-            <div class="header-actions">
-                <button class="btn-icon" title="Уведомления">
-                    <span class="badge">3</span>
-                    🔔
-                </button>
-                <button class="btn-icon" title="Помощь">❓</button>
-            </div>
-        </header>
-
-        <!-- Overview Section -->
-        <section id="overview-section" class="content-section active">
-            <!-- Stats Cards -->
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-icon">🔍</div>
-                    <div class="stat-content">
-                        <div class="stat-label">Запросов сегодня</div>
-                        <div class="stat-value">1,234</div>
-                        <div class="stat-change positive">+12% от вчера</div>
-                    </div>
-                </div>
-
-                <div class="stat-card">
-                    <div class="stat-icon">📦</div>
-                    <div class="stat-content">
-                        <div class="stat-label">Товаров в индексе</div>
-                        <div class="stat-value">5,678</div>
-                        <div class="stat-change">Обновлено 2ч назад</div>
-                    </div>
-                </div>
-
-                <div class="stat-card">
-                    <div class="stat-icon">⚡</div>
-                    <div class="stat-content">
-                        <div class="stat-label">Средний ответ</div>
-                        <div class="stat-value">23ms</div>
-                        <div class="stat-change positive">-5ms от среднего</div>
-                    </div>
-                </div>
-
-                <div class="stat-card">
-                    <div class="stat-icon">✓</div>
-                    <div class="stat-content">
-                        <div class="stat-label">Success Rate</div>
-                        <div class="stat-value">99.8%</div>
-                        <div class="stat-change positive">Отлично</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Quick Actions -->
-            <div class="quick-actions">
-                <h2>Быстрые действия</h2>
-                <div class="actions-grid">
-                    <button class="action-card" onclick="showSection('projects')">
-                        <span class="action-icon">➕</span>
-                        <span>Создать проект</span>
-                    </button>
-                    <button class="action-card" onclick="showSection('search-test')">
-                        <span class="action-icon">🔍</span>
-                        <span>Протестировать поиск</span>
-                    </button>
-                    <button class="action-card" onclick="openDocs()">
-                        <span class="action-icon">📚</span>
-                        <span>Открыть документацию</span>
-                    </button>
-                    <button class="action-card" onclick="showSection('settings')">
-                        <span class="action-icon">⚙️</span>
-                        <span>Настройки</span>
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Projects Section -->
+            <section class="content-section active" id="section-projects">
+                <div class="section-header">
+                    <h1>Мои проекты</h1>
+                    <button class="btn btn-primary" onclick="showCreateProjectModal()">
+                        + Создать проект
                     </button>
                 </div>
-            </div>
 
-            <!-- Recent Activity -->
-            <div class="activity-section">
-                <h2>Последняя активность</h2>
-                <div class="activity-list">
-                    <div class="activity-item">
-                        <div class="activity-icon">🔄</div>
-                        <div class="activity-content">
-                            <div class="activity-title">Индекс обновлен</div>
-                            <div class="activity-time">2 часа назад</div>
+                <div class="projects-grid" id="projectsGrid">
+                    <!-- Projects will be loaded here -->
+                </div>
+
+                <div class="empty-state" id="noProjects" style="display: none;">
+                    <div class="empty-icon">📁</div>
+                    <h3>У вас пока нет проектов</h3>
+                    <p>Создайте первый проект для настройки поиска на вашем сайте</p>
+                    <button class="btn btn-primary" onclick="showCreateProjectModal()">
+                        Создать проект
+                    </button>
+                </div>
+            </section>
+
+            <!-- Products Section -->
+            <section class="content-section" id="section-products">
+                <div class="section-header">
+                    <h1>Товары</h1>
+                    <div class="project-selector">
+                        <select id="productsProjectSelect" onchange="loadProducts()">
+                            <option value="">Выберите проект</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="feed-controls" id="feedControls" style="display: none;">
+                    <div class="feed-status" id="feedStatus">
+                        <span class="status-label">Статус фида:</span>
+                        <span class="status-value" id="feedStatusValue">Не загружен</span>
+                    </div>
+                    <div class="feed-actions">
+                        <input type="url" id="feedUrlInput" placeholder="URL фида (XML/YML)" class="input-feed-url">
+                        <button class="btn btn-primary" onclick="loadFeed()">Загрузить фид</button>
+                        <button class="btn btn-secondary" onclick="refreshFeed()">🔄 Обновить</button>
+                    </div>
+                </div>
+
+                <div class="products-stats" id="productsStats" style="display: none;">
+                    <div class="stat-item">
+                        <span class="stat-value" id="totalProducts">0</span>
+                        <span class="stat-label">Товаров</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value" id="indexedProducts">0</span>
+                        <span class="stat-label">Индексировано</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value" id="lastUpdate">—</span>
+                        <span class="stat-label">Обновлено</span>
+                    </div>
+                </div>
+
+                <div class="products-search">
+                    <input type="text" id="productsSearchInput" placeholder="Поиск по товарам..." onkeyup="filterProducts()">
+                </div>
+
+                <div class="products-table-container">
+                    <table class="products-table" id="productsTable">
+                        <thead>
+                            <tr>
+                                <th>Фото</th>
+                                <th>Название</th>
+                                <th>Цена</th>
+                                <th>Категория</th>
+                                <th>Наличие</th>
+                            </tr>
+                        </thead>
+                        <tbody id="productsTableBody">
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="pagination" id="productsPagination"></div>
+
+                <div class="empty-state" id="noProducts" style="display: none;">
+                    <div class="empty-icon">📦</div>
+                    <h3>Товары не найдены</h3>
+                    <p>Загрузите фид товаров или выберите проект</p>
+                </div>
+            </section>
+
+            <!-- Analytics Section -->
+            <section class="content-section" id="section-analytics">
+                <div class="section-header">
+                    <h1>Аналитика</h1>
+                    <div class="project-selector">
+                        <select id="analyticsProjectSelect" onchange="loadAnalytics()">
+                            <option value="">Выберите проект</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="analytics-period">
+                    <button class="period-btn active" data-period="7">7 дней</button>
+                    <button class="period-btn" data-period="30">30 дней</button>
+                    <button class="period-btn" data-period="90">90 дней</button>
+                </div>
+
+                <div class="analytics-cards" id="analyticsCards">
+                    <div class="analytics-card">
+                        <div class="card-icon">🔍</div>
+                        <div class="card-content">
+                            <div class="card-value" id="totalSearches">0</div>
+                            <div class="card-label">Поисковых запросов</div>
                         </div>
                     </div>
-                    <div class="activity-item">
-                        <div class="activity-icon">📊</div>
-                        <div class="activity-content">
-                            <div class="activity-title">Пик трафика: 500 запросов/мин</div>
-                            <div class="activity-time">5 часов назад</div>
+                    <div class="analytics-card">
+                        <div class="card-icon">👆</div>
+                        <div class="card-content">
+                            <div class="card-value" id="totalClicks">0</div>
+                            <div class="card-label">Кликов по результатам</div>
                         </div>
                     </div>
-                    <div class="activity-item">
-                        <div class="activity-icon">✓</div>
-                        <div class="activity-content">
-                            <div class="activity-title">API ключ обновлен</div>
-                            <div class="activity-time">Вчера</div>
+                    <div class="analytics-card">
+                        <div class="card-icon">⚡</div>
+                        <div class="card-content">
+                            <div class="card-value" id="avgResponseTime">0 мс</div>
+                            <div class="card-label">Среднее время ответа</div>
+                        </div>
+                    </div>
+                    <div class="analytics-card">
+                        <div class="card-icon">📈</div>
+                        <div class="card-content">
+                            <div class="card-value" id="conversionRate">0%</div>
+                            <div class="card-label">Конверсия в клик</div>
                         </div>
                     </div>
                 </div>
-            </div>
-        </section>
 
-        <!-- Projects Section -->
-        <section id="projects-section" class="content-section">
-            <div class="section-header">
-                <h2>Мои проекты</h2>
-                <button class="btn-primary" onclick="showCreateProjectModal()">
-                    ➕ Создать проект
-                </button>
-            </div>
-
-            <div class="projects-grid">
-                <!-- Demo Project -->
-                <div class="project-card">
-                    <div class="project-header">
-                        <div class="project-status active">Активен</div>
-                        <button class="btn-icon" onclick="toggleProjectMenu(this)">⋮</button>
-                    </div>
-                    <h3>Demo Shop</h3>
-                    <p class="project-domain">demo.shop.com</p>
-                    
-                    <div class="project-stats">
-                        <div class="project-stat">
-                            <span class="stat-label">Товаров</span>
-                            <span class="stat-value">5,678</span>
-                        </div>
-                        <div class="project-stat">
-                            <span class="stat-label">Запросов/день</span>
-                            <span class="stat-value">1,234</span>
-                        </div>
-                    </div>
-
-                    <div class="project-actions">
-                        <button class="btn-outline btn-sm" onclick="showApiKey('demo')">
-                            🔑 API ключ
-                        </button>
-                        <button class="btn-outline btn-sm" onclick="testProject('demo')">
-                            🔍 Тест
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Empty state for new project -->
-                <div class="project-card empty" onclick="showCreateProjectModal()">
-                    <div class="empty-icon">➕</div>
-                    <h3>Добавить проект</h3>
-                    <p>Создайте новый проект для интеграции поиска</p>
-                </div>
-            </div>
-        </section>
-
-        <!-- Search Test Section -->
-        <section id="search-test-section" class="content-section">
-            <h2>Тестирование поиска</h2>
-            <p class="section-description">Проверьте как работает поиск на вашем проекте</p>
-
-            <div class="test-panel">
-                <div class="form-group">
-                    <label>Проект</label>
-                    <select id="testProjectSelect" class="form-control">
-                        <option value="demo">Demo Shop</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label>Поисковый запрос</label>
-                    <input 
-                        type="text" 
-                        id="testSearchInput" 
-                        class="form-control" 
-                        placeholder="Введите запрос..."
-                    >
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Лимит результатов</label>
-                        <input type="number" class="form-control" value="10" min="1" max="100">
-                    </div>
-                    <div class="form-group">
-                        <label>Только в наличии</label>
-                        <label class="switch">
-                            <input type="checkbox" id="testInStock">
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                </div>
-
-                <button class="btn-primary" onclick="runSearchTest()">
-                    Выполнить поиск
-                </button>
-
-                <div id="testResults" class="test-results">
-                    <!-- Results will appear here -->
-                </div>
-            </div>
-        </section>
-
-        <!-- Analytics Section -->
-        <section id="analytics-section" class="content-section">
-            <h2>Аналитика</h2>
-            
-            <div class="analytics-grid">
-                <div class="chart-card">
-                    <h3>Запросы за последние 7 дней</h3>
-                    <div class="chart-placeholder">
-                        📊 График будет здесь
-                        <small>Интеграция с Chart.js</small>
-                    </div>
-                </div>
-
-                <div class="chart-card">
+                <div class="analytics-section">
                     <h3>Популярные запросы</h3>
-                    <div class="popular-queries">
-                        <div class="query-item">
-                            <span class="query-text">iphone</span>
-                            <span class="query-count">234</span>
+                    <div class="popular-queries" id="popularQueries">
+                        <div class="empty-state-inline">Нет данных</div>
+                    </div>
+                </div>
+
+                <div class="analytics-section">
+                    <h3>Запросы без результатов</h3>
+                    <div class="zero-results" id="zeroResults">
+                        <div class="empty-state-inline">Нет данных</div>
+                    </div>
+                </div>
+
+                <div class="analytics-section">
+                    <h3>Поиски по дням</h3>
+                    <div class="chart-container" id="searchesChart">
+                        <canvas id="searchesChartCanvas"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Widget Section -->
+            <section class="content-section" id="section-widget">
+                <div class="section-header">
+                    <h1>Настройка виджета</h1>
+                    <div class="project-selector">
+                        <select id="widgetProjectSelect" onchange="loadWidgetSettings()">
+                            <option value="">Выберите проект</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="widget-editor">
+                    <div class="widget-settings">
+                        <h3>Внешний вид</h3>
+                        
+                        <div class="setting-group">
+                            <label>Тема</label>
+                            <select id="widgetTheme" onchange="updateWidgetPreview()">
+                                <option value="light">Светлая</option>
+                                <option value="dark">Тёмная</option>
+                                <option value="auto">Авто (системная)</option>
+                            </select>
                         </div>
-                        <div class="query-item">
-                            <span class="query-text">наушники</span>
-                            <span class="query-count">187</span>
+
+                        <div class="setting-group">
+                            <label>Основной цвет</label>
+                            <input type="color" id="widgetPrimaryColor" value="#2563eb" onchange="updateWidgetPreview()">
                         </div>
-                        <div class="query-item">
-                            <span class="query-text">macbook</span>
-                            <span class="query-count">156</span>
+
+                        <div class="setting-group">
+                            <label>Цвет текста</label>
+                            <input type="color" id="widgetTextColor" value="#1f2937" onchange="updateWidgetPreview()">
                         </div>
-                        <div class="query-item">
-                            <span class="query-text">apple watch</span>
-                            <span class="query-count">98</span>
+
+                        <div class="setting-group">
+                            <label>Цвет фона</label>
+                            <input type="color" id="widgetBgColor" value="#ffffff" onchange="updateWidgetPreview()">
+                        </div>
+
+                        <div class="setting-group">
+                            <label>Скругление углов (px)</label>
+                            <input type="range" id="widgetBorderRadius" min="0" max="24" value="8" onchange="updateWidgetPreview()">
+                            <span id="borderRadiusValue">8</span>
+                        </div>
+
+                        <h3>Поведение</h3>
+
+                        <div class="setting-group">
+                            <label>Placeholder</label>
+                            <input type="text" id="widgetPlaceholder" value="Поиск товаров..." onchange="updateWidgetPreview()">
+                        </div>
+
+                        <div class="setting-group">
+                            <label>Результатов на странице</label>
+                            <input type="number" id="widgetResultsPerPage" min="5" max="50" value="10">
+                        </div>
+
+                        <div class="setting-group checkbox-group">
+                            <input type="checkbox" id="widgetShowImages" checked onchange="updateWidgetPreview()">
+                            <label for="widgetShowImages">Показывать изображения</label>
+                        </div>
+
+                        <div class="setting-group checkbox-group">
+                            <input type="checkbox" id="widgetShowPrices" checked onchange="updateWidgetPreview()">
+                            <label for="widgetShowPrices">Показывать цены</label>
+                        </div>
+
+                        <div class="setting-group checkbox-group">
+                            <input type="checkbox" id="widgetShowSuggestions" checked>
+                            <label for="widgetShowSuggestions">Автодополнение</label>
+                        </div>
+
+                        <button class="btn btn-primary btn-save-widget" onclick="saveWidgetSettings()">
+                            Сохранить настройки
+                        </button>
+                    </div>
+
+                    <div class="widget-preview">
+                        <h3>Предпросмотр</h3>
+                        <div class="preview-container" id="widgetPreviewContainer">
+                            <div class="preview-widget" id="previewWidget">
+                                <div class="preview-search-box">
+                                    <input type="text" placeholder="Поиск товаров..." disabled>
+                                    <button>🔍</button>
+                                </div>
+                                <div class="preview-results">
+                                    <div class="preview-result-item">
+                                        <div class="preview-result-image"></div>
+                                        <div class="preview-result-content">
+                                            <div class="preview-result-title">Название товара</div>
+                                            <div class="preview-result-price">1 990 ₽</div>
+                                        </div>
+                                    </div>
+                                    <div class="preview-result-item">
+                                        <div class="preview-result-image"></div>
+                                        <div class="preview-result-content">
+                                            <div class="preview-result-title">Другой товар</div>
+                                            <div class="preview-result-price">2 490 ₽</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
-        </section>
+            </section>
 
-        <!-- Settings Section -->
-        <section id="settings-section" class="content-section">
-            <h2>Настройки аккаунта</h2>
-
-            <div class="settings-panel">
-                <div class="settings-group">
-                    <h3>Профиль</h3>
-                    <div class="form-group">
-                        <label>Имя</label>
-                        <input type="text" class="form-control" value="John Doe">
+            <!-- Embed Section -->
+            <section class="content-section" id="section-embed">
+                <div class="section-header">
+                    <h1>Встраивание на сайт</h1>
+                    <div class="project-selector">
+                        <select id="embedProjectSelect" onchange="updateEmbedCode()">
+                            <option value="">Выберите проект</option>
+                        </select>
                     </div>
-                    <div class="form-group">
-                        <label>Email</label>
-                        <input type="email" class="form-control" value="john@example.com">
+                </div>
+
+                <div class="embed-content" id="embedContent" style="display: none;">
+                    <div class="api-key-section">
+                        <h3>🔑 Ваш API-ключ</h3>
+                        <div class="api-key-display">
+                            <code id="projectApiKey">sk_xxxxxxxxxxxx</code>
+                            <button class="btn-copy" onclick="copyApiKey()">📋 Копировать</button>
+                        </div>
+                        <p class="api-key-warning">⚠️ Не передавайте API-ключ третьим лицам</p>
                     </div>
-                    <button class="btn-primary">Сохранить</button>
+
+                    <div class="embed-instructions">
+                        <h3>📝 Инструкция по установке</h3>
+                        
+                        <div class="step">
+                            <div class="step-number">1</div>
+                            <div class="step-content">
+                                <h4>Добавьте контейнер для виджета</h4>
+                                <p>Вставьте этот HTML-код в то место на странице, где должен отображаться поиск:</p>
+                                <div class="code-block">
+                                    <pre id="embedHtmlCode">&lt;div id="searchpro-widget"&gt;&lt;/div&gt;</pre>
+                                    <button class="btn-copy-code" onclick="copyCode('embedHtmlCode')">Копировать</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="step">
+                            <div class="step-number">2</div>
+                            <div class="step-content">
+                                <h4>Подключите скрипт виджета</h4>
+                                <p>Добавьте этот код перед закрывающим тегом <code>&lt;/body&gt;</code>:</p>
+                                <div class="code-block">
+                                    <pre id="embedScriptCode">&lt;script src="/api/v1/widget/embed.js" data-api-key="YOUR_API_KEY"&gt;&lt;/script&gt;</pre>
+                                    <button class="btn-copy-code" onclick="copyCode('embedScriptCode')">Копировать</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="step">
+                            <div class="step-number">3</div>
+                            <div class="step-content">
+                                <h4>Готово!</h4>
+                                <p>Виджет поиска автоматически инициализируется и будет готов к работе.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="embed-advanced">
+                        <h3>⚙️ Расширенная настройка</h3>
+                        <p>Вы можете кастомизировать виджет программно:</p>
+                        <div class="code-block">
+                            <pre id="embedAdvancedCode">&lt;script&gt;
+window.SearchProConfig = {
+    apiKey: 'YOUR_API_KEY',
+    container: '#searchpro-widget',
+    placeholder: 'Найти товар...',
+    theme: 'light',
+    showImages: true,
+    showPrices: true,
+    resultsPerPage: 10,
+    onSearch: function(query, results) {
+        console.log('Поиск:', query, results);
+    },
+    onSelect: function(product) {
+        window.location.href = product.url;
+    }
+};
+&lt;/script&gt;
+&lt;script src="/api/v1/widget/embed.js"&gt;&lt;/script&gt;</pre>
+                            <button class="btn-copy-code" onclick="copyCode('embedAdvancedCode')">Копировать</button>
+                        </div>
+                    </div>
+
+                    <div class="embed-test">
+                        <h3>🧪 Тестирование</h3>
+                        <p>Проверьте работу поиска прямо здесь:</p>
+                        <div class="test-widget-container" id="testWidgetContainer">
+                            <div class="test-search-box">
+                                <input type="text" id="testSearchInput" placeholder="Введите поисковый запрос...">
+                                <button onclick="testSearch()">Найти</button>
+                            </div>
+                            <div class="test-results" id="testResults"></div>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="settings-group">
-                    <h3>Безопасность</h3>
-                    <button class="btn-outline">Изменить пароль</button>
-                    <button class="btn-outline">Двухфакторная аутентификация</button>
+                <div class="empty-state" id="noEmbedProject">
+                    <div class="empty-icon">📝</div>
+                    <h3>Выберите проект</h3>
+                    <p>Для получения кода встраивания выберите проект из списка выше</p>
                 </div>
+            </section>
+        </main>
+    </div>
 
-                <div class="settings-group danger-zone">
-                    <h3>Опасная зона</h3>
-                    <button class="btn-danger">Удалить аккаунт</button>
-                </div>
-            </div>
-        </section>
-    </main>
-
-    <!-- Modals -->
     <!-- Create Project Modal -->
-    <div id="createProjectModal" class="modal">
+    <div class="modal" id="createProjectModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Создать новый проект</h2>
-                <button class="modal-close" onclick="closeModal('createProjectModal')">×</button>
+                <h2>Создать проект</h2>
+                <button class="modal-close" onclick="closeModal('createProjectModal')">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="form-group">
-                    <label>Название проекта</label>
-                    <input type="text" class="form-control" placeholder="My Shop">
+                    <label for="projectName">Название проекта *</label>
+                    <input type="text" id="projectName" placeholder="Мой интернет-магазин">
                 </div>
                 <div class="form-group">
-                    <label>Домен</label>
-                    <input type="text" class="form-control" placeholder="myshop.com">
+                    <label for="projectDomain">Домен сайта *</label>
+                    <input type="text" id="projectDomain" placeholder="example.com">
                 </div>
                 <div class="form-group">
-                    <label>Описание (опционально)</label>
-                    <textarea class="form-control" rows="3"></textarea>
+                    <label for="projectFeedUrl">URL фида товаров (XML/YML)</label>
+                    <input type="url" id="projectFeedUrl" placeholder="https://example.com/feed.xml">
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn-outline" onclick="closeModal('createProjectModal')">Отмена</button>
-                <button class="btn-primary" onclick="createProject()">Создать</button>
+                <button class="btn btn-secondary" onclick="closeModal('createProjectModal')">Отмена</button>
+                <button class="btn btn-primary" onclick="createProject()">Создать</button>
             </div>
         </div>
     </div>
 
-    <!-- API Key Modal -->
-    <div id="apiKeyModal" class="modal">
+    <!-- Edit Project Modal -->
+    <div class="modal" id="editProjectModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>API ключ проекта</h2>
-                <button class="modal-close" onclick="closeModal('apiKeyModal')">×</button>
+                <h2>Редактировать проект</h2>
+                <button class="modal-close" onclick="closeModal('editProjectModal')">&times;</button>
             </div>
             <div class="modal-body">
-                <p>Используйте этот ключ для доступа к API:</p>
-                <div class="api-key-display">
-                    <code id="apiKeyValue">sk_demo_12345678901234567890</code>
-                    <button class="btn-icon" onclick="copyApiKey()" title="Копировать">📋</button>
+                <input type="hidden" id="editProjectId">
+                <div class="form-group">
+                    <label for="editProjectName">Название проекта *</label>
+                    <input type="text" id="editProjectName">
                 </div>
-                <div class="alert alert-warning">
-                    ⚠️ Не публикуйте этот ключ в открытом доступе
+                <div class="form-group">
+                    <label for="editProjectDomain">Домен сайта *</label>
+                    <input type="text" id="editProjectDomain">
                 </div>
+                <div class="form-group">
+                    <label for="editProjectFeedUrl">URL фида товаров</label>
+                    <input type="url" id="editProjectFeedUrl">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" onclick="deleteProject()">Удалить</button>
+                <button class="btn btn-secondary" onclick="closeModal('editProjectModal')">Отмена</button>
+                <button class="btn btn-primary" onclick="updateProject()">Сохранить</button>
             </div>
         </div>
     </div>
 
+    <!-- Toast Notification -->
+    <div class="toast" id="toast">
+        <span class="toast-message" id="toastMessage"></span>
+    </div>
+
+    <script src="api.js"></script>
     <script src="dashboard.js"></script>
 </body>
 </html>

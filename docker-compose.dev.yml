@@ -1,5 +1,5 @@
 services:
-  # Redis для индексов и кэша
+  # Redis
   redis:
     image: redis:7-alpine
     ports:
@@ -13,14 +13,14 @@ services:
       timeout: 3s
       retries: 5
 
-  # API сервис с Nginx
+  # API в режиме разработки
   api:
     build: .
     ports:
-      - "80:80"
+      - "8000:8000"
     environment:
-      - ENV=production
-      - DEBUG=false
+      - ENV=development
+      - DEBUG=true
       - REDIS_HOST=redis
       - REDIS_PORT=6379
     volumes:
@@ -28,7 +28,7 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+    command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
 
 volumes:
   redis_data:
-  postgres_data:

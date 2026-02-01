@@ -28,11 +28,8 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             demoResults.innerHTML = '<div style="padding: 1rem; color: #64748b;">Поиск...</div>';
             
-            // Используем текущий хост для API
-            const apiUrl = window.location.hostname === 'localhost' 
-                ? 'http://localhost:8000'
-                : `/api/v1`;
-            const response = await fetch(`${apiUrl}/api/v1/search?q=${encodeURIComponent(query)}&project_id=demo&limit=5`);
+            // Всегда используем относительный путь
+            const response = await fetch(`/api/v1/search?q=${encodeURIComponent(query)}&project_id=demo&limit=5`);
             
             if (!response.ok) {
                 throw new Error('Search failed');
@@ -41,16 +38,16 @@ document.addEventListener('DOMContentLoaded', function() {
             const data = await response.json();
             
             if (data.items && data.items.length > 0) {
-                displayResults(data.items, data.took_ms);
+                displayResults(data.items, data.meta?.took_ms || 0);
             } else {
-                demoResults.innerHTML = '<div style="padding: 1rem; color: #64748b;">Ничего не найдено. Попробуйте: iphone, наушники, macbook</div>';
+                demoResults.innerHTML = '<div style="padding: 1rem; color: #64748b;">Ничего не найдено. Загрузите товары через личный кабинет.</div>';
             }
         } catch (error) {
             console.error('Search error:', error);
             demoResults.innerHTML = `
                 <div style="padding: 1rem; color: #ef4444;">
-                    <strong>Ошибка подключения</strong><br>
-                    <small>Убедитесь, что API запущен: <code>docker-compose up -d</code></small>
+                    <strong>Демо недоступно</strong><br>
+                    <small>Зарегистрируйтесь и загрузите товары для тестирования поиска</small>
                 </div>
             `;
         }

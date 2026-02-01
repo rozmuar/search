@@ -5,6 +5,8 @@ WORKDIR /app
 # Установка системных зависимостей
 RUN apt-get update && apt-get install -y \
     gcc \
+    nginx \
+    supervisor \
     && rm -rf /var/lib/apt/lists/*
 
 # Копирование зависимостей
@@ -16,9 +18,26 @@ RUN pip install --no-cache-dir -r requirements-basic.txt
 # Копирование кода
 COPY src /app/src
 COPY scripts /app/scripts
+COPY nginx.conf /etc/nginx/sites-available/default
 
-# Порт API
-EXPOSE 8000
+# Supervisor config
+RUN echo "[supervisord]\n\
+nodaemon=true\n\
+\n\
+[program:nginx]\n\
+command=/usr/sbin/nginx -g 'daemon off;'\n\
+autostart=true\n\
+autorestart=true\n\
+\n\
+[program:uvicorn]\n\
+command=uvicorn src.api.main:app --host 127.0.0.1 --port 8000\n\
+autostart=true\n\
+autorestart=true\n\
+directory=/app\n\
+" > /etc/supervisor/conf.d/app.conf
 
-# Команда по умолчанию
-CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Порт
+EXPOSE 80
+
+# Запуск через supervisor
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/supervisord.conf"]
