@@ -271,6 +271,9 @@
       }
 
       if (suggestions.products && suggestions.products.length > 0) {
+        const showImages = this.widget.config.showImages !== false;
+        const showPrices = this.widget.config.showPrices !== false;
+        
         html += '<div class="search-widget-suggestions-section search-widget-products">';
         html += '<div class="search-widget-section-title">Товары</div>';
         html += suggestions.products.map((product, index) => {
@@ -279,13 +282,13 @@
           const oldPrice = product.old_price || product.oldPrice;
           return `
             <a href="${product.url || '#'}" class="search-widget-suggestion-item search-widget-product" data-type="product" data-id="${product.id}" data-index="${index}">
-              ${image ? `<img src="${image}" alt="" class="search-widget-product-image" loading="lazy">` : ''}
+              ${showImages && image ? `<img src="${image}" alt="" class="search-widget-product-image" loading="lazy">` : ''}
               <div class="search-widget-product-info">
                 <div class="search-widget-product-name">${escapeHtml(product.name)}</div>
-                <div class="search-widget-product-price">
+                ${showPrices && price ? `<div class="search-widget-product-price">
                   ${oldPrice ? `<span class="search-widget-old-price">${formatPrice(oldPrice, this.widget.config.currency)}</span>` : ''}
                   <span class="search-widget-current-price">${formatPrice(price, this.widget.config.currency)}</span>
-                </div>
+                </div>` : ''}
               </div>
             </a>
           `;
@@ -387,6 +390,39 @@
         return this;
       }
 
+      // Загружаем настройки с сервера и применяем
+      this.loadServerConfig().then(() => {
+        this.initWidget();
+      }).catch(err => {
+        console.warn('[SearchWidget] Failed to load server config, using defaults:', err);
+        this.initWidget();
+      });
+
+      return this;
+    }
+
+    async loadServerConfig() {
+      try {
+        const response = await fetch(`${this.config.apiUrl}/widget/${this.config.apiKey}/config`);
+        if (response.ok) {
+          const serverConfig = await response.json();
+          console.log('[SearchWidget] Loaded server config:', serverConfig);
+          
+          // Применяем настройки с сервера (они имеют приоритет над дефолтными, но не над локальными)
+          if (serverConfig.placeholder) this.config.placeholder = serverConfig.placeholder;
+          if (serverConfig.theme) this.config.theme = serverConfig.theme;
+          if (serverConfig.primaryColor) this.config.primaryColor = serverConfig.primaryColor;
+          if (serverConfig.borderRadius !== undefined) this.config.borderRadius = serverConfig.borderRadius;
+          if (serverConfig.showImages !== undefined) this.config.showImages = serverConfig.showImages;
+          if (serverConfig.showPrices !== undefined) this.config.showPrices = serverConfig.showPrices;
+          if (serverConfig.maxResults) this.config.results.limit = serverConfig.maxResults;
+        }
+      } catch (err) {
+        console.warn('[SearchWidget] Error loading config:', err);
+      }
+    }
+
+    initWidget() {
       const target = typeof this.config.selector === 'string' 
         ? document.querySelector(this.config.selector)
         : this.config.selector;
@@ -816,6 +852,9 @@
       const pageItems = this.popupItems.slice(start, end);
       const totalPages = Math.ceil(this.popupItems.length / this.popupItemsPerPage);
       
+      const showImages = this.config.showImages !== false;
+      const showPrices = this.config.showPrices !== false;
+      
       // Рендер товаров
       grid.innerHTML = pageItems.map((item, index) => {
         const price = item.price ? formatPrice(item.price, this.config.currency) : '';
@@ -824,15 +863,15 @@
         
         return `
           <a href="${item.url || '#'}" class="search-widget-popup-card ${!inStock ? 'out-of-stock' : ''}">
-            <div class="search-widget-popup-card-image">
+            ${showImages ? `<div class="search-widget-popup-card-image">
               <img src="${item.image || ''}" alt="${escapeHtml(item.name || '')}" loading="lazy" onerror="this.style.display='none'">
-            </div>
+            </div>` : ''}
             <div class="search-widget-popup-card-info">
               <div class="search-widget-popup-card-name">${escapeHtml(item.name || '')}</div>
-              <div class="search-widget-popup-card-price">
+              ${showPrices && price ? `<div class="search-widget-popup-card-price">
                 ${oldPrice ? `<span class="old-price">${oldPrice}</span>` : ''}
                 <span class="current-price">${price}</span>
-              </div>
+              </div>` : ''}
               ${!inStock ? '<div class="search-widget-out-of-stock">Нет в наличии</div>' : ''}
             </div>
           </a>
@@ -918,6 +957,8 @@
         return template(product);
       }
 
+      const showImages = this.config.showImages !== false;
+      const showPrices = this.config.showPrices !== false;
       const image = product.image || product.picture;
       const oldPrice = product.old_price || product.oldPrice;
       const inStock = product.in_stock !== false && product.available !== false;
@@ -925,13 +966,13 @@
       return `
         <div class="search-widget-result-card" data-id="${product.id}">
           <a href="${product.url || '#'}">
-            ${image ? `<img src="${image}" alt="${escapeHtml(product.name)}" loading="lazy">` : ''}
+            ${showImages && image ? `<img src="${image}" alt="${escapeHtml(product.name)}" loading="lazy">` : ''}
             <div class="search-widget-result-info">
               <h3>${product.attributes?._highlighted_name || escapeHtml(product.name)}</h3>
-              <div class="search-widget-result-price">
+              ${showPrices && product.price ? `<div class="search-widget-result-price">
                 ${oldPrice ? `<span class="old">${formatPrice(oldPrice, this.config.currency)}</span>` : ''}
                 <span class="current">${formatPrice(product.price, this.config.currency)}</span>
-              </div>
+              </div>` : ''}
               ${inStock 
                 ? '<span class="search-widget-in-stock">В наличии</span>' 
                 : '<span class="search-widget-out-of-stock">Нет в наличии</span>'}
@@ -1039,16 +1080,20 @@
     injectStyles() {
       if (document.getElementById('search-widget-styles')) return;
 
+      // Получаем настройки из конфига
+      const primaryColor = this.config.primaryColor || '#007bff';
+      const borderRadius = this.config.borderRadius !== undefined ? this.config.borderRadius + 'px' : '8px';
+
       const styles = document.createElement('style');
       styles.id = 'search-widget-styles';
       styles.textContent = `
         :root {
-          --search-primary-color: #007bff;
+          --search-primary-color: ${primaryColor};
           --search-text-color: #333;
           --search-background: #fff;
           --search-border-color: #ddd;
           --search-highlight-color: #fff3cd;
-          --search-border-radius: 8px;
+          --search-border-radius: ${borderRadius};
           --search-font-size: 14px;
           --search-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         }
