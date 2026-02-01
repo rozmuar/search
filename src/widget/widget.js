@@ -16,10 +16,13 @@
 
   // ==================== Конфигурация ====================
   
+  const VERSION = '1.0.0';
+  
   const DEFAULT_CONFIG = {
-    apiUrl: 'https://api.search-service.com/api/v1',
+    apiUrl: 'https://dr-robot.ru/api/v1',
     minChars: 2,
     debounceMs: 150,
+    placeholder: 'Поиск товаров...',
     
     suggestions: {
       enabled: true,
@@ -384,13 +387,28 @@
         throw new Error('SearchWidget: apiKey is required');
       }
 
-      // Находим инпут
-      this.input = typeof this.config.selector === 'string' 
-        ? document.querySelector(this.config.selector)
-        : this.config.selector;
+      // Находим контейнер или инпут
+      const container = typeof this.config.container === 'string'
+        ? document.querySelector(this.config.container)
+        : this.config.container;
+      
+      if (this.config.container && container) {
+        // Создаём свой инпут внутри контейнера
+        this.input = document.createElement('input');
+        this.input.type = 'text';
+        this.input.placeholder = this.config.placeholder || 'Поиск...';
+        this.input.className = 'search-widget-input';
+        container.appendChild(this.input);
+        this.containerMode = true;
+      } else {
+        // Используем существующий инпут
+        this.input = typeof this.config.selector === 'string' 
+          ? document.querySelector(this.config.selector)
+          : this.config.selector;
+      }
 
       if (!this.input) {
-        throw new Error(`SearchWidget: element not found: ${this.config.selector}`);
+        throw new Error(`SearchWidget: element not found: ${this.config.selector || this.config.container}`);
       }
 
       // Создаём API клиент
@@ -414,10 +432,45 @@
       this.initialized = true;
       this.emit('init', { config: this.config });
 
+      // Красивый вывод в консоль
+      this._logInitInfo();
+
       // Обрабатываем начальный запрос, если есть
       if (this.config.initialQuery) {
         this.search(this.config.initialQuery);
       }
+    }
+
+    /**
+     * Вывод информации о виджете в консоль (как у конкурентов)
+     */
+    _logInitInfo() {
+      console.log(
+        `%c SearchPro ${VERSION} %c https://dr-robot.ru `,
+        'background: #2563eb; color: white; padding: 4px 8px; border-radius: 4px 0 0 4px; font-weight: bold;',
+        'background: #1e40af; color: white; padding: 4px 8px; border-radius: 0 4px 4px 0;'
+      );
+      console.log('%cSearchPro Widget initialized', 'color: #2563eb; font-weight: bold;');
+      console.log({
+        api: {
+          apiKey: this.config.apiKey.substring(0, 15) + '...',
+          apiUrl: this.config.apiUrl
+        },
+        config: {
+          minChars: this.config.minChars,
+          debounceMs: this.config.debounceMs,
+          suggestions: this.config.suggestions,
+          theme: this.config.theme,
+          locale: this.config.locale,
+          currency: this.config.currency
+        },
+        screen: {
+          width: window.innerWidth,
+          device: window.innerWidth > 1024 ? 'desktop' : window.innerWidth > 768 ? 'tablet' : 'mobile',
+          isMobile: window.innerWidth <= 768
+        },
+        _instance: this
+      });
     }
 
     /**
