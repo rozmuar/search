@@ -140,10 +140,10 @@ class SimpleSearchEngine:
         suggestions = [sug for sug, _ in sorted(matching, key=lambda x: x[1], reverse=True)[:limit]]
         
         products = []
-        if include_products and suggestions:
-            # Берем первую подсказку и ищем товары
-            first_suggestion = suggestions[0]
-            result = await self.search(project_id, first_suggestion, limit=4)
+        if include_products:
+            # Если есть подсказки - ищем по первой, иначе ищем по оригинальному запросу
+            search_query = suggestions[0] if suggestions else prefix
+            result = await self.search(project_id, search_query, limit=4)
             products = result.items
         
         return SuggestResult(

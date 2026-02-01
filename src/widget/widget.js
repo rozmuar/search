@@ -620,13 +620,21 @@
      */
     async fetchSuggestions(prefix) {
       try {
+        console.log('[SearchWidget] Fetching suggestions for:', prefix);
         const data = await this.api.suggest(prefix, {
           limit: this.config.suggestions.limit,
           includeProducts: this.config.suggestions.showProducts,
           includeCategories: this.config.suggestions.showCategories,
         });
 
-        console.log('[SearchWidget] Showing suggestions:', data);
+        console.log('[SearchWidget] Suggest raw response:', JSON.stringify(data, null, 2));
+        console.log('[SearchWidget] Suggestions to show:', data.suggestions);
+        
+        if (data.suggestions) {
+          console.log('[SearchWidget] Queries:', data.suggestions.queries?.length);
+          console.log('[SearchWidget] Products:', data.suggestions.products?.length);
+        }
+        
         this.suggestions.show(data.suggestions || data);
         this.emit('suggest', { prefix, suggestions: data });
         
