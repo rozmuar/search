@@ -42,7 +42,7 @@ feed_scheduler = None
 
 
 async def restore_products_from_backup(indexer_instance):
-    """Восстановление товаров из PostgreSQL если Redis пустой"""
+    """Восстановление товаров из PostgreSQL если Redis пустой или нет индекса"""
     try:
         # Получаем все проекты
         from .database import db
@@ -55,14 +55,22 @@ async def restore_products_from_backup(indexer_instance):
             
             # Проверяем есть ли товары в Redis
             product_keys = await redis_client.keys(f"products:{project_id}:*")
+            # Проверяем есть ли индекс
+            index_keys = await redis_client.keys(f"idx:{project_id}:inv:*")
             
             if not product_keys:
                 # Redis пустой - восстанавливаем из PostgreSQL
                 count = await indexer_instance.restore_from_backup(project_id)
                 if count > 0:
-                    logger.info(f"Restored {count} products for project {project_id} from PostgreSQL")
+                    logger.info(f"Restored {count} products for project {project_id} from PostgreSQL (no products)")
+            elif not index_keys:
+                # Товары есть, но индекса нет - переиндексируем
+                logger.info(f"Project {project_id} has {len(product_keys)} products but no index - rebuilding...")
+                count = await indexer_instance.rebuild_index_from_redis(project_id)
+                if count > 0:
+                    logger.info(f"Rebuilt index for {count} products in project {project_id}")
             else:
-                logger.info(f"Project {project_id} has {len(product_keys)} products in Redis - skip restore")
+                logger.info(f"Project {project_id} has {len(product_keys)} products and {len(index_keys)} index keys - OK")
                 
     except Exception as e:
         logger.error(f"Failed to restore products from backup: {e}")

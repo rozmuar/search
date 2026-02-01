@@ -251,3 +251,94 @@ class SimpleIndexer:
         except Exception as e:
             logger.error(f"[Indexer] Failed to restore from backup: {e}")
             return 0
+
+    async def rebuild_index_from_redis(self, project_id: str) -> int:
+        """Перестроение индекса из товаров в Redis (без обращения к PostgreSQL)"""
+        try:
+            # Получаем все товары из Redis
+            product_keys = await self.redis.keys(f"products:{project_id}:*")
+            
+            if not product_keys:
+                logger.warning(f"[Indexer] No products in Redis for project {project_id}")
+                return 0
+            
+            logger.info(f"[Indexer] Rebuilding index from {len(product_keys)} products in Redis")
+            
+            # Загружаем данные товаров
+            products = []
+            for key in product_keys:
+                data = await self.redis.get(key)
+                if data:
+                    if isinstance(data, bytes):
+                        data = data.decode('utf-8')
+                    product_data = json.loads(data)
+                    
+                    product = Product(
+                        id=product_data.get('id', ''),
+                        name=product_data.get('name', ''),
+                        description=product_data.get('description', ''),
+                        url=product_data.get('url', ''),
+                        image=product_data.get('image', ''),
+                        price=product_data.get('price'),
+                        old_price=product_data.get('old_price'),
+                        in_stock=product_data.get('in_stock', True),
+                        category=product_data.get('category', ''),
+                        brand=product_data.get('brand', ''),
+                    )
+                    if product_data.get('params'):
+                        product.params = product_data['params']
+                    if product_data.get('vendor_code'):
+                        product.vendor_code = product_data['vendor_code']
+                    products.append(product)
+            
+            if not products:
+                return 0
+            
+            # Строим только индекс (без перезаписи товаров)
+            inverted_index = defaultdict(dict)
+            ngram_index = defaultdict(set)
+            suggest_index = defaultdict(int)
+            
+            for product in products:
+                tokens = self._extract_tokens(product)
+                
+                for token, score in tokens.items():
+                    inverted_index[token][product.id] = score
+                    for ngram in self.ngram_gen.generate(token):
+                        ngram_index[ngram].add(token)
+                
+                name_tokens = self.query_processor.tokenize(
+                    self.query_processor.normalize(product.name)
+                )
+                for i in range(len(name_tokens)):
+                    prefix = " ".join(name_tokens[:i+1])
+                    suggest_index[prefix] += 1
+            
+            # Удаляем старые индексы и записываем новые
+            pipe = self.redis.pipeline()
+            
+            old_idx_keys = await self.redis.keys(f"idx:{project_id}:*")
+            if old_idx_keys:
+                pipe.delete(*old_idx_keys)
+            
+            for token, product_scores in inverted_index.items():
+                key = f"idx:{project_id}:inv:{token}"
+                pipe.zadd(key, product_scores)
+            
+            for ngram, tokens in ngram_index.items():
+                key = f"idx:{project_id}:ngram:{ngram}"
+                if tokens:
+                    pipe.sadd(key, *tokens)
+            
+            for prefix, count in suggest_index.items():
+                key = f"idx:{project_id}:suggest"
+                pipe.zadd(key, {prefix: count})
+            
+            await pipe.execute()
+            
+            logger.info(f"[Indexer] Rebuilt index for {len(products)} products")
+            return len(products)
+            
+        except Exception as e:
+            logger.error(f"[Indexer] Failed to rebuild index: {e}")
+            return 0
