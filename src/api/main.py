@@ -217,16 +217,22 @@ async def regenerate_api_key(project_id: str, user: User = Depends(require_auth)
 
 # ============ FEED ENDPOINTS ============
 
+class FeedLoadRequest(BaseModel):
+    url: str
+
 @app.post("/api/v1/projects/{project_id}/feed/load")
-async def load_feed(project_id: str, user: User = Depends(require_auth)):
+async def load_feed(project_id: str, request: FeedLoadRequest, user: User = Depends(require_auth)):
     """Загрузка фида проекта"""
     project = await data_store.get_project(project_id)
     if not project or project.get("user_id") != user.id:
         raise HTTPException(status_code=404, detail="Project not found")
     
-    feed_url = project.get("feed_url")
+    feed_url = request.url
     if not feed_url:
-        raise HTTPException(status_code=400, detail="Feed URL not configured")
+        raise HTTPException(status_code=400, detail="Feed URL not provided")
+    
+    # Сохраняем URL фида в проект
+    await data_store.update_project(project_id, {"feed_url": feed_url})
     
     # Загружаем фид
     result = await feed_manager.load_feed(project_id, feed_url)
