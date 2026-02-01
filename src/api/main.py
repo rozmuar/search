@@ -334,7 +334,8 @@ async def search(
     min_price: Optional[float] = None,
     max_price: Optional[float] = None,
     in_stock: Optional[bool] = None,
-    category: Optional[str] = None
+    category: Optional[str] = None,
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ):
     """
     Поиск товаров
@@ -344,10 +345,11 @@ async def search(
     import time
     start_time = time.time()
     
-    # Определяем проект
+    # Определяем проект (приоритет: header > query param)
+    effective_api_key = x_api_key or api_key
     actual_project_id = project_id
-    if api_key:
-        project = await data_store.get_project_by_api_key(api_key)
+    if effective_api_key:
+        project = await data_store.get_project_by_api_key(effective_api_key)
         if project:
             actual_project_id = project["id"]
     
@@ -394,12 +396,14 @@ async def suggest(
     q: str = Query(..., min_length=1),
     project_id: Optional[str] = Query(None),
     api_key: Optional[str] = Query(None),
-    limit: int = Query(5, ge=1, le=20)
+    limit: int = Query(5, ge=1, le=20),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ):
     """Автодополнение запроса"""
+    effective_api_key = x_api_key or api_key
     actual_project_id = project_id
-    if api_key:
-        project = await data_store.get_project_by_api_key(api_key)
+    if effective_api_key:
+        project = await data_store.get_project_by_api_key(effective_api_key)
         if project:
             actual_project_id = project["id"]
     
