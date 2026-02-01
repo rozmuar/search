@@ -418,9 +418,9 @@ async def suggest(
     
     result = await search_engine.suggest(actual_project_id, q, limit)
     
-    # Форматируем для виджета
+    # Форматируем для виджета (максимум 3 текстовые подсказки)
     suggestions = {
-        "queries": [{"text": s, "highlight": s} for s in (result.suggestions or [])],
+        "queries": [{"text": s, "highlight": s} for s in (result.suggestions or [])[:3]],
         "categories": [],
         "products": result.products or []
     }
