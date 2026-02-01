@@ -72,8 +72,10 @@ class SimpleIndexer:
         # Атомарная замена в Redis
         pipe = self.redis.pipeline()
         
-        # Удаляем старые данные
-        old_keys = await self.redis.keys(f"*:{project_id}:*")
+        # Удаляем старые данные (только товары и индексы, НЕ данные проекта)
+        old_product_keys = await self.redis.keys(f"products:{project_id}:*")
+        old_idx_keys = await self.redis.keys(f"idx:{project_id}:*")
+        old_keys = old_product_keys + old_idx_keys
         if old_keys:
             pipe.delete(*old_keys)
         
