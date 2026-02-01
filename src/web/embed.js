@@ -1,5 +1,6 @@
 /**
  * SearchPro Widget - JavaScript виджет для внешнего поиска
+ * Version: 1.0.3
  * 
  * Использование:
  * <script src="https://your-server.com/embed.js"></script>
@@ -19,6 +20,9 @@
   const scriptSrc = currentScript?.src || '';
   const baseUrl = scriptSrc ? new URL(scriptSrc).origin : window.location.origin;
 
+  const VERSION = '1.0.3';
+  console.log('[SearchWidget] Loading embed.js version', VERSION);
+
   // ==================== Конфигурация ====================
   
   const DEFAULT_CONFIG = {
@@ -32,12 +36,12 @@
       limit: 10,
       showProducts: true,
       showCategories: true,
-      productLimit: 4,
+      productLimit: 8,
     },
     
     results: {
       enabled: true,
-      limit: 20,
+      limit: 50,
       showFilters: true,
       showSorting: true,
       highlightMatches: true,
@@ -427,14 +431,20 @@
     }
 
     bindEvents() {
+      // При вводе сразу выполняем поиск
       const handleInput = debounce((e) => {
         const query = e.target.value.trim();
         this.state.query = query;
 
         if (query.length >= this.config.minChars) {
-          this.fetchSuggestions(query);
+          // Выполняем полноценный поиск вместо подсказок
+          this.search(query);
         } else {
           this.suggestions.hide();
+          if (this.resultsContainer) {
+            this.resultsContainer.remove();
+            this.resultsContainer = null;
+          }
         }
       }, this.config.debounceMs);
 
@@ -479,11 +489,53 @@
         }
       });
 
+      // При фокусе показываем популярные запросы если поле пустое
       this.input.addEventListener('focus', () => {
-        if (this.state.query.length >= this.config.minChars) {
-          this.fetchSuggestions(this.state.query);
+        const query = this.input.value.trim();
+        console.log('[SearchWidget] Focus event, query:', query);
+        if (query.length >= this.config.minChars) {
+          // Если есть текст - ищем
+          this.search(query);
+        } else {
+          // Если пусто - показываем популярные запросы
+          this.fetchPopularQueries();
         }
       });
+    }
+
+    async fetchPopularQueries() {
+      try {
+        console.log('[SearchWidget] Fetching popular queries...');
+        const response = await fetch(`${this.config.apiUrl}/popular?limit=5`, {
+          headers: {
+            'X-API-Key': this.config.apiKey,
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Popular failed: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('[SearchWidget] Popular data:', data);
+        
+        if (data.queries && data.queries.length > 0) {
+          const suggestions = {
+            queries: data.queries.map(q => ({
+              text: q.text,
+              highlight: q.text,
+              count: q.count,
+              isPopular: true
+            })),
+            categories: [],
+            products: []
+          };
+          this.suggestions.show({ suggestions }, true);
+        }
+      } catch (error) {
+        console.error('[SearchWidget] Failed to fetch popular queries:', error);
+      }
     }
 
     async fetchSuggestions(prefix) {
