@@ -11,6 +11,7 @@ from contextlib import asynccontextmanager
 from pydantic import BaseModel, EmailStr
 import json
 import os
+import logging
 from datetime import datetime
 
 from ..search.query_processor_simple import SimpleQueryProcessor, NGramGenerator
@@ -22,6 +23,13 @@ from .database import db
 from ..feed.parser import FeedParser, FeedManager
 from ..feed.scheduler import start_feed_scheduler, stop_feed_scheduler
 from ..core.models import Product
+
+# Настройка логирования
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 
 # Глобальные объекты

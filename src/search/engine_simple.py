@@ -4,9 +4,12 @@
 """
 import json
 import math
+import logging
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 from collections import defaultdict
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -58,7 +61,7 @@ class SimpleSearchEngine:
         # Обрабатываем запрос
         search_query = self.query_processor.process(query)
         
-        print(f"[SEARCH] Query: '{query}' -> tokens: {search_query.tokens}")
+        logger.info(f"[SEARCH] Query: '{query}' -> tokens: {search_query.tokens}")
         
         if not search_query.tokens:
             return SearchResult(
@@ -74,7 +77,7 @@ class SimpleSearchEngine:
         # Расширяем токены синонимами
         expanded_tokens = self._expand_with_synonyms(search_query.tokens, synonyms)
         
-        print(f"[SEARCH] Expanded tokens (with synonyms): {expanded_tokens}")
+        logger.info(f"[SEARCH] Expanded tokens (with synonyms): {expanded_tokens}")
         
         # Поиск по инвертированному индексу
         product_scores = await self._search_inverted_index(
@@ -82,7 +85,7 @@ class SimpleSearchEngine:
             expanded_tokens
         )
         
-        print(f"[SEARCH] Found {len(product_scores)} products in inverted index")
+        logger.info(f"[SEARCH] Found {len(product_scores)} products in inverted index")
         
         # Если мало результатов, пробуем с другой раскладкой
         if len(product_scores) < limit and search_query.layout_variants:
@@ -249,7 +252,7 @@ class SimpleSearchEngine:
         
         # Диагностика: сколько всего ключей в индексе
         total_idx_keys = await self.redis.keys(f"idx:{project_id}:inv:*")
-        print(f"[SEARCH] Total inverted index keys: {len(total_idx_keys)}")
+        logger.info(f"[SEARCH] Total inverted index keys: {len(total_idx_keys)}")
         
         for token in tokens:
             key = f"idx:{project_id}:inv:{token}"
@@ -257,7 +260,7 @@ class SimpleSearchEngine:
             # Получаем товары с этим токеном
             results = await self.redis.zrevrange(key, 0, -1, withscores=True)
             
-            print(f"[SEARCH] Token '{token}' -> found {len(results)} products")
+            logger.info(f"[SEARCH] Token '{token}' -> found {len(results)} products")
             
             for product_id, score in results:
                 if isinstance(product_id, bytes):
