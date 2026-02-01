@@ -838,6 +838,298 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Feed Guide Section -->
+                <div class="card" id="feedGuideCard">
+                    <div class="card-header">
+                        <h3 class="card-title">📄 Как подготовить товарный фид</h3>
+                        <p class="card-subtitle">Подробная инструкция по созданию XML-фида для SearchPro</p>
+                    </div>
+                    <div class="card-body feed-guide-section">
+                        
+                        <!-- Intro -->
+                        <div class="guide-block">
+                            <h4>🔹 Что такое товарный фид?</h4>
+                            <p>
+                                Товарный фид — это XML-файл, содержащий структурированную информацию о ваших товарах: 
+                                названия, цены, описания, изображения и другие характеристики. SearchPro использует 
+                                формат <strong>YML (Yandex Market Language)</strong> — стандарт Яндекс.Маркета, 
+                                который поддерживается большинством CMS и интернет-магазинов.
+                            </p>
+                        </div>
+
+                        <!-- Minimum Structure -->
+                        <div class="guide-block">
+                            <h4>🔹 Минимальная структура фида</h4>
+                            <p>Ваш фид должен содержать корневой элемент <code>&lt;yml_catalog&gt;</code>, внутри которого находится <code>&lt;shop&gt;</code> с категориями и товарами:</p>
+                            <div class="code-block">
+                                <div class="code-block-header">
+                                    <span class="code-block-title">XML (YML)</span>
+                                    <button class="btn-copy" onclick="copyCode('feedStructure')">📋 Копировать</button>
+                                </div>
+                                <pre id="feedStructure"><code>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;yml_catalog date="2024-01-15 10:00"&gt;
+  &lt;shop&gt;
+    &lt;name&gt;Название вашего магазина&lt;/name&gt;
+    &lt;company&gt;ООО "Ваша компания"&lt;/company&gt;
+    &lt;url&gt;https://www.yoursite.ru&lt;/url&gt;
+    
+    &lt;currencies&gt;
+      &lt;currency id="RUB" rate="1"/&gt;
+    &lt;/currencies&gt;
+    
+    &lt;categories&gt;
+      &lt;category id="1"&gt;Электроника&lt;/category&gt;
+      &lt;category id="2" parentId="1"&gt;Смартфоны&lt;/category&gt;
+      &lt;category id="3" parentId="1"&gt;Ноутбуки&lt;/category&gt;
+      &lt;category id="4"&gt;Одежда&lt;/category&gt;
+    &lt;/categories&gt;
+    
+    &lt;offers&gt;
+      &lt;!-- Здесь будут ваши товары --&gt;
+    &lt;/offers&gt;
+  &lt;/shop&gt;
+&lt;/yml_catalog&gt;</code></pre>
+                            </div>
+                        </div>
+
+                        <!-- Product Example -->
+                        <div class="guide-block">
+                            <h4>🔹 Пример описания товара</h4>
+                            <p>Каждый товар описывается в теге <code>&lt;offer&gt;</code>. Вот полный пример с комментариями:</p>
+                            <div class="code-block">
+                                <div class="code-block-header">
+                                    <span class="code-block-title">XML</span>
+                                    <button class="btn-copy" onclick="copyCode('offerExample')">📋 Копировать</button>
+                                </div>
+                                <pre id="offerExample"><code>&lt;offer id="SKU-12345" available="true"&gt;
+  &lt;!-- Обязательные поля --&gt;
+  &lt;name&gt;Apple iPhone 15 Pro Max 256GB Titanium Blue&lt;/name&gt;
+  &lt;url&gt;https://yoursite.ru/product/iphone-15-pro-max&lt;/url&gt;
+  &lt;price&gt;149990&lt;/price&gt;
+  &lt;currencyId&gt;RUB&lt;/currencyId&gt;
+  &lt;categoryId&gt;2&lt;/categoryId&gt;
+  
+  &lt;!-- Рекомендуемые поля --&gt;
+  &lt;picture&gt;https://yoursite.ru/images/iphone-15-1.jpg&lt;/picture&gt;
+  &lt;picture&gt;https://yoursite.ru/images/iphone-15-2.jpg&lt;/picture&gt;
+  &lt;vendor&gt;Apple&lt;/vendor&gt;
+  &lt;vendorCode&gt;MU7A3&lt;/vendorCode&gt;
+  &lt;description&gt;
+    Флагманский смартфон Apple с процессором A17 Pro, 
+    титановым корпусом и продвинутой камерой 48 Мп.
+    Поддержка USB-C и Action Button.
+  &lt;/description&gt;
+  
+  &lt;!-- Дополнительные поля --&gt;
+  &lt;oldprice&gt;169990&lt;/oldprice&gt;
+  &lt;model&gt;iPhone 15 Pro Max&lt;/model&gt;
+  &lt;typePrefix&gt;Смартфон&lt;/typePrefix&gt;
+  
+  &lt;!-- Характеристики (param) --&gt;
+  &lt;param name="Цвет"&gt;Titanium Blue&lt;/param&gt;
+  &lt;param name="Память"&gt;256 ГБ&lt;/param&gt;
+  &lt;param name="Диагональ экрана"&gt;6.7"&lt;/param&gt;
+  &lt;param name="Операционная система"&gt;iOS 17&lt;/param&gt;
+&lt;/offer&gt;</code></pre>
+                            </div>
+                        </div>
+
+                        <!-- Fields Reference -->
+                        <div class="guide-block">
+                            <h4>🔹 Справочник полей</h4>
+                            
+                            <h5>Обязательные поля</h5>
+                            <table class="guide-table">
+                                <thead>
+                                    <tr>
+                                        <th>Поле</th>
+                                        <th>Описание</th>
+                                        <th>Пример</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><code>id</code> (атрибут)</td>
+                                        <td>Уникальный идентификатор товара (артикул, SKU)</td>
+                                        <td>SKU-12345</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>name</code></td>
+                                        <td>Полное название товара. Включайте бренд, модель, важные характеристики</td>
+                                        <td>Apple iPhone 15 Pro 256GB</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>url</code></td>
+                                        <td>Прямая ссылка на страницу товара (абсолютный URL)</td>
+                                        <td>https://site.ru/product/123</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>price</code></td>
+                                        <td>Актуальная цена товара (число без пробелов и валюты)</td>
+                                        <td>149990</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>currencyId</code></td>
+                                        <td>Код валюты (должен быть объявлен в currencies)</td>
+                                        <td>RUB</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>categoryId</code></td>
+                                        <td>ID категории из раздела categories</td>
+                                        <td>2</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <h5>Рекомендуемые поля (улучшают качество поиска)</h5>
+                            <table class="guide-table">
+                                <thead>
+                                    <tr>
+                                        <th>Поле</th>
+                                        <th>Описание</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><code>picture</code></td>
+                                        <td>URL изображения товара. Можно указать несколько тегов picture для галереи</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>description</code></td>
+                                        <td>Текстовое описание товара. <strong>Важно для поиска!</strong> Чем подробнее — тем лучше</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>vendor</code></td>
+                                        <td>Производитель / бренд товара</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>vendorCode</code></td>
+                                        <td>Артикул производителя</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>available</code> (атрибут)</td>
+                                        <td>Наличие товара: <code>true</code> — в наличии, <code>false</code> — нет</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>oldprice</code></td>
+                                        <td>Старая цена (для отображения скидки)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>param</code></td>
+                                        <td>Характеристики товара. Атрибут <code>name</code> — название, значение внутри тега</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Tips -->
+                        <div class="guide-block">
+                            <h4>🔹 Рекомендации по качеству фида</h4>
+                            <div class="tips-grid">
+                                <div class="tip-card tip-success">
+                                    <div class="tip-icon">✅</div>
+                                    <div class="tip-content">
+                                        <strong>Полные названия</strong>
+                                        <p>Указывайте бренд, модель и ключевые характеристики в name</p>
+                                    </div>
+                                </div>
+                                <div class="tip-card tip-success">
+                                    <div class="tip-icon">✅</div>
+                                    <div class="tip-content">
+                                        <strong>Подробные описания</strong>
+                                        <p>Description влияет на релевантность поиска</p>
+                                    </div>
+                                </div>
+                                <div class="tip-card tip-success">
+                                    <div class="tip-icon">✅</div>
+                                    <div class="tip-content">
+                                        <strong>UTF-8 кодировка</strong>
+                                        <p>Фид должен быть в кодировке UTF-8</p>
+                                    </div>
+                                </div>
+                                <div class="tip-card tip-success">
+                                    <div class="tip-icon">✅</div>
+                                    <div class="tip-content">
+                                        <strong>Актуальные данные</strong>
+                                        <p>Обновляйте фид при изменениях каталога</p>
+                                    </div>
+                                </div>
+                                <div class="tip-card tip-warning">
+                                    <div class="tip-icon">⚠️</div>
+                                    <div class="tip-content">
+                                        <strong>Размер файла</strong>
+                                        <p>Максимальный размер фида — 50 МБ</p>
+                                    </div>
+                                </div>
+                                <div class="tip-card tip-warning">
+                                    <div class="tip-icon">⚠️</div>
+                                    <div class="tip-content">
+                                        <strong>Доступность URL</strong>
+                                        <p>Фид должен быть доступен по прямой ссылке</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- CMS Solutions -->
+                        <div class="guide-block">
+                            <h4>🔹 Готовые решения для популярных CMS</h4>
+                            <p>Большинство платформ умеют генерировать YML-фиды автоматически:</p>
+                            <div class="cms-grid">
+                                <div class="cms-card">
+                                    <div class="cms-logo">🛒</div>
+                                    <div class="cms-name">1С-Битрикс</div>
+                                    <div class="cms-desc">Встроенный модуль экспорта в Яндекс.Маркет</div>
+                                    <a href="https://dev.1c-bitrix.ru/learning/course/?COURSE_ID=42&LESSON_ID=2830" target="_blank" class="cms-link">Документация →</a>
+                                </div>
+                                <div class="cms-card">
+                                    <div class="cms-logo">🛍️</div>
+                                    <div class="cms-name">WooCommerce</div>
+                                    <div class="cms-desc">Плагин YML for Yandex Market</div>
+                                    <a href="https://wordpress.org/plugins/yml-for-yandex-market/" target="_blank" class="cms-link">Скачать плагин →</a>
+                                </div>
+                                <div class="cms-card">
+                                    <div class="cms-logo">🏪</div>
+                                    <div class="cms-name">OpenCart</div>
+                                    <div class="cms-desc">Модули экспорта в маркетплейс</div>
+                                    <a href="https://www.opencart.com/index.php?route=marketplace/extension&filter_search=yandex" target="_blank" class="cms-link">Маркетплейс →</a>
+                                </div>
+                                <div class="cms-card">
+                                    <div class="cms-logo">🛒</div>
+                                    <div class="cms-name">Shopify</div>
+                                    <div class="cms-desc">Apps для генерации фидов</div>
+                                    <a href="https://apps.shopify.com/search?q=yandex+market+feed" target="_blank" class="cms-link">App Store →</a>
+                                </div>
+                                <div class="cms-card">
+                                    <div class="cms-logo">📦</div>
+                                    <div class="cms-name">MODX</div>
+                                    <div class="cms-desc">Компонент msYML2</div>
+                                    <a href="https://modstore.pro/packages/import-and-export/msyml2" target="_blank" class="cms-link">Установить →</a>
+                                </div>
+                                <div class="cms-card">
+                                    <div class="cms-logo">📖</div>
+                                    <div class="cms-name">Документация YML</div>
+                                    <div class="cms-desc">Официальная спецификация Яндекса</div>
+                                    <a href="https://yandex.ru/support/partnermarket/export/yml.html" target="_blank" class="cms-link">Читать →</a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Validation -->
+                        <div class="guide-block">
+                            <h4>🔹 Проверка фида</h4>
+                            <p>После создания фида рекомендуем проверить его валидность:</p>
+                            <ol class="guide-steps">
+                                <li>Откройте URL фида в браузере — он должен отображаться как XML</li>
+                                <li>Проверьте кодировку — кириллица должна отображаться корректно</li>
+                                <li>Используйте <a href="https://webmaster.yandex.ru/tools/xml-validator/" target="_blank">валидатор Яндекс.Вебмастера</a> для проверки структуры</li>
+                                <li>Загрузите фид в SearchPro и проверьте количество распознанных товаров</li>
+                            </ol>
+                        </div>
+
+                    </div>
+                </div>
             </section>
 
         </main>

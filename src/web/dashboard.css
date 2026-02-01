@@ -2240,6 +2240,164 @@ body {
     color: var(--primary);
 }
 
+/* ========== FEED GUIDE SECTION (in Embed) ========== */
+.feed-guide-section {
+    max-height: none;
+}
+
+.guide-block {
+    margin-bottom: 32px;
+    padding-bottom: 32px;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.guide-block:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.guide-block h4 {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--gray-800);
+    margin-bottom: 12px;
+}
+
+.guide-block h5 {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--gray-700);
+    margin: 20px 0 12px;
+}
+
+.guide-block p {
+    color: var(--gray-600);
+    line-height: 1.7;
+    margin-bottom: 16px;
+}
+
+.guide-block code {
+    background: var(--gray-100);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.8125rem;
+    color: var(--primary);
+}
+
+.tips-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+}
+
+.tip-card {
+    display: flex;
+    gap: 12px;
+    padding: 16px;
+    background: var(--gray-50);
+    border-radius: var(--radius);
+    border-left: 4px solid var(--gray-300);
+}
+
+.tip-card.tip-success {
+    background: rgba(16, 185, 129, 0.05);
+    border-left-color: var(--success);
+}
+
+.tip-card.tip-warning {
+    background: rgba(245, 158, 11, 0.05);
+    border-left-color: var(--warning);
+}
+
+.tip-icon {
+    font-size: 1.25rem;
+    flex-shrink: 0;
+}
+
+.tip-content strong {
+    display: block;
+    color: var(--gray-800);
+    margin-bottom: 4px;
+}
+
+.tip-content p {
+    font-size: 0.875rem;
+    color: var(--gray-600);
+    margin: 0;
+    line-height: 1.5;
+}
+
+.cms-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+    margin-top: 16px;
+}
+
+.cms-card {
+    padding: 20px;
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    transition: all 0.2s ease;
+}
+
+.cms-card:hover {
+    background: #fff;
+    border-color: var(--primary);
+    box-shadow: var(--shadow-md);
+}
+
+.cms-logo {
+    font-size: 2rem;
+    margin-bottom: 12px;
+}
+
+.cms-name {
+    font-weight: 600;
+    color: var(--gray-800);
+    margin-bottom: 4px;
+}
+
+.cms-desc {
+    font-size: 0.8125rem;
+    color: var(--gray-500);
+    margin-bottom: 12px;
+}
+
+.cms-card .cms-link {
+    display: inline-block;
+    font-size: 0.875rem;
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.cms-card .cms-link:hover {
+    text-decoration: underline;
+}
+
+.guide-steps {
+    margin: 0;
+    padding-left: 24px;
+}
+
+.guide-steps li {
+    padding: 8px 0;
+    color: var(--gray-600);
+    line-height: 1.6;
+}
+
+.guide-steps a {
+    color: var(--primary);
+    text-decoration: none;
+}
+
+.guide-steps a:hover {
+    text-decoration: underline;
+}
+
 /* ========== RESPONSIVE ========== */
 @media (max-width: 1400px) {
     .stats-grid {
