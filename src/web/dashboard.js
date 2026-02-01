@@ -507,7 +507,7 @@ let searchSettingsChanged = false;
 async function loadSearchSettings() {
     if (!currentProject) return;
     
-    const select = document.getElementById('relatedProductsField');
+    const select = document.getElementById('relatedProductsFields');
     const limitInput = document.getElementById('relatedProductsLimit');
     const saveBtn = document.getElementById('saveSearchSettingsBtn');
     const statusEl = document.getElementById('searchSettingsStatus');
@@ -515,7 +515,7 @@ async function loadSearchSettings() {
     if (!select || !limitInput) return;
     
     // Reset
-    select.innerHTML = '<option value="">Отключено</option>';
+    select.innerHTML = '';
     searchSettingsChanged = false;
     saveBtn.disabled = true;
     statusEl.textContent = '';
@@ -547,17 +547,24 @@ async function loadSearchSettings() {
         
         // Load current settings
         const settings = await fetchAPI(`/api/v1/projects/${currentProject.id}/search-settings`);
+        console.log('Search settings loaded:', settings);
         
-        if (settings.relatedProductsField) {
-            select.value = settings.relatedProductsField;
+        // Устанавливаем выбранные поля (поддержка и массива и строки)
+        const selectedFields = settings.relatedProductsFields || 
+                              (settings.relatedProductsField ? [settings.relatedProductsField] : []);
+        
+        if (selectedFields.length > 0) {
+            Array.from(select.options).forEach(opt => {
+                opt.selected = selectedFields.includes(opt.value);
+            });
         }
+        
         if (settings.relatedProductsLimit) {
             limitInput.value = settings.relatedProductsLimit;
         }
         
     } catch (err) {
         console.error('Error loading search settings:', err);
-        // If feed not loaded, show message
         if (err.message?.includes('404') || err.message?.includes('No products')) {
             statusEl.textContent = 'Сначала загрузите фид';
         }
@@ -573,7 +580,7 @@ function markSearchSettingsChanged() {
 async function saveSearchSettings() {
     if (!currentProject) return;
     
-    const select = document.getElementById('relatedProductsField');
+    const select = document.getElementById('relatedProductsFields');
     const limitInput = document.getElementById('relatedProductsLimit');
     const saveBtn = document.getElementById('saveSearchSettingsBtn');
     const statusEl = document.getElementById('searchSettingsStatus');
@@ -582,10 +589,15 @@ async function saveSearchSettings() {
     statusEl.textContent = 'Сохранение...';
     
     try {
+        // Получаем все выбранные поля
+        const selectedFields = Array.from(select.selectedOptions).map(opt => opt.value);
+        
         const settings = {
-            relatedProductsField: select.value || null,
+            relatedProductsFields: selectedFields,
             relatedProductsLimit: parseInt(limitInput.value) || 4
         };
+        
+        console.log('Saving search settings:', settings);
         
         await fetchAPI(`/api/v1/projects/${currentProject.id}/search-settings`, {
             method: 'PUT',
@@ -597,9 +609,7 @@ async function saveSearchSettings() {
         showToast('Настройки поиска сохранены', 'success');
         
         // Update local project data
-        if (currentProject.search_settings) {
-            currentProject.search_settings = JSON.stringify(settings);
-        }
+        currentProject.search_settings = JSON.stringify(settings);
         
     } catch (err) {
         console.error('Error saving search settings:', err);

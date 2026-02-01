@@ -389,43 +389,50 @@ async def search(
     )
     
     # Получаем настройки поиска для связанных товаров
-    related_items = []
-    related_field = None
-    field_value = None
+    related_groups = []
     
     if project and results.items:
         try:
             search_settings_str = project.get("search_settings", "{}")
             search_settings = json.loads(search_settings_str) if isinstance(search_settings_str, str) else search_settings_str
             
-            related_field = search_settings.get("relatedProductsField")
+            # Поддержка и старого формата (relatedProductsField) и нового (relatedProductsFields)
+            related_fields = search_settings.get("relatedProductsFields", [])
+            if not related_fields and search_settings.get("relatedProductsField"):
+                related_fields = [search_settings.get("relatedProductsField")]
+            
             related_limit = search_settings.get("relatedProductsLimit", 4)
             
-            if related_field and results.items:
-                # Берём первый товар из результатов
+            if related_fields and results.items:
                 first_item = results.items[0]
+                exclude_ids = [item["id"] for item in results.items[:5]]
                 
-                # Проверяем формат params.НазваниеПараметра
-                if related_field.startswith("params."):
-                    actual_field = related_field[7:]  # убираем "params."
-                    field_value = first_item.get("params", {}).get(actual_field)
-                else:
-                    # Обычное поле
-                    field_value = first_item.get(related_field)
-                    # Если не нашли - пробуем в params
-                    if not field_value and "params" in first_item:
-                        field_value = first_item.get("params", {}).get(related_field)
-                
-                if field_value:
-                    # Ищем товары с таким же параметром
-                    related_results = await search_engine.search_by_field(
-                        project_id=actual_project_id,
-                        field=related_field,
-                        value=field_value,
-                        limit=related_limit,
-                        exclude_ids=[item["id"] for item in results.items[:5]]
-                    )
-                    related_items = related_results
+                for related_field in related_fields:
+                    # Проверяем формат params.НазваниеПараметра
+                    if related_field.startswith("params."):
+                        actual_field = related_field[7:]
+                        field_value = first_item.get("params", {}).get(actual_field)
+                    else:
+                        field_value = first_item.get(related_field)
+                        if not field_value and "params" in first_item:
+                            field_value = first_item.get("params", {}).get(related_field)
+                    
+                    if field_value:
+                        related_results = await search_engine.search_by_field(
+                            project_id=actual_project_id,
+                            field=related_field,
+                            value=field_value,
+                            limit=related_limit,
+                            exclude_ids=exclude_ids
+                        )
+                        if related_results:
+                            related_groups.append({
+                                "field": related_field,
+                                "value": field_value,
+                                "items": related_results
+                            })
+                            # Добавляем в exclude чтобы не дублировались
+                            exclude_ids.extend([p["id"] for p in related_results])
         except Exception as e:
             print(f"Error fetching related products: {e}")
     
@@ -445,12 +452,8 @@ async def search(
     }
     
     # Добавляем связанные товары если есть
-    if related_items:
-        response["related"] = {
-            "items": related_items,
-            "field": related_field,
-            "value": field_value
-        }
+    if related_groups:
+        response["related"] = related_groups
     
     return response
 
