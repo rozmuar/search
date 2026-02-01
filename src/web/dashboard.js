@@ -640,7 +640,7 @@ async function saveSearchSettings() {
         showToast('Настройки поиска сохранены', 'success');
         
         // Update local project data
-        currentProject.search_settings = JSON.stringify(settings);
+        currentProject.search_settings = settings;
         
     } catch (err) {
         console.error('Error saving search settings:', err);
@@ -1449,7 +1449,16 @@ function loadWidgetSettings() {
     
     // Load saved settings or use defaults
     const project = projects.find(p => p.id === projectId);
-    const settings = project?.widget_settings || {};
+    let settings = project?.widget_settings || {};
+    
+    // Если настройки пришли как строка JSON - парсим
+    if (typeof settings === 'string') {
+        try {
+            settings = JSON.parse(settings);
+        } catch (e) {
+            settings = {};
+        }
+    }
     
     document.getElementById('widgetPrimaryColor').value = settings.primaryColor || '#4F46E5';
     document.getElementById('widgetPrimaryColorText').value = settings.primaryColor || '#4F46E5';

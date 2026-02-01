@@ -175,8 +175,7 @@ class Database:
                 
                 result = dict(row)
                 result['api_key'] = api_key
-                result['widget_settings'] = json.dumps(widget_settings)
-                result['search_settings'] = json.dumps(search_settings)
+                # widget_settings и search_settings уже dict из RETURNING
                 return result
     
     async def get_project(self, project_id: str) -> Optional[Dict]:
@@ -192,12 +191,7 @@ class Database:
             if not row:
                 return None
             result = dict(row)
-            if result.get('widget_settings'):
-                result['widget_settings'] = json.dumps(result['widget_settings'])
-            if result.get('search_settings'):
-                result['search_settings'] = json.dumps(result['search_settings'])
-            if result.get('synonyms'):
-                result['synonyms'] = result['synonyms']  # JSONB уже dict/list
+            # JSONB поля уже приходят как dict/list из PostgreSQL, не нужно сериализовать
             return result
     
     async def get_project_by_api_key(self, api_key: str) -> Optional[Dict]:
@@ -213,10 +207,7 @@ class Database:
             if not row:
                 return None
             result = dict(row)
-            if result.get('widget_settings'):
-                result['widget_settings'] = json.dumps(result['widget_settings'])
-            if result.get('search_settings'):
-                result['search_settings'] = json.dumps(result['search_settings'])
+            # JSONB поля уже приходят как dict/list из PostgreSQL
             return result
     
     async def get_user_projects(self, user_id: str) -> List[Dict]:
@@ -234,10 +225,7 @@ class Database:
             result = []
             for row in rows:
                 project = dict(row)
-                if project.get('widget_settings'):
-                    project['widget_settings'] = json.dumps(project['widget_settings'])
-                if project.get('search_settings'):
-                    project['search_settings'] = json.dumps(project['search_settings'])
+                # JSONB поля уже приходят как dict/list из PostgreSQL
                 result.append(project)
             return result
     
