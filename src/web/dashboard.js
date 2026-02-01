@@ -523,6 +523,7 @@ async function loadSearchSettings() {
     try {
         // Load available fields from feed
         const feedParams = await fetchAPI(`/api/v1/projects/${currentProject.id}/feed-params`);
+        console.log('Feed params response:', feedParams);
         
         if (feedParams.fields && feedParams.fields.length > 0) {
             // Common fields first
