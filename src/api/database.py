@@ -228,8 +228,14 @@ class Database:
         values = []
         for i, (key, value) in enumerate(filtered.items(), 1):
             set_parts.append(f"{key} = ${i}")
-            if key in ('widget_settings', 'search_settings') and isinstance(value, str):
-                values.append(json.loads(value))
+            # Для JSONB полей конвертируем dict в JSON строку
+            if key in ('widget_settings', 'search_settings'):
+                if isinstance(value, dict):
+                    values.append(json.dumps(value))
+                elif isinstance(value, str):
+                    values.append(value)
+                else:
+                    values.append(json.dumps({}))
             else:
                 values.append(value)
         
