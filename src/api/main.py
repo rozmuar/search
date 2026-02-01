@@ -498,6 +498,13 @@ async def track_click(data: ClickTrack):
     return {"success": True}
 
 
+@app.post("/api/v1/analytics/event")
+async def analytics_event(request: Request):
+    """Принимает события аналитики от виджета"""
+    # Просто принимаем и игнорируем пока
+    return {"success": True}
+
+
 # ============ HEALTH CHECK ============
 
 @app.get("/health")
