@@ -415,6 +415,7 @@
           if (serverConfig.borderRadius !== undefined) this.config.borderRadius = serverConfig.borderRadius;
           if (serverConfig.showImages !== undefined) this.config.showImages = serverConfig.showImages;
           if (serverConfig.showPrices !== undefined) this.config.showPrices = serverConfig.showPrices;
+          if (serverConfig.showButton !== undefined) this.config.showButton = serverConfig.showButton;
           if (serverConfig.maxResults) this.config.results.limit = serverConfig.maxResults;
         }
       } catch (err) {
@@ -472,6 +473,22 @@
       this.inputWrapper.appendChild(this.input);
       
       this.input.classList.add('search-widget-input');
+      
+      // Добавляем кнопку поиска если включено
+      if (this.config.showButton !== false) {
+        this.searchButton = document.createElement('button');
+        this.searchButton.type = 'button';
+        this.searchButton.className = 'search-widget-button';
+        this.searchButton.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>';
+        this.searchButton.addEventListener('click', () => {
+          const query = this.input.value.trim();
+          if (query.length >= this.config.minChars) {
+            this.search(query);
+          }
+        });
+        this.inputWrapper.appendChild(this.searchButton);
+        this.inputWrapper.classList.add('has-button');
+      }
     }
 
     bindEvents() {
@@ -1117,6 +1134,37 @@
 
         .search-widget-input:focus {
           border-color: var(--search-primary-color);
+        }
+
+        .search-widget-wrapper.has-button .search-widget-input {
+          padding-right: 50px;
+        }
+
+        .search-widget-button {
+          position: absolute;
+          right: 4px;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 40px;
+          height: 40px;
+          background: var(--search-primary-color);
+          border: none;
+          border-radius: calc(var(--search-border-radius) - 2px);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: white;
+          transition: background-color 0.2s;
+        }
+
+        .search-widget-button:hover {
+          filter: brightness(1.1);
+        }
+
+        .search-widget-button svg {
+          width: 20px;
+          height: 20px;
         }
 
         .search-widget-suggestions {
