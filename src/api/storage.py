@@ -234,6 +234,13 @@ class DataStore:
         day_key = now.strftime("%Y-%m-%d")
         hour_key = now.strftime("%Y-%m-%d-%H")
         
+        # Нормализуем запрос (убираем лишние пробелы, приводим к нижнему регистру)
+        normalized_query = " ".join(query.lower().split())
+        
+        # Не сохраняем слишком короткие запросы
+        if len(normalized_query) < 2:
+            return
+        
         pipe = self.redis.pipeline()
         
         # Счетчик запросов за день
@@ -244,14 +251,31 @@ class DataStore:
         pipe.incr(f"analytics:{project_id}:queries:hourly:{hour_key}")
         pipe.expire(f"analytics:{project_id}:queries:hourly:{hour_key}", 86400 * 7)  # 7 дней
         
-        # Популярные запросы
-        pipe.zincrby(f"analytics:{project_id}:popular_queries", 1, query.lower())
+        # Популярные запросы (только если есть результаты)
+        if results_count > 0:
+            pipe.zincrby(f"analytics:{project_id}:popular_queries", 1, normalized_query)
         
         # Среднее время ответа
         pipe.lpush(f"analytics:{project_id}:response_times", took_ms)
         pipe.ltrim(f"analytics:{project_id}:response_times", 0, 999)  # Последние 1000
         
         await pipe.execute()
+    
+    async def get_popular_queries(self, project_id: str, limit: int = 5) -> List[Dict[str, Any]]:
+        """Получение популярных запросов для показа при фокусе на поле поиска"""
+        popular = await self.redis.zrevrange(
+            f"analytics:{project_id}:popular_queries",
+            0, limit - 1,
+            withscores=True
+        )
+        
+        result = []
+        for item in popular:
+            query = item[0].decode() if isinstance(item[0], bytes) else item[0]
+            count = int(item[1])
+            result.append({"text": query, "count": count})
+        
+        return result
     
     async def get_analytics(self, project_id: str, days: int = 7) -> Dict[str, Any]:
         """Получение аналитики проекта"""

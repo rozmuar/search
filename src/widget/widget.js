@@ -180,6 +180,27 @@
       return data;
     }
 
+    async getPopular(limit = 5) {
+      const url = `${this.apiUrl}/popular?limit=${limit}`;
+      console.log('[SearchWidget] Popular request:', url);
+
+      const response = await fetch(url, {
+        headers: {
+          'X-API-Key': this.apiKey,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Popular failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('[SearchWidget] Popular response:', data);
+
+      return data;
+    }
+
     trackEvent(eventType, data) {
       // Отправка аналитики (fire and forget)
       navigator.sendBeacon(`${this.apiUrl}/analytics`, JSON.stringify({
@@ -222,20 +243,21 @@
       this.widget.inputWrapper.appendChild(this.element);
     }
 
-    show(suggestions) {
+    show(suggestions, isPopular = false) {
       if (!suggestions || (
-        suggestions.queries.length === 0 && 
-        suggestions.categories.length === 0 && 
-        suggestions.products.length === 0
+        (!suggestions.queries || suggestions.queries.length === 0) && 
+        (!suggestions.categories || suggestions.categories.length === 0) && 
+        (!suggestions.products || suggestions.products.length === 0)
       )) {
         this.hide();
         return;
       }
 
-      this.element.innerHTML = this.render(suggestions);
+      this.element.innerHTML = this.render(suggestions, isPopular);
       this.element.style.display = 'block';
       this.visible = true;
       this.selectedIndex = -1;
+      this.isPopular = isPopular;
 
       // Привязываем события
       this.bindEvents();
@@ -245,19 +267,29 @@
       this.element.style.display = 'none';
       this.visible = false;
       this.selectedIndex = -1;
+      this.isPopular = false;
     }
 
-    render(suggestions) {
+    render(suggestions, isPopular = false) {
       let html = '';
 
-      // Поисковые подсказки (максимум 3)
+      // Поисковые подсказки (максимум 3 для обычных, 5 для популярных)
       if (suggestions.queries && suggestions.queries.length > 0) {
+        const maxItems = isPopular ? 5 : 3;
         html += '<div class="search-widget-suggestions-section">';
-        html += suggestions.queries.slice(0, 3).map((item, index) => `
-          <div class="search-widget-suggestion-item" data-type="query" data-index="${index}" data-value="${escapeHtml(item.text)}">
+        
+        // Заголовок для популярных запросов
+        if (isPopular) {
+          html += '<div class="search-widget-section-title search-widget-popular-title">🔥 Популярные запросы</div>';
+        }
+        
+        html += suggestions.queries.slice(0, maxItems).map((item, index) => `
+          <div class="search-widget-suggestion-item${isPopular ? ' search-widget-popular-item' : ''}" data-type="query" data-index="${index}" data-value="${escapeHtml(item.text)}">
             <svg class="search-widget-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="11" cy="11" r="8"></circle>
-              <path d="m21 21-4.35-4.35"></path>
+              ${isPopular 
+                ? '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>'
+                : '<circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path>'
+              }
             </svg>
             <span>${item.highlight || escapeHtml(item.text)}</span>
             ${item.count ? `<span class="search-widget-count">${item.count}</span>` : ''}
@@ -540,12 +572,43 @@
         }
       });
 
-      // Фокус
+      // Фокус - показываем популярные запросы если поле пустое
       this.input.addEventListener('focus', () => {
-        if (this.state.query.length >= this.config.minChars) {
-          this.fetchSuggestions(this.state.query);
+        const query = this.input.value.trim();
+        if (query.length >= this.config.minChars) {
+          this.fetchSuggestions(query);
+        } else {
+          // Показываем популярные запросы
+          this.fetchPopularQueries();
         }
       });
+    }
+
+    /**
+     * Получение популярных запросов
+     */
+    async fetchPopularQueries() {
+      try {
+        const data = await this.api.getPopular(5);
+        
+        if (data.queries && data.queries.length > 0) {
+          // Форматируем для показа
+          const suggestions = {
+            queries: data.queries.map(q => ({
+              text: q.text,
+              highlight: q.text,
+              count: q.count,
+              isPopular: true
+            })),
+            categories: [],
+            products: []
+          };
+          
+          this.suggestions.show(suggestions, true); // true = показать заголовок "Популярные запросы"
+        }
+      } catch (error) {
+        console.error('[SearchWidget] Failed to fetch popular queries:', error);
+      }
     }
 
     /**

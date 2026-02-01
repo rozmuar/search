@@ -354,6 +354,8 @@ async def search(
     # Определяем проект (приоритет: header > query param)
     effective_api_key = x_api_key or api_key
     actual_project_id = project_id
+    project = None
+    
     if effective_api_key:
         project = await data_store.get_project_by_api_key(effective_api_key)
         if project:
@@ -381,12 +383,44 @@ async def search(
         filters=filters
     )
     
+    # Получаем настройки поиска для связанных товаров
+    related_items = []
+    if project and results.items:
+        try:
+            search_settings_str = project.get("search_settings", "{}")
+            search_settings = json.loads(search_settings_str) if isinstance(search_settings_str, str) else search_settings_str
+            
+            related_field = search_settings.get("relatedProductsField")
+            related_limit = search_settings.get("relatedProductsLimit", 4)
+            
+            if related_field and results.items:
+                # Берём первый товар из результатов
+                first_item = results.items[0]
+                field_value = first_item.get(related_field)
+                
+                # Если значение в params
+                if not field_value and "params" in first_item:
+                    field_value = first_item.get("params", {}).get(related_field)
+                
+                if field_value:
+                    # Ищем товары с таким же параметром
+                    related_results = await search_engine.search_by_field(
+                        project_id=actual_project_id,
+                        field=related_field,
+                        value=field_value,
+                        limit=related_limit,
+                        exclude_ids=[item["id"] for item in results.items[:5]]
+                    )
+                    related_items = related_results
+        except Exception as e:
+            print(f"Error fetching related products: {e}")
+    
     took_ms = (time.time() - start_time) * 1000
     
     # Логируем для аналитики
     await data_store.log_search(actual_project_id, q, results.total, took_ms)
     
-    return {
+    response = {
         "items": results.items,
         "total": results.total,
         "query": q,
@@ -395,6 +429,16 @@ async def search(
             "project_id": actual_project_id
         }
     }
+    
+    # Добавляем связанные товары если есть
+    if related_items:
+        response["related"] = {
+            "items": related_items,
+            "field": related_field,
+            "value": field_value
+        }
+    
+    return response
 
 
 @app.get("/api/v1/suggest")
@@ -428,6 +472,30 @@ async def suggest(
     return {"suggestions": suggestions}
 
 
+@app.get("/api/v1/popular")
+async def get_popular_queries(
+    project_id: Optional[str] = Query(None),
+    api_key: Optional[str] = Query(None),
+    limit: int = Query(5, ge=1, le=10),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
+):
+    """Получение популярных запросов для показа при фокусе на поле поиска"""
+    effective_api_key = x_api_key or api_key
+    actual_project_id = project_id
+    
+    if effective_api_key:
+        project = await data_store.get_project_by_api_key(effective_api_key)
+        if project:
+            actual_project_id = project["id"]
+    
+    if not actual_project_id:
+        actual_project_id = "demo"
+    
+    popular = await data_store.get_popular_queries(actual_project_id, limit)
+    
+    return {"queries": popular}
+
+
 # ============ WIDGET SETTINGS ============
 
 @app.get("/api/v1/projects/{project_id}/widget")
@@ -453,6 +521,73 @@ async def update_widget_settings(project_id: str, settings: dict, user: User = D
     
     await data_store.update_project(project_id, {"widget_settings": settings})
     return settings
+
+
+# ============ SEARCH SETTINGS ============
+
+@app.get("/api/v1/projects/{project_id}/search-settings")
+async def get_search_settings(project_id: str, user: User = Depends(require_auth)):
+    """Получение настроек поиска проекта"""
+    project = await data_store.get_project(project_id)
+    if not project or project.get("user_id") != user.id:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    settings = project.get("search_settings", "{}")
+    try:
+        return json.loads(settings) if isinstance(settings, str) else settings
+    except:
+        return {"relatedProductsField": None, "relatedProductsLimit": 4, "boostFields": ["brand", "category"]}
+
+
+@app.put("/api/v1/projects/{project_id}/search-settings")
+async def update_search_settings(project_id: str, settings: dict, user: User = Depends(require_auth)):
+    """Обновление настроек поиска (поле для связанных товаров, лимиты и т.д.)
+    
+    Пример settings:
+    {
+        "relatedProductsField": "brand",  // или "category", или параметр из фида
+        "relatedProductsLimit": 4,
+        "boostFields": ["brand", "category"]
+    }
+    """
+    project = await data_store.get_project(project_id)
+    if not project or project.get("user_id") != user.id:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    await data_store.update_project(project_id, {"search_settings": settings})
+    return settings
+
+
+@app.get("/api/v1/projects/{project_id}/feed-params")
+async def get_feed_params(project_id: str, user: User = Depends(require_auth)):
+    """Получение списка параметров из фида для настройки поиска"""
+    project = await data_store.get_project(project_id)
+    if not project or project.get("user_id") != user.id:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    # Получаем пример товара чтобы извлечь параметры
+    sample_keys = await redis_client.keys(f"products:{project_id}:*")
+    
+    params = set(["brand", "category"])  # Базовые параметры
+    
+    if sample_keys:
+        # Берём первые 10 товаров для анализа параметров
+        for key in sample_keys[:10]:
+            product_data = await redis_client.get(key)
+            if product_data:
+                try:
+                    product = json.loads(product_data)
+                    # Добавляем все ключи товара как возможные параметры
+                    for k in product.keys():
+                        if k not in ['id', 'name', 'description', 'url', 'image', 'price', 'old_price', 'in_stock']:
+                            params.add(k)
+                    # Если есть вложенные params
+                    if 'params' in product and isinstance(product['params'], dict):
+                        params.update(product['params'].keys())
+                except:
+                    pass
+    
+    return {"params": sorted(list(params))}
 
 
 # ============ PUBLIC WIDGET ENDPOINT ============

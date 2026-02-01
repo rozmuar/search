@@ -115,15 +115,21 @@ class Database:
             "maxResults": 10
         }
         
+        search_settings = {
+            "relatedProductsField": None,  # Поле для связанных товаров (brand, category, или параметр из фида)
+            "relatedProductsLimit": 4,      # Количество связанных товаров
+            "boostFields": ["brand", "category"]  # Поля для повышения релевантности
+        }
+        
         async with self.pool.acquire() as conn:
             async with conn.transaction():
                 # Создаем проект
                 row = await conn.fetchrow('''
-                    INSERT INTO projects (id, user_id, name, domain, feed_url, widget_settings)
-                    VALUES ($1, $2, $3, $4, $5, $6)
+                    INSERT INTO projects (id, user_id, name, domain, feed_url, widget_settings, search_settings)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7)
                     RETURNING id, user_id, name, domain, feed_url, status, products_count, 
-                              widget_settings, created_at
-                ''', project_id, user_id, name, domain, feed_url, json.dumps(widget_settings))
+                              widget_settings, search_settings, created_at
+                ''', project_id, user_id, name, domain, feed_url, json.dumps(widget_settings), json.dumps(search_settings))
                 
                 # Создаем API ключ
                 await conn.execute('''
@@ -133,6 +139,7 @@ class Database:
                 result = dict(row)
                 result['api_key'] = api_key
                 result['widget_settings'] = json.dumps(widget_settings)
+                result['search_settings'] = json.dumps(search_settings)
                 return result
     
     async def get_project(self, project_id: str) -> Optional[Dict]:
@@ -140,7 +147,7 @@ class Database:
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow('''
                 SELECT p.id, p.user_id, p.name, p.domain, p.feed_url, p.status,
-                       p.products_count, p.widget_settings, p.created_at, a.key as api_key
+                       p.products_count, p.widget_settings, p.search_settings, p.created_at, a.key as api_key
                 FROM projects p
                 LEFT JOIN api_keys a ON a.project_id = p.id
                 WHERE p.id = $1
@@ -150,6 +157,8 @@ class Database:
             result = dict(row)
             if result.get('widget_settings'):
                 result['widget_settings'] = json.dumps(result['widget_settings'])
+            if result.get('search_settings'):
+                result['search_settings'] = json.dumps(result['search_settings'])
             return result
     
     async def get_project_by_api_key(self, api_key: str) -> Optional[Dict]:
@@ -157,7 +166,7 @@ class Database:
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow('''
                 SELECT p.id, p.user_id, p.name, p.domain, p.feed_url, p.status,
-                       p.products_count, p.widget_settings, p.created_at, a.key as api_key
+                       p.products_count, p.widget_settings, p.search_settings, p.created_at, a.key as api_key
                 FROM api_keys a
                 JOIN projects p ON p.id = a.project_id
                 WHERE a.key = $1
@@ -167,6 +176,8 @@ class Database:
             result = dict(row)
             if result.get('widget_settings'):
                 result['widget_settings'] = json.dumps(result['widget_settings'])
+            if result.get('search_settings'):
+                result['search_settings'] = json.dumps(result['search_settings'])
             return result
     
     async def get_user_projects(self, user_id: str) -> List[Dict]:
@@ -174,7 +185,7 @@ class Database:
         async with self.pool.acquire() as conn:
             rows = await conn.fetch('''
                 SELECT p.id, p.user_id, p.name, p.domain, p.feed_url, p.status,
-                       p.products_count, p.widget_settings, p.created_at, a.key as api_key
+                       p.products_count, p.widget_settings, p.search_settings, p.created_at, a.key as api_key
                 FROM projects p
                 LEFT JOIN api_keys a ON a.project_id = p.id
                 WHERE p.user_id = $1
@@ -186,13 +197,15 @@ class Database:
                 project = dict(row)
                 if project.get('widget_settings'):
                     project['widget_settings'] = json.dumps(project['widget_settings'])
+                if project.get('search_settings'):
+                    project['search_settings'] = json.dumps(project['search_settings'])
                 result.append(project)
             return result
     
     async def update_project(self, project_id: str, updates: Dict[str, Any]) -> Optional[Dict]:
         """Обновление проекта"""
         # Фильтруем разрешенные поля
-        allowed_fields = ['name', 'domain', 'feed_url', 'status', 'products_count', 'widget_settings']
+        allowed_fields = ['name', 'domain', 'feed_url', 'status', 'products_count', 'widget_settings', 'search_settings']
         filtered = {k: v for k, v in updates.items() if k in allowed_fields}
         
         if not filtered:
@@ -203,7 +216,7 @@ class Database:
         values = []
         for i, (key, value) in enumerate(filtered.items(), 1):
             set_parts.append(f"{key} = ${i}")
-            if key == 'widget_settings' and isinstance(value, str):
+            if key in ('widget_settings', 'search_settings') and isinstance(value, str):
                 values.append(json.loads(value))
             else:
                 values.append(value)

@@ -152,6 +152,57 @@ class SimpleSearchEngine:
             products=products
         )
     
+    async def search_by_field(
+        self,
+        project_id: str,
+        field: str,
+        value: str,
+        limit: int = 4,
+        exclude_ids: List[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Поиск товаров по конкретному полю (для связанных товаров)"""
+        exclude_ids = exclude_ids or []
+        
+        # Получаем все ключи товаров проекта
+        pattern = f"products:{project_id}:*"
+        cursor = 0
+        matching_products = []
+        
+        while True:
+            cursor, keys = await self.redis.scan(cursor, match=pattern, count=100)
+            
+            for key in keys:
+                product_data = await self.redis.get(key)
+                if not product_data:
+                    continue
+                
+                try:
+                    product = json.loads(product_data if isinstance(product_data, str) else product_data.decode())
+                    
+                    # Пропускаем исключённые
+                    if product.get("id") in exclude_ids:
+                        continue
+                    
+                    # Проверяем поле
+                    product_value = product.get(field)
+                    
+                    # Если поле в params
+                    if not product_value and "params" in product:
+                        product_value = product.get("params", {}).get(field)
+                    
+                    if product_value and str(product_value).lower() == str(value).lower():
+                        matching_products.append(product)
+                        
+                        if len(matching_products) >= limit:
+                            return matching_products
+                except:
+                    continue
+            
+            if cursor == 0:
+                break
+        
+        return matching_products
+    
     async def _search_inverted_index(
         self,
         project_id: str,

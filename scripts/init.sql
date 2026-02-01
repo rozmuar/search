@@ -20,8 +20,17 @@ CREATE TABLE IF NOT EXISTS projects (
     status VARCHAR(20) DEFAULT 'active',
     products_count INTEGER DEFAULT 0,
     widget_settings JSONB DEFAULT '{"theme":"light","primaryColor":"#2563eb","borderRadius":8,"showImages":true,"showPrices":true,"placeholder":"Поиск товаров...","maxResults":10}',
+    search_settings JSONB DEFAULT '{"relatedProductsField":null,"relatedProductsLimit":4,"boostFields":["brand","category"]}',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Добавляем колонку search_settings если её нет (для существующих БД)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='projects' AND column_name='search_settings') THEN
+        ALTER TABLE projects ADD COLUMN search_settings JSONB DEFAULT '{"relatedProductsField":null,"relatedProductsLimit":4,"boostFields":["brand","category"]}';
+    END IF;
+END $$;
 
 -- Таблица API ключей
 CREATE TABLE IF NOT EXISTS api_keys (
