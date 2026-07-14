@@ -9,6 +9,7 @@ from typing import Optional, List
 import redis.asyncio as redis
 from contextlib import asynccontextmanager
 from pydantic import BaseModel, EmailStr
+import asyncio
 import json
 import os
 import logging
@@ -41,22 +42,30 @@ feed_manager = None
 feed_scheduler = None
 
 
+async def _scan_keys(client, pattern: str) -> list:
+    """Неблокирующий аналог KEYS - не держит event loop Redis на больших keyspace"""
+    keys = []
+    async for key in client.scan_iter(match=pattern, count=500):
+        keys.append(key)
+    return keys
+
+
 async def restore_products_from_backup(indexer_instance):
     """Восстановление товаров и аналитики из PostgreSQL если Redis пустой или нет индекса"""
     try:
         # Получаем все проекты
         from .database import db
-        
+
         async with db.pool.acquire() as conn:
             projects = await conn.fetch("SELECT id FROM projects")
-        
+
         for project in projects:
             project_id = project['id']
-            
+
             # Проверяем есть ли товары в Redis
-            product_keys = await redis_client.keys(f"products:{project_id}:*")
+            product_keys = await _scan_keys(redis_client, f"products:{project_id}:*")
             # Проверяем есть ли индекс
-            index_keys = await redis_client.keys(f"idx:{project_id}:inv:*")
+            index_keys = await _scan_keys(redis_client, f"idx:{project_id}:inv:*")
             
             if not product_keys:
                 # Redis пустой - восстанавливаем из PostgreSQL
@@ -73,7 +82,7 @@ async def restore_products_from_backup(indexer_instance):
                 logger.info(f"Project {project_id} has {len(product_keys)} products and {len(index_keys)} index keys - OK")
             
             # Проверяем и восстанавливаем аналитику
-            analytics_keys = await redis_client.keys(f"analytics:{project_id}:*")
+            analytics_keys = await _scan_keys(redis_client, f"analytics:{project_id}:*")
             if not analytics_keys:
                 logger.info(f"Restoring analytics for project {project_id} from PostgreSQL...")
                 success = await db.restore_analytics_to_redis(project_id, redis_client)
@@ -112,12 +121,14 @@ async def lifespan(app: FastAPI):
     data_store = DataStore(redis_client)
     feed_manager = FeedManager(redis_client)
     
-    # Восстановление товаров из PostgreSQL если Redis пустой
-    await restore_products_from_backup(indexer)
-    
     # Запуск планировщика автообновления фидов
     feed_scheduler = await start_feed_scheduler(redis_client, feed_manager, data_store, indexer)
-    
+
+    # Восстановление товаров из PostgreSQL если Redis пустой - в фоне,
+    # чтобы не блокировать старт uvicorn (nginx проксирует на этот порт сразу
+    # после запуска контейнера и отдаёт 502, пока порт не забиндлен)
+    asyncio.create_task(restore_products_from_backup(indexer))
+
     print("✓ Search service initialized (full version with PostgreSQL)")
     
     yield
