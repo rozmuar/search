@@ -894,17 +894,28 @@ async function loadProjectFeed() {
     statusBadge.className = 'feed-status-badge loading';
     statusBadge.innerHTML = '<span class="status-dot"></span><span>Загрузка...</span>';
     
+    // Фиксируем ID проекта на момент запуска - currentProject может
+    // измениться, если пользователь переключится на другой проект
+    // пока идёт опрос статуса, и тогда опрос начнёт показывать
+    // данные чужого проекта в этой же панели
+    const projectId = currentProject.id;
+
     try {
         // Запускаем фоновую загрузку
-        await fetchAPI(`/api/v1/projects/${currentProject.id}/feed/load`, {
+        await fetchAPI(`/api/v1/projects/${projectId}/feed/load`, {
             method: 'POST'
         });
-        
+
         // Polling статуса каждые 2 секунды
         const pollStatus = async () => {
+            // Пользователь ушёл на другой проект - прекращаем опрос,
+            // не трогая чужую панель. Сама загрузка на сервере не прервётся.
+            if (currentProject?.id !== projectId) {
+                return;
+            }
             try {
-                const status = await fetchAPI(`/api/v1/projects/${currentProject.id}/feed/status`);
-                
+                const status = await fetchAPI(`/api/v1/projects/${projectId}/feed/status`);
+
                 const progress = parseInt(status.progress) || 0;
                 progressFill.style.width = progress + '%';
                 progressPercent.textContent = progress + '%';
@@ -1413,9 +1424,14 @@ async function loadFeed() {
         
         // Polling статуса
         const pollStatus = async () => {
+            // Пользователь выбрал другой проект в списке - прекращаем опрос,
+            // не трогая чужой статус. Сама загрузка на сервере не прервётся.
+            if (document.getElementById('productsProjectSelect').value !== projectId) {
+                return;
+            }
             try {
                 const status = await fetchAPI(`/api/v1/projects/${projectId}/feed/status`);
-                
+
                 if (status.status === 'downloading') {
                     updateFeedStatus('warning', 'Загрузка фида...');
                 } else if (status.status === 'indexing') {
