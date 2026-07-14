@@ -159,7 +159,10 @@ class FeedParser:
     async def load_and_parse(url: str) -> Dict[str, Any]:
         """Загрузка и парсинг фида"""
         xml_content = await FeedParser.fetch_feed(url)
-        return FeedParser.parse_yml(xml_content)
+        # Парсинг XML - CPU-bound, выносим в отдельный поток чтобы не
+        # блокировать event loop (иначе весь сервер перестаёт отвечать
+        # на другие запросы на время парсинга большого фида)
+        return await asyncio.to_thread(FeedParser.parse_yml, xml_content)
 
 
 class FeedManager:

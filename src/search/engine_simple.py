@@ -249,11 +249,7 @@ class SimpleSearchEngine:
     ) -> Dict[str, float]:
         """Поиск по инвертированному индексу"""
         product_scores = defaultdict(float)
-        
-        # Диагностика: сколько всего ключей в индексе
-        total_idx_keys = await self.redis.keys(f"idx:{project_id}:inv:*")
-        logger.info(f"[SEARCH] Total inverted index keys: {len(total_idx_keys)}")
-        
+
         for token in tokens:
             key = f"idx:{project_id}:inv:{token}"
             
