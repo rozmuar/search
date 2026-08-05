@@ -510,29 +510,44 @@ async function loadProjectFeedStatus() {
 // ==================== SEARCH SETTINGS ====================
 let searchSettingsChanged = false;
 
+function parseFieldListSetting(rawValue) {
+    let value = rawValue;
+    if (typeof value === 'string') {
+        try {
+            value = JSON.parse(value);
+        } catch (e) {
+            return [];
+        }
+    }
+    return Array.isArray(value) ? value : [];
+}
+
 async function loadSearchSettings() {
     if (!currentProject) return;
-    
+
     const container = document.getElementById('relatedProductsFields');
+    const facetContainer = document.getElementById('facetFieldsList');
     const limitInput = document.getElementById('relatedProductsLimit');
     const saveBtn = document.getElementById('saveSearchSettingsBtn');
     const statusEl = document.getElementById('searchSettingsStatus');
-    
+
     if (!container || !limitInput) return;
-    
+
     // Reset
     container.innerHTML = '<div class="form-hint">Загрузка параметров...</div>';
+    if (facetContainer) facetContainer.innerHTML = '<div class="form-hint">Загрузка параметров...</div>';
     searchSettingsChanged = false;
     saveBtn.disabled = true;
     statusEl.textContent = '';
-    
+
     let selectedFields = [];
-    
+    let selectedFacetFields = [];
+
     try {
         // Load current settings first
         let settings = await fetchAPI(`/api/v1/projects/${currentProject.id}/search-settings`);
         console.log('Search settings loaded (raw):', settings, 'type:', typeof settings);
-        
+
         // Если settings - строка, парсим её
         if (typeof settings === 'string') {
             try {
@@ -543,33 +558,27 @@ async function loadSearchSettings() {
             }
         }
         console.log('Search settings parsed:', settings);
-        
+
         // Поддержка разных форматов (массив или JSON-строка)
-        let rawFields = settings.relatedProductsFields;
-        if (typeof rawFields === 'string') {
-            try {
-                rawFields = JSON.parse(rawFields);
-            } catch (e) {
-                rawFields = null;
-            }
-        }
-        
-        selectedFields = Array.isArray(rawFields) ? rawFields : 
+        const rawFields = parseFieldListSetting(settings.relatedProductsFields);
+        selectedFields = rawFields.length ? rawFields :
                         (settings.relatedProductsField ? [settings.relatedProductsField] : []);
         console.log('Selected fields to check:', selectedFields);
-        
+
+        selectedFacetFields = parseFieldListSetting(settings.facetFields);
+
         if (settings.relatedProductsLimit) {
             limitInput.value = settings.relatedProductsLimit;
         }
     } catch (err) {
         console.log('No search settings yet:', err);
     }
-    
+
     try {
         // Load available fields from feed
         const feedParams = await fetchAPI(`/api/v1/projects/${currentProject.id}/feed-params`);
         console.log('Feed params response:', feedParams);
-        
+
         if (feedParams.fields && feedParams.fields.length > 0) {
             // Common fields first
             const commonFields = ['brand', 'vendor', 'category', 'categoryId', 'model'];
@@ -581,7 +590,7 @@ async function loadSearchSettings() {
                 if (bCommon >= 0) return 1;
                 return a.localeCompare(b);
             });
-            
+
             // Render checkboxes
             console.log('Rendering checkboxes, selectedFields:', selectedFields);
             container.innerHTML = sortedFields.map(field => {
@@ -594,13 +603,37 @@ async function loadSearchSettings() {
                     </label>
                 `;
             }).join('');
+
+            // Фасеты виджета - только реальные свойства товаров (params.*),
+            // не служебные поля типа brand/category (у них уже есть свои фасеты)
+            if (facetContainer) {
+                const facetFields = sortedFields
+                    .filter(f => f.startsWith('params.'))
+                    .map(f => f.slice(7));
+
+                if (facetFields.length > 0) {
+                    facetContainer.innerHTML = facetFields.map(field => {
+                        const checked = selectedFacetFields.includes(field) ? 'checked' : '';
+                        return `
+                            <label class="checkbox-item">
+                                <input type="checkbox" name="facetField" value="${field}" ${checked} onchange="markSearchSettingsChanged()">
+                                <span>${field}</span>
+                            </label>
+                        `;
+                    }).join('');
+                } else {
+                    facetContainer.innerHTML = '<div class="form-hint">В фиде нет параметров товаров (param) - только базовые поля</div>';
+                }
+            }
         } else {
             container.innerHTML = '<div class="form-hint">Нет доступных параметров. Загрузите фид.</div>';
+            if (facetContainer) facetContainer.innerHTML = '<div class="form-hint">Нет доступных параметров. Загрузите фид.</div>';
         }
-        
+
     } catch (err) {
         console.error('Error loading search settings:', err);
         container.innerHTML = '<div class="form-hint">Сначала загрузите фид</div>';
+        if (facetContainer) facetContainer.innerHTML = '<div class="form-hint">Сначала загрузите фид</div>';
     }
 }
 
@@ -614,22 +647,33 @@ async function saveSearchSettings() {
     if (!currentProject) return;
     
     const container = document.getElementById('relatedProductsFields');
+    const facetContainer = document.getElementById('facetFieldsList');
     const limitInput = document.getElementById('relatedProductsLimit');
     const saveBtn = document.getElementById('saveSearchSettingsBtn');
     const statusEl = document.getElementById('searchSettingsStatus');
-    
+
     saveBtn.disabled = true;
     statusEl.textContent = 'Сохранение...';
-    
+
     try {
         // Получаем все отмеченные чекбоксы
         const checkboxes = container.querySelectorAll('input[name="relatedField"]:checked');
         const selectedFields = Array.from(checkboxes).map(cb => cb.value);
-        
+
+        const facetCheckboxes = facetContainer ? facetContainer.querySelectorAll('input[name="facetField"]:checked') : [];
+        const selectedFacetFields = Array.from(facetCheckboxes).map(cb => cb.value);
+
         const settings = {
             relatedProductsFields: selectedFields,
             relatedProductsLimit: parseInt(limitInput.value) || 4
         };
+
+        // facetFields пишем только если что-то выбрано - пустой массив означал бы
+        // "явно показывать 0 фасетов", а не "ничего не трогал, пусть определяет
+        // автоматически" (см. facet_fields в engine_simple.py: None = автоопределение)
+        if (selectedFacetFields.length > 0) {
+            settings.facetFields = selectedFacetFields;
+        }
         
         console.log('Saving search settings:', settings);
         

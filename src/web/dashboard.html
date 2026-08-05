@@ -373,8 +373,15 @@
                         </div>
                         <div class="form-group">
                             <label class="form-label">Количество связанных товаров (на каждый параметр)</label>
-                            <input type="number" id="relatedProductsLimit" class="form-input" 
+                            <input type="number" id="relatedProductsLimit" class="form-input"
                                    value="4" min="1" max="20" onchange="markSearchSettingsChanged()">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Свойства товаров для фильтров в виджете</label>
+                            <p class="form-hint">Выберите, какие параметры из фида показывать как фильтры (фасеты) в результатах поиска виджета. Если ничего не выбрано - подходящие параметры определяются автоматически.</p>
+                            <div id="facetFieldsList" class="checkbox-group">
+                                <div class="form-hint">Загрузка параметров...</div>
+                            </div>
                         </div>
                         <div class="form-actions">
                             <button class="btn btn-primary" id="saveSearchSettingsBtn" onclick="saveSearchSettings()" disabled>

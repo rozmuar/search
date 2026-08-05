@@ -578,6 +578,29 @@ async def search(
             raise HTTPException(status_code=400, detail="Invalid filters JSON")
         search_filters.update(extra_filters)
 
+    # Настройки проекта - парсим один раз, используются и для facetFields, и для related products
+    search_settings = {}
+    if project:
+        try:
+            search_settings_str = project.get("search_settings", "{}")
+            search_settings = json.loads(search_settings_str) if isinstance(search_settings_str, str) else search_settings_str
+        except Exception:
+            search_settings = {}
+
+    # Поля params.*, явно выбранные в личном кабинете для фасетов виджета.
+    # Если не заданы - движок сам подбирает подходящие параметры эвристикой
+    # (покрытие/уникальность значений, см. engine_simple.py)
+    facet_fields = None
+    if facets:
+        raw_facet_fields = search_settings.get("facetFields")
+        if isinstance(raw_facet_fields, str):
+            try:
+                raw_facet_fields = json.loads(raw_facet_fields)
+            except (json.JSONDecodeError, TypeError):
+                raw_facet_fields = None
+        if isinstance(raw_facet_fields, list):
+            facet_fields = [f for f in raw_facet_fields if isinstance(f, str)]
+
     # Выполняем поиск
     # limit=-1 означает все результаты
     actual_limit = 10000 if limit == -1 else limit
@@ -588,17 +611,15 @@ async def search(
         limit=actual_limit,
         filters=search_filters,
         sort=sort,
-        facets=facets
+        facets=facets,
+        facet_fields=facet_fields
     )
-    
+
     # Получаем настройки поиска для связанных товаров
     related_groups = []
-    
+
     if project and results.items:
         try:
-            search_settings_str = project.get("search_settings", "{}")
-            search_settings = json.loads(search_settings_str) if isinstance(search_settings_str, str) else search_settings_str
-            
             # Поддержка и старого формата (relatedProductsField) и нового (relatedProductsFields)
             related_fields = search_settings.get("relatedProductsFields", [])
             
@@ -836,12 +857,14 @@ async def get_search_settings(project_id: str, user: User = Depends(require_auth
 @app.put("/api/v1/projects/{project_id}/search-settings")
 async def update_search_settings(project_id: str, settings: dict, user: User = Depends(require_auth)):
     """Обновление настроек поиска (поле для связанных товаров, лимиты и т.д.)
-    
+
     Пример settings:
     {
         "relatedProductsField": "brand",  // или "category", или параметр из фида
         "relatedProductsLimit": 4,
-        "boostFields": ["brand", "category"]
+        "boostFields": ["brand", "category"],
+        "facetFields": ["Вязкость", "Вид фасовки"]  // params.* для фасетов в виджете;
+                                                      // не задано - автоопределение
     }
     """
     project = await data_store.get_project(project_id)

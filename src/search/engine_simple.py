@@ -54,7 +54,8 @@ class SimpleSearchEngine:
         offset: int = 0,
         filters: Optional[Dict[str, Any]] = None,
         sort: str = "relevance",
-        facets: bool = False
+        facets: bool = False,
+        facet_fields: Optional[List[str]] = None
     ) -> SearchResult:
         """Выполнить поиск товаров"""
         import time
@@ -129,7 +130,8 @@ class SimpleSearchEngine:
             sorted_products,
             filters,
             compute_facets=facets,
-            force_load=force_load
+            force_load=force_load,
+            facet_fields=facet_fields
         )
 
         if sort == "price_asc":
@@ -346,11 +348,17 @@ class SimpleSearchEngine:
         products: List[tuple],
         filters: Optional[Dict[str, Any]],
         compute_facets: bool = False,
-        force_load: bool = False
+        force_load: bool = False,
+        facet_fields: Optional[List[str]] = None
     ) -> tuple:
         """
         Применение фильтров и (опционально) расчёт фасетов - за один проход,
         без лишних round-trip'ов к Redis (данные уже грузятся для проверки фильтров).
+
+        facet_fields - если задано (даже пустой список), фасеты по params.* строятся
+        ТОЛЬКО по этим полям в этом порядке, без эвристики покрытия/уникальности
+        (администратор явно выбрал их в личном кабинете). Если None - автоопределение
+        как раньше.
 
         Возвращает (filtered, facets_or_None, product_cache), где product_cache -
         уже распарсенные товары, чтобы _load_products их не грузил повторно.
@@ -359,7 +367,7 @@ class SimpleSearchEngine:
             return products, None, {}
 
         if not products:
-            empty_facets = self._build_facets_payload({}, None, None, {}, {}, 0) if compute_facets else None
+            empty_facets = self._build_facets_payload({}, None, None, {}, {}, 0, facet_fields) if compute_facets else None
             return [], empty_facets, {}
 
         filters = filters or {}
@@ -433,6 +441,8 @@ class SimpleSearchEngine:
                 for key, value in product_params.items():
                     if not value:
                         continue
+                    if facet_fields is not None and key not in facet_fields:
+                        continue
                     params_counts[key][value] += 1
                     params_products_with[key] += 1
 
@@ -444,7 +454,8 @@ class SimpleSearchEngine:
             facets_payload = self._build_facets_payload(
                 category_counts, price_min_ex, price_max_ex,
                 params_counts, params_products_with,
-                total_passing=len(filtered)
+                total_passing=len(filtered),
+                facet_fields=facet_fields
             )
 
         return filtered, facets_payload, product_cache
@@ -456,7 +467,8 @@ class SimpleSearchEngine:
         price_max: Optional[float],
         params_counts: Dict[str, Dict[str, int]],
         params_products_with: Dict[str, int],
-        total_passing: int
+        total_passing: int,
+        facet_fields: Optional[List[str]] = None
     ) -> Dict[str, Any]:
         """Формирует финальный JSON фасетов из накопленных счётчиков"""
         categories = [
@@ -470,24 +482,37 @@ class SimpleSearchEngine:
 
         params_facets = {}
         if params_counts and total_passing:
-            candidates = []
-            for key, value_counts in params_counts.items():
-                products_with = params_products_with.get(key, 0)
-                if products_with == 0:
-                    continue
-                coverage = products_with / total_passing
-                distinct_ratio = len(value_counts) / products_with
-                if coverage < self.FACET_MIN_COVERAGE:
-                    continue
-                if distinct_ratio > self.FACET_MAX_DISTINCT_RATIO:
-                    continue
-                candidates.append((key, coverage, value_counts))
+            if facet_fields is not None:
+                # Поля явно выбраны в личном кабинете - показываем их в заданном
+                # порядке, без эвристики покрытия/уникальности (это уже осознанный
+                # выбор администратора, а не авто-угадывание)
+                for key in facet_fields:
+                    value_counts = params_counts.get(key)
+                    if not value_counts:
+                        continue
+                    top_values = sorted(value_counts.items(), key=lambda x: (-x[1], x[0]))
+                    top_values = top_values[:self.FACET_MAX_VALUES_PER_GROUP]
+                    params_facets[key] = [{"value": v, "count": c} for v, c in top_values]
+            else:
+                # Автоопределение по покрытию/уникальности
+                candidates = []
+                for key, value_counts in params_counts.items():
+                    products_with = params_products_with.get(key, 0)
+                    if products_with == 0:
+                        continue
+                    coverage = products_with / total_passing
+                    distinct_ratio = len(value_counts) / products_with
+                    if coverage < self.FACET_MIN_COVERAGE:
+                        continue
+                    if distinct_ratio > self.FACET_MAX_DISTINCT_RATIO:
+                        continue
+                    candidates.append((key, coverage, value_counts))
 
-            candidates.sort(key=lambda x: -x[1])
-            for key, _, value_counts in candidates[:self.FACET_MAX_GROUPS]:
-                top_values = sorted(value_counts.items(), key=lambda x: (-x[1], x[0]))
-                top_values = top_values[:self.FACET_MAX_VALUES_PER_GROUP]
-                params_facets[key] = [{"value": v, "count": c} for v, c in top_values]
+                candidates.sort(key=lambda x: -x[1])
+                for key, _, value_counts in candidates[:self.FACET_MAX_GROUPS]:
+                    top_values = sorted(value_counts.items(), key=lambda x: (-x[1], x[0]))
+                    top_values = top_values[:self.FACET_MAX_VALUES_PER_GROUP]
+                    params_facets[key] = [{"value": v, "count": c} for v, c in top_values]
 
         return {
             "categories": categories,
