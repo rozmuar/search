@@ -2,6 +2,7 @@ services:
   # PostgreSQL для хранения пользователей и проектов
   postgres:
     image: postgres:16-alpine
+    restart: unless-stopped
     ports:
       - "5432:5432"
     environment:
@@ -20,6 +21,7 @@ services:
   # Redis для индексов и кэша
   redis:
     image: redis:7-alpine
+    restart: unless-stopped
     ports:
       - "6379:6379"
     volumes:
@@ -34,6 +36,7 @@ services:
   # API сервис с Nginx
   api:
     build: .
+    restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"

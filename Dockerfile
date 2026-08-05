@@ -39,6 +39,14 @@ RUN python -c "import jwt; print('PyJWT OK')"
 RUN python -c "from src.api.main import app; print('App import OK')"
 
 # Supervisor config - логи uvicorn в stdout для docker logs
+#
+# startretries=1000000 намеренно огромный: по умолчанию supervisor даёт
+# всего 3 попытки перезапуска (startretries=3), после чего помечает процесс
+# FATAL и БОЛЬШЕ НИКОГДА не перезапускает сам - autorestart=true тут не
+# спасает, это частая ловушка. Из-за этого при временном сбое (Postgres/Redis
+# чуть задержались, кратковременная ошибка при старте) uvicorn мог упасть
+# в FATAL и не подняться сам - "лечилось" только пересборкой контейнера,
+# потому что она перезапускает сам supervisord и сбрасывает счётчик попыток.
 RUN echo "[supervisord]\n\
 nodaemon=true\n\
 \n\
@@ -46,6 +54,7 @@ nodaemon=true\n\
 command=/usr/sbin/nginx -g 'daemon off;'\n\
 autostart=true\n\
 autorestart=true\n\
+startretries=1000000\n\
 stdout_logfile=/dev/stdout\n\
 stdout_logfile_maxbytes=0\n\
 stderr_logfile=/dev/stderr\n\
@@ -55,6 +64,8 @@ stderr_logfile_maxbytes=0\n\
 command=uvicorn src.api.main:app --host 127.0.0.1 --port 8000 --log-level info\n\
 autostart=true\n\
 autorestart=true\n\
+startretries=1000000\n\
+startsecs=3\n\
 directory=/app\n\
 stdout_logfile=/dev/stdout\n\
 stdout_logfile_maxbytes=0\n\
