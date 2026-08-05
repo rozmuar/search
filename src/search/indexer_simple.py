@@ -79,7 +79,11 @@ class SimpleIndexer:
             pipe.zadd(key, {prefix: count})
         
         await pipe.execute()
-        
+
+        # Сбрасываем кэш категорий (см. GET /api/v1/categories) - иначе
+        # свежезагруженный фид до 5 минут не отразится в scope-дропдауне виджета
+        await self.redis.delete(f"cache:categories:{project_id}")
+
         # Бэкап в PostgreSQL
         if self.db:
             try:

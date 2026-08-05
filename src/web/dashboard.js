@@ -1590,6 +1590,7 @@ function loadWidgetSettings() {
     document.getElementById('widgetBorderRadius').value = settings.borderRadius || 10;
     document.getElementById('widgetFontSize').value = settings.fontSize || 15;
     document.getElementById('widgetPlaceholder').value = settings.placeholder || 'Поиск товаров...';
+    document.getElementById('widgetCartCallbackUrl').value = settings.cartCallbackUrl || '';
     document.getElementById('widgetShowButton').checked = settings.showButton !== false;
     document.getElementById('widgetShowImages').checked = settings.showImages !== false;
     
@@ -1657,6 +1658,7 @@ async function saveWidgetSettings() {
         borderRadius: parseInt(document.getElementById('widgetBorderRadius').value),
         fontSize: parseInt(document.getElementById('widgetFontSize').value),
         placeholder: document.getElementById('widgetPlaceholder').value,
+        cartCallbackUrl: document.getElementById('widgetCartCallbackUrl').value.trim(),
         showButton: document.getElementById('widgetShowButton').checked,
         showImages: document.getElementById('widgetShowImages').checked
     };

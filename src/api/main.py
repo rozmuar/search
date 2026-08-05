@@ -5,7 +5,7 @@ from fastapi import FastAPI, HTTPException, Query, Depends, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse, Response
 from fastapi.staticfiles import StaticFiles
-from typing import Optional, List
+from typing import Optional, List, Literal
 import redis.asyncio as redis
 from contextlib import asynccontextmanager
 from pydantic import BaseModel, EmailStr
@@ -16,7 +16,7 @@ import logging
 from datetime import datetime
 
 from ..search.query_processor_simple import SimpleQueryProcessor, NGramGenerator
-from ..search.indexer_simple import SimpleIndexer
+from ..search.indexer_simple import SimpleIndexer, _scan_keys
 from ..search.engine_simple import SimpleSearchEngine
 from .auth import decode_token, UserCreate, UserLogin, User
 from .storage import DataStore
@@ -530,11 +530,14 @@ async def search(
     max_price: Optional[float] = None,
     in_stock: Optional[bool] = None,
     category: Optional[str] = None,
+    filters: Optional[str] = Query(None, description="JSON с расширенными фильтрами: {category:[], params:{}, min_price, max_price, in_stock}"),
+    facets: bool = Query(False, description="Вернуть фасеты (категории/цена/params) для сайдбара фильтров"),
+    sort: Literal["relevance", "price_asc", "price_desc"] = Query("relevance"),
     x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ):
     """
     Поиск товаров
-    
+
     Можно использовать project_id или api_key для идентификации проекта
     """
     import time
@@ -553,26 +556,39 @@ async def search(
     if not actual_project_id:
         actual_project_id = "demo"  # Демо проект по умолчанию
     
-    # Формируем фильтры
-    filters = {}
+    # Формируем фильтры: сначала из старых фиксированных query-параметров
+    # (для обратной совместимости с уже интегрированными клиентами),
+    # затем накладываем расширенный JSON из filters, если передан - он приоритетнее
+    search_filters = {}
     if min_price is not None:
-        filters["min_price"] = min_price
+        search_filters["min_price"] = min_price
     if max_price is not None:
-        filters["max_price"] = max_price
+        search_filters["max_price"] = max_price
     if in_stock is not None:
-        filters["in_stock"] = in_stock
+        search_filters["in_stock"] = in_stock
     if category:
-        filters["category"] = category
-    
+        search_filters["category"] = category
+
+    if filters:
+        try:
+            extra_filters = json.loads(filters)
+        except (json.JSONDecodeError, TypeError):
+            raise HTTPException(status_code=400, detail="Invalid filters JSON")
+        if not isinstance(extra_filters, dict):
+            raise HTTPException(status_code=400, detail="Invalid filters JSON")
+        search_filters.update(extra_filters)
+
     # Выполняем поиск
     # limit=-1 означает все результаты
     actual_limit = 10000 if limit == -1 else limit
-    
+
     results = await search_engine.search(
         query=q,
         project_id=actual_project_id,
         limit=actual_limit,
-        filters=filters
+        filters=search_filters,
+        sort=sort,
+        facets=facets
     )
     
     # Получаем настройки поиска для связанных товаров
@@ -657,7 +673,11 @@ async def search(
     # Добавляем связанные товары если есть
     if related_groups:
         response["related"] = related_groups
-    
+
+    # Добавляем фасеты если были запрошены и что-то нашлось
+    if facets and results.facets:
+        response["facets"] = results.facets
+
     return response
 
 
@@ -712,8 +732,62 @@ async def get_popular_queries(
         actual_project_id = "demo"
     
     popular = await data_store.get_popular_queries(actual_project_id, limit)
-    
+
     return {"queries": popular}
+
+
+@app.get("/api/v1/categories")
+async def get_categories(
+    project_id: Optional[str] = Query(None),
+    api_key: Optional[str] = Query(None),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
+):
+    """Список категорий проекта со счётчиками - для дропдауна scope-фильтра в виджете.
+    Кэшируется в Redis на 5 минут, кэш сбрасывается при переиндексации фида."""
+    effective_api_key = x_api_key or api_key
+    actual_project_id = project_id
+
+    if effective_api_key:
+        project = await data_store.get_project_by_api_key(effective_api_key)
+        if project:
+            actual_project_id = project["id"]
+
+    if not actual_project_id:
+        actual_project_id = "demo"
+
+    cache_key = f"cache:categories:{actual_project_id}"
+    cached = await redis_client.get(cache_key)
+    if cached:
+        return json.loads(cached)
+
+    category_counts = {}
+    total_products = 0
+
+    keys = await _scan_keys(redis_client, f"products:{actual_project_id}:*")
+    for key in keys:
+        data = await redis_client.get(key)
+        if not data:
+            continue
+        try:
+            product = json.loads(data if isinstance(data, str) else data.decode())
+        except (json.JSONDecodeError, TypeError, UnicodeDecodeError):
+            continue
+
+        total_products += 1
+        category = product.get("category")
+        if category:
+            category_counts[category] = category_counts.get(category, 0) + 1
+
+    categories = [
+        {"name": name, "count": count}
+        for name, count in sorted(category_counts.items(), key=lambda x: -x[1])
+    ]
+
+    result = {"categories": categories, "total_products": total_products}
+
+    await redis_client.setex(cache_key, 300, json.dumps(result))
+
+    return result
 
 
 # ============ WIDGET SETTINGS ============

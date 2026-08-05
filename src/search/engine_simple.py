@@ -20,6 +20,7 @@ class SearchResult:
     items: List[Dict[str, Any]]
     took_ms: int
     suggestions: List[str] = None
+    facets: Optional[Dict[str, Any]] = None
 
 
 @dataclass
@@ -52,7 +53,8 @@ class SimpleSearchEngine:
         limit: int = 20,
         offset: int = 0,
         filters: Optional[Dict[str, Any]] = None,
-        sort: str = "relevance"
+        sort: str = "relevance",
+        facets: bool = False
     ) -> SearchResult:
         """Выполнить поиск товаров"""
         import time
@@ -120,27 +122,36 @@ class SimpleSearchEngine:
             reverse=True
         )
         
-        # Применяем фильтры
-        filtered_products = await self._apply_filters(
+        # Применяем фильтры (+ считаем фасеты, если запрошены)
+        force_load = sort in ("price_asc", "price_desc")
+        filtered_products, facets_payload, product_cache = await self._apply_filters_and_facets(
             project_id,
             sorted_products,
-            filters
+            filters,
+            compute_facets=facets,
+            force_load=force_load
         )
-        
+
+        if sort == "price_asc":
+            filtered_products.sort(key=lambda t: product_cache.get(t[0], {}).get("price") or 0)
+        elif sort == "price_desc":
+            filtered_products.sort(key=lambda t: product_cache.get(t[0], {}).get("price") or 0, reverse=True)
+
         # Пагинация
         total = len(filtered_products)
         paginated = filtered_products[offset:offset + limit]
-        
+
         # Загружаем полные данные товаров
-        items = await self._load_products(project_id, paginated)
-        
+        items = await self._load_products(project_id, paginated, product_cache)
+
         took_ms = int((time.time() - start_time) * 1000)
-        
+
         return SearchResult(
             query=query,
             total=total,
             items=items,
-            took_ms=took_ms
+            took_ms=took_ms,
+            facets=facets_payload
         )
     
     async def suggest(
@@ -315,62 +326,204 @@ class SimpleSearchEngine:
         
         return intersection / union if union > 0 else 0.0
     
-    async def _apply_filters(
+    # Пороги авто-определения фасетируемых параметров (см. docs/search-algorithm.md)
+    FACET_MIN_COVERAGE = 0.05
+    FACET_MAX_DISTINCT_RATIO = 0.8
+    FACET_MAX_GROUPS = 8
+    FACET_MAX_VALUES_PER_GROUP = 20
+
+    @staticmethod
+    def _as_list(value: Any) -> list:
+        if value is None:
+            return []
+        if isinstance(value, list):
+            return value
+        return [value]
+
+    async def _apply_filters_and_facets(
         self,
         project_id: str,
         products: List[tuple],
-        filters: Optional[Dict[str, Any]]
-    ) -> List[tuple]:
-        """Применение фильтров"""
-        if not filters:
-            return products
-        
-        filtered = []
-        
-        for product_id, score in products:
-            # Загружаем данные товара
-            key = f"products:{project_id}:{product_id}"
-            data = await self.redis.get(key)
-            
+        filters: Optional[Dict[str, Any]],
+        compute_facets: bool = False,
+        force_load: bool = False
+    ) -> tuple:
+        """
+        Применение фильтров и (опционально) расчёт фасетов - за один проход,
+        без лишних round-trip'ов к Redis (данные уже грузятся для проверки фильтров).
+
+        Возвращает (filtered, facets_or_None, product_cache), где product_cache -
+        уже распарсенные товары, чтобы _load_products их не грузил повторно.
+        """
+        if not filters and not compute_facets and not force_load:
+            return products, None, {}
+
+        if not products:
+            empty_facets = self._build_facets_payload({}, None, None, {}, {}, 0) if compute_facets else None
+            return [], empty_facets, {}
+
+        filters = filters or {}
+
+        # Батч-загрузка всех кандидатов одним round-trip вместо N последовательных GET
+        keys = [f"products:{project_id}:{pid}" for pid, _ in products]
+        raw_values = await self.redis.mget(keys)
+
+        product_cache: Dict[str, dict] = {}
+        for (product_id, _), data in zip(products, raw_values):
             if not data:
                 continue
-            
-            product = json.loads(data)
-            
-            # Проверяем фильтры
-            if filters.get("in_stock") and not product.get("in_stock"):
+            try:
+                product_cache[product_id] = json.loads(data)
+            except (json.JSONDecodeError, TypeError):
                 continue
-            
-            if filters.get("price_min") and product.get("price", 0) < filters["price_min"]:
+
+        category_filter = self._as_list(filters.get("category"))
+        in_stock_filter = filters.get("in_stock")
+        min_price = filters.get("min_price")
+        max_price = filters.get("max_price")
+        params_filter = filters.get("params") or {}
+
+        filtered = []
+        category_counts: Dict[str, int] = defaultdict(int)
+        params_counts: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+        params_products_with: Dict[str, int] = defaultdict(int)
+        price_min_ex = None  # границы цены считаются БЕЗ учёта фильтра по цене,
+        price_max_ex = None  # иначе слайдер нельзя было бы раздвинуть обратно
+
+        for product_id, score in products:
+            product = product_cache.get(product_id)
+            if not product:
                 continue
-            
-            if filters.get("price_max") and product.get("price", 0) > filters["price_max"]:
-                continue
-            
-            if filters.get("category") and product.get("category") != filters["category"]:
-                continue
-            
-            filtered.append((product_id, score))
-        
-        return filtered
-    
+
+            price = product.get("price") or 0
+
+            passes_non_price = True
+            if in_stock_filter and not product.get("in_stock"):
+                passes_non_price = False
+            if passes_non_price and category_filter and product.get("category") not in category_filter:
+                passes_non_price = False
+            if passes_non_price and params_filter:
+                product_params = product.get("params") or {}
+                for key, allowed in params_filter.items():
+                    allowed_list = self._as_list(allowed)
+                    if allowed_list and product_params.get(key) not in allowed_list:
+                        passes_non_price = False
+                        break
+
+            if compute_facets and passes_non_price:
+                if price_min_ex is None or price < price_min_ex:
+                    price_min_ex = price
+                if price_max_ex is None or price > price_max_ex:
+                    price_max_ex = price
+
+            passes_price = True
+            if min_price is not None and price < min_price:
+                passes_price = False
+            if max_price is not None and price > max_price:
+                passes_price = False
+
+            passes = passes_non_price and passes_price
+
+            if passes and compute_facets:
+                category = product.get("category")
+                if category:
+                    category_counts[category] += 1
+
+                product_params = product.get("params") or {}
+                for key, value in product_params.items():
+                    if not value:
+                        continue
+                    params_counts[key][value] += 1
+                    params_products_with[key] += 1
+
+            if passes:
+                filtered.append((product_id, score))
+
+        facets_payload = None
+        if compute_facets:
+            facets_payload = self._build_facets_payload(
+                category_counts, price_min_ex, price_max_ex,
+                params_counts, params_products_with,
+                total_passing=len(filtered)
+            )
+
+        return filtered, facets_payload, product_cache
+
+    def _build_facets_payload(
+        self,
+        category_counts: Dict[str, int],
+        price_min: Optional[float],
+        price_max: Optional[float],
+        params_counts: Dict[str, Dict[str, int]],
+        params_products_with: Dict[str, int],
+        total_passing: int
+    ) -> Dict[str, Any]:
+        """Формирует финальный JSON фасетов из накопленных счётчиков"""
+        categories = [
+            {"value": cat, "count": count}
+            for cat, count in sorted(category_counts.items(), key=lambda x: -x[1])
+        ]
+
+        price = None
+        if price_min is not None and price_max is not None:
+            price = {"min": price_min, "max": price_max}
+
+        params_facets = {}
+        if params_counts and total_passing:
+            candidates = []
+            for key, value_counts in params_counts.items():
+                products_with = params_products_with.get(key, 0)
+                if products_with == 0:
+                    continue
+                coverage = products_with / total_passing
+                distinct_ratio = len(value_counts) / products_with
+                if coverage < self.FACET_MIN_COVERAGE:
+                    continue
+                if distinct_ratio > self.FACET_MAX_DISTINCT_RATIO:
+                    continue
+                candidates.append((key, coverage, value_counts))
+
+            candidates.sort(key=lambda x: -x[1])
+            for key, _, value_counts in candidates[:self.FACET_MAX_GROUPS]:
+                top_values = sorted(value_counts.items(), key=lambda x: (-x[1], x[0]))
+                top_values = top_values[:self.FACET_MAX_VALUES_PER_GROUP]
+                params_facets[key] = [{"value": v, "count": c} for v, c in top_values]
+
+        return {
+            "categories": categories,
+            "price": price,
+            "params": params_facets
+        }
+
     async def _load_products(
         self,
         project_id: str,
-        products: List[tuple]
+        products: List[tuple],
+        product_cache: Optional[Dict[str, dict]] = None
     ) -> List[Dict[str, Any]]:
-        """Загрузка полных данных товаров"""
+        """Загрузка полных данных товаров (переиспользует уже распарсенный product_cache)"""
+        product_cache = dict(product_cache) if product_cache else {}
+
+        missing = [(pid, score) for pid, score in products if pid not in product_cache]
+        if missing:
+            keys = [f"products:{project_id}:{pid}" for pid, _ in missing]
+            raw_values = await self.redis.mget(keys)
+            for (pid, _), data in zip(missing, raw_values):
+                if not data:
+                    continue
+                try:
+                    product_cache[pid] = json.loads(data)
+                except (json.JSONDecodeError, TypeError):
+                    continue
+
         items = []
-        
         for product_id, score in products:
-            key = f"products:{project_id}:{product_id}"
-            data = await self.redis.get(key)
-            
-            if data:
-                product = json.loads(data)
-                product["score"] = round(score, 2)
-                items.append(product)
-        
+            product = product_cache.get(product_id)
+            if product:
+                item = dict(product)
+                item["score"] = round(score, 2)
+                items.append(item)
+
         return items
     
     async def _load_synonyms(self, project_id: str) -> List[List[str]]:

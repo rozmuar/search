@@ -110,10 +110,15 @@
         limit: options.limit || 20,
         offset: options.offset || 0,
       });
-      
+
       if (options.sort) params.append('sort', options.sort);
-      if (options.filters) {
-        Object.entries(options.filters).forEach(([k, v]) => params.append(k, v));
+      if (options.facets) params.append('facets', 'true');
+
+      // Расширенные фильтры (category[]/params{}/min_price/max_price/in_stock)
+      // уходят одним JSON-параметром - бэкенд ждёт именно такую форму,
+      // плоский Object.entries тут не подходит (значения бывают массивами/объектами)
+      if (options.filters && Object.keys(options.filters).length > 0) {
+        params.append('filters', JSON.stringify(options.filters));
       }
 
       const response = await fetch(`${this.apiUrl}/search?${params}`, {
@@ -128,6 +133,36 @@
       }
 
       return response.json();
+    }
+
+    async categories() {
+      const response = await fetch(`${this.apiUrl}/categories`, {
+        headers: {
+          'X-API-Key': this.apiKey,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Categories failed: ${response.status}`);
+      }
+
+      return response.json();
+    }
+
+    // POST в кастомный колбэк корзины клиента (widget_settings.cartCallbackUrl) -
+    // это не наш API, поэтому CORS/ответ полностью на стороне сервера клиента.
+    // В отличие от trackEvent - промис возвращается, чтобы вызывающий код
+    // мог показать успех/ошибку добавления в корзину.
+    postCart(callbackUrl, payload) {
+      return fetch(callbackUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        keepalive: true,
+        mode: 'cors',
+        credentials: 'omit'
+      });
     }
 
     async suggest(prefix, options = {}) {
@@ -447,6 +482,7 @@
           if (serverConfig.showPrices !== undefined) this.config.showPrices = serverConfig.showPrices;
           if (serverConfig.showButton !== undefined) this.config.showButton = serverConfig.showButton;
           if (serverConfig.maxResults) this.config.results.limit = serverConfig.maxResults;
+          if (serverConfig.cartCallbackUrl) this.config.cartCallbackUrl = serverConfig.cartCallbackUrl;
         }
       } catch (err) {
         console.warn('[SearchWidget] Error loading config:', err);
@@ -474,6 +510,7 @@
 
       this.api = new ApiClient(this.config.apiUrl, this.config.apiKey);
       this.createWrapper();
+      this.loadCategories(); // fire-and-forget, не блокирует готовность инпута
 
       this.suggestions = new SuggestionsDropdown(this);
       this.suggestions.create();
@@ -498,12 +535,30 @@
       this.inputWrapper = document.createElement('div');
       this.inputWrapper.className = 'search-widget-wrapper';
       this.inputWrapper.style.position = 'relative';
-      
+
       this.input.parentNode.insertBefore(this.inputWrapper, this.input);
       this.inputWrapper.appendChild(this.input);
-      
+
       this.input.classList.add('search-widget-input');
-      
+
+      // Дропдаун "Везде" - выбор категории, в которой ищем (заполняется loadCategories())
+      this.categorySelect = document.createElement('select');
+      this.categorySelect.className = 'search-widget-category-select';
+      this.categorySelect.innerHTML = '<option value="">Везде</option>';
+      this.categorySelect.addEventListener('change', () => {
+        const value = this.categorySelect.value;
+        if (value) {
+          this.state.filters.category = [value];
+        } else {
+          delete this.state.filters.category;
+        }
+        const query = this.input.value.trim();
+        if (query.length >= this.config.minChars) {
+          this.search(query);
+        }
+      });
+      this.inputWrapper.insertBefore(this.categorySelect, this.input);
+
       // Добавляем кнопку поиска если включено
       if (this.config.showButton !== false) {
         this.searchButton = document.createElement('button');
@@ -518,6 +573,21 @@
         });
         this.inputWrapper.appendChild(this.searchButton);
         this.inputWrapper.classList.add('has-button');
+      }
+    }
+
+    async loadCategories() {
+      try {
+        const data = await this.api.categories();
+        const categories = data.categories || [];
+        if (!categories.length) return;
+
+        const options = categories.map(c =>
+          `<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)} (${c.count})</option>`
+        ).join('');
+        this.categorySelect.innerHTML = '<option value="">Везде</option>' + options;
+      } catch (error) {
+        console.warn('[SearchWidget] Failed to load categories:', error);
       }
     }
 
@@ -807,163 +877,457 @@
 
     async showAllResultsPopup() {
       const query = this.lastSearchQuery;
-      const total = this.lastSearchTotal;
       if (!query) return;
-      
+
       this.suggestions.hide();
-      
-      // Создаём popup с индикатором загрузки
+
+      // Состояние текущего открытия результатов - отдельно от dropdown/scope-фильтра сверху,
+      // но стартует с тех же фильтров (например, если сверху уже выбрана категория)
+      this.popupState = {
+        query,
+        filters: { ...this.state.filters },
+        sort: 'relevance',
+        mode: 'grouped', // 'grouped' - секции по категориям, 'category' - плоская пагинация по одной категории
+        categoryName: null,
+        page: 1,
+        itemsPerPage: 20,
+      };
+      this.popupItemsById = {};
+
       const popup = document.createElement('div');
       popup.className = 'search-widget-popup-overlay';
       popup.innerHTML = `
-        <div class="search-widget-popup">
+        <div class="search-widget-popup search-widget-popup-faceted">
           <div class="search-widget-popup-header">
             <h3>Результаты поиска: "${escapeHtml(query)}"</h3>
-            <span class="search-widget-popup-count">Найдено: ${total} товаров</span>
+            <span class="search-widget-popup-count" id="search-popup-count">Загрузка...</span>
             <button class="search-widget-popup-close">&times;</button>
           </div>
-          <div class="search-widget-popup-content">
-            <div class="search-widget-popup-loading">Загрузка всех товаров...</div>
-            <div class="search-widget-popup-grid" id="search-popup-grid"></div>
+          <div class="search-widget-popup-body">
+            <aside class="search-widget-facets-sidebar" id="search-popup-sidebar"></aside>
+            <main class="search-widget-results-main">
+              <div class="search-widget-popup-loading">Загрузка товаров...</div>
+              <div id="search-popup-main-content"></div>
+            </main>
           </div>
-          <div class="search-widget-popup-pagination" id="search-popup-pagination"></div>
         </div>
       `;
-      
+
       document.body.appendChild(popup);
-      
-      // Закрытие popup
-      popup.querySelector('.search-widget-popup-close').addEventListener('click', () => {
+      this.popupEl = popup;
+
+      // Закрытие popup - все три пути закрытия должны снимать escHandler,
+      // иначе он остаётся висеть на document навсегда (была такая утечка)
+      const closePopup = () => {
+        document.removeEventListener('keydown', escHandler);
         popup.remove();
-      });
-      
-      popup.addEventListener('click', (e) => {
-        if (e.target === popup) {
-          popup.remove();
-        }
-      });
-      
-      // ESC для закрытия
-      const escHandler = (e) => {
-        if (e.key === 'Escape') {
-          popup.remove();
-          document.removeEventListener('keydown', escHandler);
-        }
+        this.popupEl = null;
       };
+      const escHandler = (e) => {
+        if (e.key === 'Escape') closePopup();
+      };
+
+      popup.querySelector('.search-widget-popup-close').addEventListener('click', closePopup);
+      popup.addEventListener('click', (e) => {
+        if (e.target === popup) closePopup();
+      });
       document.addEventListener('keydown', escHandler);
-      
-      // Загружаем ВСЕ товары (limit=-1)
+
+      await this.refreshPopupResults();
+    }
+
+    // Перезапрашивает результаты с текущим состоянием popupState (фильтры/сортировка/режим)
+    // и перерисовывает и сайдбар, и основной контент
+    async refreshPopupResults() {
+      if (!this.popupEl) return;
+      const state = this.popupState;
+
+      const loadingEl = this.popupEl.querySelector('.search-widget-popup-loading');
+      if (loadingEl) loadingEl.style.display = 'block';
+
       try {
-        const data = await this.api.search(query, {
-          limit: -1, // Загружаем все товары
+        const isCategoryMode = state.mode === 'category';
+        const filters = isCategoryMode
+          ? { ...state.filters, category: [state.categoryName] }
+          : state.filters;
+
+        const data = await this.api.search(state.query, {
+          limit: isCategoryMode ? state.itemsPerPage : 500,
+          offset: isCategoryMode ? (state.page - 1) * state.itemsPerPage : 0,
+          facets: true,
+          sort: state.sort,
+          filters,
         });
-        
-        let items = data.items || data.products || [];
-        
-        // Сортировка: сначала в наличии
-        items = [...items].sort((a, b) => {
-          const aInStock = a.in_stock !== false ? 1 : 0;
-          const bInStock = b.in_stock !== false ? 1 : 0;
-          return bInStock - aInStock;
-        });
-        
-        // Убираем индикатор загрузки
-        const loadingEl = popup.querySelector('.search-widget-popup-loading');
+
+        this.popupItemsById = {};
+        (data.items || []).forEach(item => { this.popupItemsById[item.id] = item; });
+
+        const countEl = this.popupEl.querySelector('#search-popup-count');
+        if (countEl) countEl.textContent = `Найдено: ${data.total || 0} товаров`;
+
         if (loadingEl) loadingEl.remove();
-        
-        // Обновляем счётчик
-        const countEl = popup.querySelector('.search-widget-popup-count');
-        if (countEl) countEl.textContent = `Найдено: ${data.total || items.length} товаров`;
-        
-        // Пагинация
-        this.popupCurrentPage = 1;
-        this.popupItemsPerPage = 20;
-        this.popupItems = items;
-        
-        this.renderPopupPage();
-        
+
+        this.renderFacetsSidebar(data.facets || {});
+        this.renderPopupMain(data);
+
       } catch (error) {
-        console.error('[SearchWidget] Failed to load all results:', error);
-        const loadingEl = popup.querySelector('.search-widget-popup-loading');
+        console.error('[SearchWidget] Failed to load results:', error);
         if (loadingEl) loadingEl.textContent = 'Ошибка загрузки товаров';
       }
     }
 
-    renderPopupPage() {
-      const grid = document.getElementById('search-popup-grid');
-      const pagination = document.getElementById('search-popup-pagination');
-      if (!grid || !pagination) return;
-      
-      const start = (this.popupCurrentPage - 1) * this.popupItemsPerPage;
-      const end = start + this.popupItemsPerPage;
-      const pageItems = this.popupItems.slice(start, end);
-      const totalPages = Math.ceil(this.popupItems.length / this.popupItemsPerPage);
-      
+    renderFacetsSidebar(facets) {
+      const sidebar = this.popupEl?.querySelector('#search-popup-sidebar');
+      if (!sidebar) return;
+      const state = this.popupState;
+
+      let html = `
+        <div class="search-widget-facet-group">
+          <label class="search-widget-facet-title">Сортировать по</label>
+          <select class="search-widget-sort-select">
+            <option value="relevance" ${state.sort === 'relevance' ? 'selected' : ''}>Релевантности</option>
+            <option value="price_asc" ${state.sort === 'price_asc' ? 'selected' : ''}>Цене (сначала дешёвые)</option>
+            <option value="price_desc" ${state.sort === 'price_desc' ? 'selected' : ''}>Цене (сначала дорогие)</option>
+          </select>
+        </div>
+      `;
+
+      if (facets.categories && facets.categories.length) {
+        const selected = state.filters.category || [];
+        html += `
+          <div class="search-widget-facet-group">
+            <div class="search-widget-facet-title">Категория</div>
+            ${facets.categories.map(c => `
+              <label class="search-widget-facet-checkbox-row">
+                <input type="checkbox" data-facet="category" value="${escapeHtml(c.value)}" ${selected.includes(c.value) ? 'checked' : ''}>
+                <span>${escapeHtml(c.value)} <em>${c.count}</em></span>
+              </label>
+            `).join('')}
+          </div>
+        `;
+      }
+
+      if (facets.price) {
+        const min = facets.price.min ?? 0;
+        const max = facets.price.max ?? 0;
+        const curMin = state.filters.min_price ?? min;
+        const curMax = state.filters.max_price ?? max;
+        html += `
+          <div class="search-widget-facet-group">
+            <div class="search-widget-facet-title">Цена</div>
+            <div class="search-widget-price-range">
+              <input type="number" class="search-widget-price-min" min="${min}" max="${max}" value="${curMin}">
+              <span>–</span>
+              <input type="number" class="search-widget-price-max" min="${min}" max="${max}" value="${curMax}">
+            </div>
+            <button type="button" class="search-widget-price-apply">Применить</button>
+          </div>
+        `;
+      }
+
+      if (facets.params) {
+        for (const [name, values] of Object.entries(facets.params)) {
+          if (!values || !values.length) continue;
+          const selected = (state.filters.params || {})[name] || [];
+          html += `
+            <div class="search-widget-facet-group">
+              <div class="search-widget-facet-title">${escapeHtml(name)}</div>
+              ${values.map(v => `
+                <label class="search-widget-facet-checkbox-row">
+                  <input type="checkbox" data-facet="params.${escapeHtml(name)}" value="${escapeHtml(v.value)}" ${selected.includes(v.value) ? 'checked' : ''}>
+                  <span>${escapeHtml(v.value)} <em>${v.count}</em></span>
+                </label>
+              `).join('')}
+            </div>
+          `;
+        }
+      }
+
+      sidebar.innerHTML = html;
+
+      const sortSelect = sidebar.querySelector('.search-widget-sort-select');
+      sortSelect?.addEventListener('change', () => {
+        state.sort = sortSelect.value;
+        this.refreshPopupResults();
+      });
+
+      sidebar.querySelectorAll('input[type="checkbox"][data-facet]').forEach(cb => {
+        cb.addEventListener('change', () => {
+          const facetKey = cb.dataset.facet;
+          const value = cb.value;
+
+          if (facetKey === 'category') {
+            const list = new Set(state.filters.category || []);
+            cb.checked ? list.add(value) : list.delete(value);
+            if (list.size) state.filters.category = [...list];
+            else delete state.filters.category;
+          } else if (facetKey.startsWith('params.')) {
+            const paramName = facetKey.slice(7);
+            state.filters.params = state.filters.params || {};
+            const list = new Set(state.filters.params[paramName] || []);
+            cb.checked ? list.add(value) : list.delete(value);
+            if (list.size) state.filters.params[paramName] = [...list];
+            else delete state.filters.params[paramName];
+          }
+
+          state.mode = 'grouped';
+          state.page = 1;
+          this.refreshPopupResults();
+        });
+      });
+
+      const priceApply = sidebar.querySelector('.search-widget-price-apply');
+      priceApply?.addEventListener('click', () => {
+        const minVal = parseFloat(sidebar.querySelector('.search-widget-price-min').value);
+        const maxVal = parseFloat(sidebar.querySelector('.search-widget-price-max').value);
+        if (!isNaN(minVal)) state.filters.min_price = minVal; else delete state.filters.min_price;
+        if (!isNaN(maxVal)) state.filters.max_price = maxVal; else delete state.filters.max_price;
+        state.mode = 'grouped';
+        state.page = 1;
+        this.refreshPopupResults();
+      });
+    }
+
+    renderPopupMain(data) {
+      const container = this.popupEl?.querySelector('#search-popup-main-content');
+      if (!container) return;
+
+      const items = data.items || data.products || [];
+
+      if (items.length === 0) {
+        container.innerHTML = this.renderNoResults(this.popupState.query);
+        return;
+      }
+
+      if (this.popupState.mode === 'category') {
+        this.renderCategoryGrid(container, items, data.total || items.length);
+      } else {
+        this.renderGroupedResults(container, items, data.facets || {});
+      }
+    }
+
+    renderGroupedResults(container, items, facets) {
+      const categoryCounts = {};
+      (facets.categories || []).forEach(c => { categoryCounts[c.value] = c.count; });
+
+      const groups = new Map();
+      items.forEach(item => {
+        const cat = item.category || 'Без категории';
+        if (!groups.has(cat)) groups.set(cat, []);
+        groups.get(cat).push(item);
+      });
+
+      let html = '';
+      for (const [category, groupItems] of groups.entries()) {
+        const total = categoryCounts[category] ?? groupItems.length;
+        const preview = groupItems.slice(0, 8);
+        html += `
+          <section class="search-widget-category-section">
+            <div class="search-widget-category-section-header">
+              <h4>${escapeHtml(category)}</h4>
+              <span class="search-widget-category-count">${total}</span>
+            </div>
+            <div class="search-widget-category-grid">
+              ${preview.map(p => this.renderCard(p, { compact: true })).join('')}
+            </div>
+            ${total > preview.length ? `
+              <button type="button" class="search-widget-show-category-btn" data-category="${escapeHtml(category)}">
+                Показать все ${total} →
+              </button>
+            ` : ''}
+          </section>
+        `;
+      }
+
+      container.innerHTML = html;
+      this.bindCardEvents(container);
+
+      container.querySelectorAll('.search-widget-show-category-btn').forEach(btn => {
+        btn.addEventListener('click', () => this.showCategoryGrid(btn.dataset.category));
+      });
+    }
+
+    showCategoryGrid(categoryName) {
+      this.popupState.mode = 'category';
+      this.popupState.categoryName = categoryName;
+      this.popupState.page = 1;
+      this.refreshPopupResults();
+    }
+
+    renderCategoryGrid(container, items, total) {
+      const state = this.popupState;
+      const totalPages = Math.ceil(total / state.itemsPerPage);
+
+      let html = `
+        <div class="search-widget-category-grid-header">
+          <button type="button" class="search-widget-back-btn">← Ко всем категориям</button>
+          <h4>${escapeHtml(state.categoryName)} (${total})</h4>
+        </div>
+        <div class="search-widget-popup-grid">
+          ${items.map(p => this.renderCard(p, { compact: false })).join('')}
+        </div>
+      `;
+
+      if (totalPages > 1) {
+        html += '<div class="search-widget-pagination-buttons">';
+        html += `<button class="search-widget-page-btn" data-page="prev" ${state.page === 1 ? 'disabled' : ''}>←</button>`;
+        for (let i = 1; i <= totalPages; i++) {
+          if (i === 1 || i === totalPages || (i >= state.page - 2 && i <= state.page + 2)) {
+            html += `<button class="search-widget-page-btn ${i === state.page ? 'active' : ''}" data-page="${i}">${i}</button>`;
+          } else if (i === state.page - 3 || i === state.page + 3) {
+            html += '<span class="search-widget-page-dots">...</span>';
+          }
+        }
+        html += `<button class="search-widget-page-btn" data-page="next" ${state.page === totalPages ? 'disabled' : ''}>→</button>`;
+        html += '</div>';
+      }
+
+      container.innerHTML = html;
+      this.bindCardEvents(container);
+
+      container.querySelector('.search-widget-back-btn')?.addEventListener('click', () => {
+        state.mode = 'grouped';
+        state.categoryName = null;
+        this.refreshPopupResults();
+      });
+
+      container.querySelectorAll('.search-widget-page-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const page = btn.dataset.page;
+          if (page === 'prev' && state.page > 1) state.page--;
+          else if (page === 'next' && state.page < totalPages) state.page++;
+          else if (page !== 'prev' && page !== 'next') state.page = parseInt(page, 10);
+          this.refreshPopupResults();
+        });
+      });
+    }
+
+    // Общая карточка товара для нового вида результатов (секции по категориям +
+    // плоская сетка одной категории) - со степпером количества и кнопкой "В корзину".
+    // Не используется в dropdown-подсказках и в renderProductCard() (custom-container
+    // режим с config.templates.productCard) - это отдельные, уже работающие шаблоны.
+    renderCard(product, opts = {}) {
       const showImages = this.config.showImages !== false;
       const showPrices = this.config.showPrices !== false;
-      
-      // Рендер товаров
-      grid.innerHTML = pageItems.map((item, index) => {
-        const price = item.price ? formatPrice(item.price, this.config.currency) : '';
-        const oldPrice = item.old_price ? formatPrice(item.old_price, this.config.currency) : '';
-        const inStock = item.in_stock !== false;
-        
-        return `
-          <a href="${item.url || '#'}" class="search-widget-popup-card ${!inStock ? 'out-of-stock' : ''}">
-            ${showImages ? `<div class="search-widget-popup-card-image">
-              <img src="${item.image || ''}" alt="${escapeHtml(item.name || '')}" loading="lazy" onerror="this.style.display='none'">
+      const price = product.price ? formatPrice(product.price, this.config.currency) : '';
+      const oldPrice = product.old_price ? formatPrice(product.old_price, this.config.currency) : '';
+      const inStock = product.in_stock !== false;
+      const compactClass = opts.compact ? 'search-widget-facet-card-compact' : '';
+
+      return `
+        <div class="search-widget-facet-card ${compactClass} ${!inStock ? 'out-of-stock' : ''}" data-id="${escapeHtml(String(product.id))}">
+          <a href="${product.url || '#'}">
+            ${showImages ? `<div class="search-widget-facet-card-image">
+              <img src="${product.image || ''}" alt="${escapeHtml(product.name || '')}" loading="lazy" onerror="this.style.display='none'">
             </div>` : ''}
-            <div class="search-widget-popup-card-info">
-              <div class="search-widget-popup-card-name">${escapeHtml(item.name || '')}</div>
-              ${showPrices && price ? `<div class="search-widget-popup-card-price">
+            <div class="search-widget-facet-card-info">
+              <div class="search-widget-facet-card-name">${escapeHtml(product.name || '')}</div>
+              ${showPrices && price ? `<div class="search-widget-facet-card-price">
                 ${oldPrice ? `<span class="old-price">${oldPrice}</span>` : ''}
                 <span class="current-price">${price}</span>
               </div>` : ''}
               ${!inStock ? '<div class="search-widget-out-of-stock">Нет в наличии</div>' : ''}
             </div>
           </a>
-        `;
-      }).join('');
-      
-      // Рендер пагинации
-      if (totalPages > 1) {
-        let paginationHtml = '<div class="search-widget-pagination-buttons">';
-        
-        // Кнопка "Назад"
-        paginationHtml += `<button class="search-widget-page-btn" data-page="prev" ${this.popupCurrentPage === 1 ? 'disabled' : ''}>←</button>`;
-        
-        // Номера страниц
-        for (let i = 1; i <= totalPages; i++) {
-          if (i === 1 || i === totalPages || (i >= this.popupCurrentPage - 2 && i <= this.popupCurrentPage + 2)) {
-            paginationHtml += `<button class="search-widget-page-btn ${i === this.popupCurrentPage ? 'active' : ''}" data-page="${i}">${i}</button>`;
-          } else if (i === this.popupCurrentPage - 3 || i === this.popupCurrentPage + 3) {
-            paginationHtml += '<span class="search-widget-page-dots">...</span>';
+          ${inStock ? `
+            <div class="search-widget-cart-row">
+              <div class="search-widget-qty-stepper">
+                <button type="button" class="qty-minus">−</button>
+                <input type="number" class="qty-input" min="1" value="1">
+                <button type="button" class="qty-plus">+</button>
+              </div>
+              <button type="button" class="search-widget-add-to-cart-btn">В корзину</button>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    bindCardEvents(container) {
+      container.querySelectorAll('.search-widget-facet-card').forEach((card, index) => {
+        const productId = card.dataset.id;
+
+        const link = card.querySelector('a');
+        link?.addEventListener('click', (e) => {
+          e.preventDefault();
+          this.trackClick(productId, index);
+          if (link.href) {
+            setTimeout(() => { window.location.href = link.href; }, 50);
           }
-        }
-        
-        // Кнопка "Вперёд"
-        paginationHtml += `<button class="search-widget-page-btn" data-page="next" ${this.popupCurrentPage === totalPages ? 'disabled' : ''}>→</button>`;
-        
-        paginationHtml += '</div>';
-        pagination.innerHTML = paginationHtml;
-        
-        // События пагинации
-        pagination.querySelectorAll('.search-widget-page-btn').forEach(btn => {
-          btn.addEventListener('click', (e) => {
-            const page = btn.dataset.page;
-            if (page === 'prev' && this.popupCurrentPage > 1) {
-              this.popupCurrentPage--;
-            } else if (page === 'next' && this.popupCurrentPage < totalPages) {
-              this.popupCurrentPage++;
-            } else if (page !== 'prev' && page !== 'next') {
-              this.popupCurrentPage = parseInt(page);
-            }
-            this.renderPopupPage();
-            grid.scrollTop = 0;
-          });
         });
-      } else {
-        pagination.innerHTML = '';
+
+        const qtyInput = card.querySelector('.qty-input');
+        card.querySelector('.qty-minus')?.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (qtyInput) qtyInput.value = Math.max(1, (parseInt(qtyInput.value, 10) || 1) - 1);
+        });
+        card.querySelector('.qty-plus')?.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (qtyInput) qtyInput.value = (parseInt(qtyInput.value, 10) || 1) + 1;
+        });
+
+        const cartBtn = card.querySelector('.search-widget-add-to-cart-btn');
+        cartBtn?.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const quantity = Math.max(1, parseInt(qtyInput?.value, 10) || 1);
+          const product = this.popupItemsById[productId] || { id: productId };
+          this.addToCart(product, quantity, cartBtn);
+        });
+      });
+    }
+
+    // POSTит в cartCallbackUrl проекта (настраивается в личном кабинете). Если колбэк
+    // не настроен - тихий no-op с предупреждением в консоль, аналитика "добавления в
+    // корзину" всё равно фиксируется через trackAddToCart.
+    async addToCart(product, quantity, buttonEl) {
+      this.trackAddToCart({ product_id: product.id, quantity });
+
+      if (!this.config.cartCallbackUrl) {
+        console.warn('[SearchWidget] cartCallbackUrl is not configured - "В корзину" is a no-op. ' +
+          'Set it in project widget settings, or handle the "addToCart" event instead.');
+        return;
+      }
+
+      const originalText = buttonEl.textContent;
+      buttonEl.disabled = true;
+
+      const payload = {
+        apiKey: this.config.apiKey,
+        productId: product.id,
+        quantity,
+        product: {
+          id: product.id,
+          name: product.name,
+          price: product.price,
+          url: product.url,
+          params: product.params || {},
+        },
+      };
+
+      try {
+        const response = await this.api.postCart(this.config.cartCallbackUrl, payload);
+        if (!response.ok) {
+          throw new Error(`Cart callback failed: ${response.status}`);
+        }
+        buttonEl.textContent = 'Добавлено ✓';
+        buttonEl.classList.add('search-widget-cart-success');
+        setTimeout(() => {
+          buttonEl.textContent = originalText;
+          buttonEl.classList.remove('search-widget-cart-success');
+          buttonEl.disabled = false;
+        }, 1500);
+      } catch (error) {
+        console.error('[SearchWidget] addToCart error:', error);
+        buttonEl.textContent = 'Не удалось добавить';
+        buttonEl.classList.add('search-widget-cart-error');
+        setTimeout(() => {
+          buttonEl.textContent = originalText;
+          buttonEl.classList.remove('search-widget-cart-error');
+          buttonEl.disabled = false;
+        }, 1500);
       }
     }
 
@@ -1159,15 +1523,20 @@
 
         .search-widget-wrapper {
           position: relative;
+          display: flex;
+          align-items: stretch;
           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
           font-size: var(--search-font-size);
         }
 
         .search-widget-input {
-          width: 100%;
+          flex: 1;
+          min-width: 0;
           padding: 12px 16px;
           border: 1px solid var(--search-border-color);
           border-radius: var(--search-border-radius);
+          border-top-left-radius: 0;
+          border-bottom-left-radius: 0;
           font-size: var(--search-font-size);
           outline: none;
           transition: border-color 0.2s;
@@ -1535,6 +1904,10 @@
           box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
         }
 
+        .search-widget-popup-faceted {
+          max-width: 1100px;
+        }
+
         .search-widget-popup-header {
           display: flex;
           align-items: center;
@@ -1570,10 +1943,312 @@
           color: #333;
         }
 
-        .search-widget-popup-content {
+        .search-widget-popup-body {
+          flex: 1;
+          overflow: hidden;
+          display: flex;
+          gap: 20px;
+          padding: 20px;
+        }
+
+        .search-widget-facets-sidebar {
+          width: 220px;
+          flex-shrink: 0;
+          overflow-y: auto;
+        }
+
+        .search-widget-results-main {
           flex: 1;
           overflow-y: auto;
-          padding: 20px;
+          min-width: 0;
+        }
+
+        .search-widget-facet-group {
+          margin-bottom: 20px;
+          padding-bottom: 16px;
+          border-bottom: 1px solid var(--search-border-color);
+        }
+
+        .search-widget-facet-group:last-child {
+          border-bottom: none;
+        }
+
+        .search-widget-facet-title {
+          display: block;
+          font-weight: 600;
+          font-size: 13px;
+          margin-bottom: 8px;
+          color: var(--search-text-color);
+        }
+
+        .search-widget-sort-select,
+        .search-widget-category-select {
+          width: 100%;
+          padding: 8px 10px;
+          border: 1px solid var(--search-border-color);
+          border-radius: 6px;
+          font-size: 13px;
+          background: #fff;
+        }
+
+        .search-widget-category-select {
+          width: auto;
+          flex-shrink: 0;
+          border-right: none;
+          border-top-right-radius: 0;
+          border-bottom-right-radius: 0;
+        }
+
+        .search-widget-facet-checkbox-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 4px 0;
+          font-size: 13px;
+          cursor: pointer;
+        }
+
+        .search-widget-facet-checkbox-row input {
+          flex-shrink: 0;
+        }
+
+        .search-widget-facet-checkbox-row span {
+          flex: 1;
+          display: flex;
+          justify-content: space-between;
+          gap: 8px;
+        }
+
+        .search-widget-facet-checkbox-row em {
+          font-style: normal;
+          color: #999;
+        }
+
+        .search-widget-price-range {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          margin-bottom: 8px;
+        }
+
+        .search-widget-price-range input {
+          width: 0;
+          flex: 1;
+          padding: 6px 8px;
+          border: 1px solid var(--search-border-color);
+          border-radius: 6px;
+          font-size: 13px;
+        }
+
+        .search-widget-price-apply {
+          width: 100%;
+          padding: 6px;
+          background: var(--search-primary-color);
+          color: #fff;
+          border: none;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 13px;
+        }
+
+        .search-widget-category-section {
+          margin-bottom: 28px;
+        }
+
+        .search-widget-category-section-header {
+          display: flex;
+          align-items: baseline;
+          gap: 8px;
+          margin-bottom: 12px;
+          padding-bottom: 6px;
+          border-bottom: 2px solid var(--search-text-color);
+        }
+
+        .search-widget-category-section-header h4 {
+          margin: 0;
+          font-size: 15px;
+        }
+
+        .search-widget-category-count {
+          color: #999;
+          font-size: 13px;
+        }
+
+        .search-widget-category-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+          gap: 14px;
+        }
+
+        .search-widget-show-category-btn {
+          margin-top: 10px;
+          background: none;
+          border: none;
+          color: var(--search-primary-color);
+          font-size: 13px;
+          cursor: pointer;
+          padding: 0;
+        }
+
+        .search-widget-category-grid-header {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          margin-bottom: 16px;
+        }
+
+        .search-widget-category-grid-header h4 {
+          margin: 0;
+          font-size: 16px;
+        }
+
+        .search-widget-back-btn {
+          background: none;
+          border: 1px solid var(--search-border-color);
+          border-radius: 6px;
+          padding: 6px 10px;
+          cursor: pointer;
+          font-size: 13px;
+        }
+
+        .search-widget-facet-card {
+          display: flex;
+          flex-direction: column;
+          border: 1px solid #eee;
+          border-radius: 8px;
+          overflow: hidden;
+          transition: box-shadow 0.2s, transform 0.2s;
+        }
+
+        .search-widget-facet-card:hover {
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+          transform: translateY(-2px);
+        }
+
+        .search-widget-facet-card.out-of-stock {
+          opacity: 0.6;
+        }
+
+        .search-widget-facet-card a {
+          text-decoration: none;
+          color: var(--search-text-color);
+        }
+
+        .search-widget-facet-card-image {
+          height: 140px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: #f9f9f9;
+          padding: 10px;
+        }
+
+        .search-widget-facet-card-compact .search-widget-facet-card-image {
+          height: 110px;
+        }
+
+        .search-widget-facet-card-image img {
+          max-width: 100%;
+          max-height: 100%;
+          object-fit: contain;
+        }
+
+        .search-widget-facet-card-info {
+          padding: 10px 12px;
+        }
+
+        .search-widget-facet-card-name {
+          font-size: 13px;
+          font-weight: 500;
+          margin-bottom: 6px;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+          line-height: 1.3;
+        }
+
+        .search-widget-facet-card-price {
+          font-size: 14px;
+        }
+
+        .search-widget-facet-card-price .old-price {
+          text-decoration: line-through;
+          color: #999;
+          margin-right: 6px;
+          font-size: 12px;
+        }
+
+        .search-widget-facet-card-price .current-price {
+          font-weight: bold;
+          color: var(--search-primary-color);
+        }
+
+        .search-widget-cart-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 0 12px 12px;
+        }
+
+        .search-widget-qty-stepper {
+          display: flex;
+          align-items: center;
+          border: 1px solid var(--search-border-color);
+          border-radius: 6px;
+          flex-shrink: 0;
+        }
+
+        .search-widget-qty-stepper button {
+          width: 26px;
+          height: 26px;
+          background: none;
+          border: none;
+          cursor: pointer;
+          font-size: 14px;
+          line-height: 1;
+        }
+
+        .search-widget-qty-stepper .qty-input {
+          width: 30px;
+          border: none;
+          text-align: center;
+          font-size: 13px;
+          -moz-appearance: textfield;
+        }
+
+        .search-widget-qty-stepper .qty-input::-webkit-outer-spin-button,
+        .search-widget-qty-stepper .qty-input::-webkit-inner-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+
+        .search-widget-add-to-cart-btn {
+          flex: 1;
+          padding: 6px 8px;
+          background: var(--search-primary-color);
+          color: #fff;
+          border: none;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 12px;
+          transition: background-color 0.2s;
+        }
+
+        .search-widget-add-to-cart-btn:hover:not(:disabled) {
+          filter: brightness(1.1);
+        }
+
+        .search-widget-add-to-cart-btn:disabled {
+          cursor: default;
+        }
+
+        .search-widget-add-to-cart-btn.search-widget-cart-success {
+          background: #16a34a;
+        }
+
+        .search-widget-add-to-cart-btn.search-widget-cart-error {
+          background: #dc2626;
         }
 
         .search-widget-popup-loading {
@@ -1708,8 +2383,24 @@
             border-radius: 0;
           }
 
-          .search-widget-popup-grid {
+          .search-widget-popup-grid,
+          .search-widget-category-grid {
             grid-template-columns: repeat(2, 1fr);
+          }
+
+          .search-widget-popup-body {
+            flex-direction: column;
+            overflow-y: auto;
+          }
+
+          .search-widget-facets-sidebar {
+            width: 100%;
+          }
+
+          .search-widget-category-select {
+            border-right: 1px solid var(--search-border-color);
+            border-top-right-radius: var(--search-border-radius);
+            border-bottom-right-radius: var(--search-border-radius);
           }
         }
       `;
