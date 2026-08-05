@@ -1,96 +1,165 @@
 # Интеграция виджета поиска
 
-## Быстрый старт
+> Сверено с реальным `src/web/embed.js` (класс `SearchWidgetClass`, глобально доступен как `window.SearchWidget`) и с тем, что дашборд реально показывает клиентам на вкладке "Код для сайта" (`src/web/dashboard.html`, `updateEmbedCode()` в `dashboard.js`). Предыдущая версия этого файла в целом была близка к реальности по форме конфига, но с фактическими неточностями (см. ниже) — они исправлены.
+>
+> ⚠️ В корне репозитория есть ещё файл `WIDGET_INTEGRATION.md`, описывающий **другой, нереализованный** API виджета (`<div id="searchpro-widget">` + `data-api-key` атрибут на `<script>` + глобальный `window.SearchProConfig`). Он не соответствует `embed.js` — используйте этот файл, а не тот.
 
-### 1. Подключение скрипта
-
-Добавьте скрипт перед закрывающим тегом `</body>`:
+## Быстрый старт (то, что реально показывает дашборд)
 
 ```html
-<script src="https://cdn.search-service.com/widget.js"></script>
+<div id="search-widget"></div>
+<script src="https://ваш-домен/embed.js"></script>
 <script>
   SearchWidget.init({
-    apiKey: 'sk_live_xxxxxxxxxxxxx',
-    selector: '#search-input',  // CSS селектор поля поиска
+    apiKey: 'ВАШ_API_КЛЮЧ',
+    container: '#search-widget'
   });
 </script>
 ```
 
-### 2. Минимальная разметка
+Скрипт отдаётся статикой напрямую через nginx (`location = /embed.js` в `nginx.conf`, файл — `src/web/embed.js`), а не с CDN. Есть и второй путь — `GET /api/v1/widget/embed.js` через FastAPI (тот же файл), но клиентам показывается первый.
 
-```html
-<input type="text" id="search-input" placeholder="Поиск товаров...">
-```
+`container` — это просто алиас для `selector` (если передан `container` без `selector`, виджет использует его как `selector`). Если элемент по селектору — `<input>`, виджет использует его напрямую; если это, например, `<div>` — создаёт `<input>` внутри него сам.
 
-Виджет автоматически:
-- Перехватывает ввод в поле поиска
-- Показывает подсказки по мере ввода
-- Выводит результаты поиска
+`data-api-key` на теге `<script>` **не поддерживается** — `apiKey` передаётся только через объект конфига в `SearchWidget.init()`.
+
+### Дропдаун категорий и полноэкранный вид результатов
+
+Слева от поля ввода виджет сам добавляет `<select>` "Везде ▾" — список категорий подтягивается один раз при инициализации через `GET /api/v1/categories` (кэшируется на бэкенде 5 минут). Выбор категории ограничивает и dropdown-подсказки, и последующий "Показать все N товаров" этой категорией.
+
+Клик по "Показать все N товаров" в dropdown-подсказках открывает не плоскую сетку с постраничной навигацией (как раньше), а вид с сайдбаром фасетов (категории со счётчиками, диапазон цен, авто-определённые параметры из фида — например "Вязкость"/"Допуски") и результатами, сгруппированными по категориям. Это перезапрашивает `/api/v1/search` с `facets=true` и текущими фильтрами при каждом изменении фильтра/сортировки — см. `showAllResultsPopup`/`refreshPopupResults` в `embed.js`, формат `filters`/`facets` — в [api.md](api.md).
 
 ---
 
 ## Конфигурация
 
-### Полный список опций
+Реальные поля `DEFAULT_CONFIG` в `embed.js` + то, что дополнительно подхватывается с сервера (`GET /api/v1/widget/{apiKey}/config`, настраивается в личном кабинете):
 
 ```javascript
 SearchWidget.init({
-  // Обязательные
-  apiKey: 'sk_live_xxxxxxxxxxxxx',
-  
-  // Селекторы элементов
-  selector: '#search-input',           // Поле ввода
-  resultsSelector: '#search-results',  // Контейнер результатов (опционально)
-  
+  // Обязательно
+  apiKey: 'sk_...',
+
+  // Куда встраивать (селектор или сам DOM-элемент)
+  selector: '#search-widget',   // или container: '#search-widget' - синоним
+
   // Поведение
-  minChars: 2,                         // Мин. символов для поиска
-  debounceMs: 150,                     // Задержка перед запросом
-  
-  // Подсказки
+  minChars: 2,        // мин. символов до запроса подсказок - реально используется
+  debounceMs: 150,    // задержка перед запросом - реально используется
+  placeholder: 'Поиск товаров...',
+
   suggestions: {
     enabled: true,
     limit: 10,
-    showProducts: true,                // Показывать товары в подсказках
-    showCategories: true,              // Показывать категории
-    productLimit: 4,                   // Кол-во товаров в подсказках
+    showProducts: true,
+    showCategories: true,   // объявлено, но категорийных подсказок нет - API их не отдаёт
+    productLimit: 8,
   },
-  
-  // Результаты поиска
+
   results: {
-    limit: 20,                         // Товаров на странице
-    showFilters: true,                 // Показывать фильтры
-    showSorting: true,                 // Показывать сортировку
-    highlightMatches: true,            // Подсветка совпадений
+    enabled: true,
+    limit: 200,
+    showFilters: true,      // объявлено в конфиге, но нигде не используется в рендере - мёртвая опция
+    showSorting: true,      // аналогично - мёртвая опция
+    highlightMatches: true, // аналогично - мёртвая опция
   },
-  
-  // Фильтры
-  filters: {
-    price: true,
-    category: true,
-    brand: true,
-    inStock: true,
-  },
-  
-  // Аналитика
+
   analytics: {
     enabled: true,
-    trackClicks: true,                 // Отслеживать клики
-    trackConversions: true,            // Отслеживать покупки
+    trackClicks: true,
+    trackConversions: true,
   },
-  
-  // Внешний вид
-  theme: 'light',                      // light | dark | auto
+
+  theme: 'light',
   zIndex: 9999,
-  
-  // Локализация
   locale: 'ru',
   currency: 'RUB',
-  
-  // Callbacks
-  onSearch: (query, results) => {},
-  onSuggest: (query, suggestions) => {},
-  onClick: (product) => {},
-  onAddToCart: (product) => {},
+
+  // Опционально: если задан onSearch, виджет не показывает встроенную
+  // страницу результатов и просто вызывает ваш колбэк вместо запроса
+  onSearch: (query) => { window.location.href = `/search?q=${query}`; },
+
+  // Выполнить поиск сразу при инициализации
+  initialQuery: 'наушники',
+});
+```
+
+Настройки, приходящие с сервера (`GET /widget/{apiKey}/config`, из `PUT /projects/{id}/widget` в личном кабинете) и реально применяемые поверх дефолтов: `placeholder`, `theme`, `primaryColor`, `borderRadius`, `showImages`, `showPrices`, `showButton`, `maxResults` (→ `results.limit`), `cartCallbackUrl`. Если запрос конфига падает — виджет тихо продолжает с локальными/дефолтными настройками.
+
+### `cartCallbackUrl` — реальная кнопка "В корзину"
+
+Настраивается в личном кабинете (вкладка "Виджет"). Когда задан, каждая карточка товара в новом виде результатов получает степпер количества и кнопку "В корзину"; клик POSTит на этот URL:
+```json
+{ "apiKey": "sk_...", "productId": "abc123", "quantity": 2,
+  "product": { "id": "abc123", "name": "...", "price": 1990, "url": "...", "params": {} } }
+```
+`fetch` идёт с `mode: 'cors', credentials: 'omit'` — сервер клиента должен ответить `Access-Control-Allow-Origin`, иначе виджет не сможет отличить успех от ошибки (запрос при этом всё равно уйдёт). Если `cartCallbackUrl` не задан — кнопка есть, но клик — no-op с предупреждением в консоль (аналитика "добавления в корзину" всё равно фиксируется).
+
+### Чего нет в конфиге, в отличие от прошлой версии документа
+
+`resultsSelector` как отдельно настраиваемый контейнер результатов, `filters.{price,category,brand,inStock}` как переключатели, `templates` (кастомные HTML-шаблоны подсказок/карточек) — рендер зашит в `embed.js` и не параметризуется через конфиг.
+
+---
+
+## API виджета (`window.SearchWidget`)
+
+Реальные публичные методы класса:
+
+```javascript
+// Выполнить поиск программно (то же, что ввод в поле + Enter)
+SearchWidget.search('кроссовки nike');
+
+// Очистить поле и результаты
+SearchWidget.clear();
+
+// Закрыть выпадашку подсказок
+SearchWidget.closeSuggestions();
+
+// Слить новые опции в текущий конфиг
+SearchWidget.setConfig({ results: { limit: 30 } });
+
+// Текущее состояние
+const state = SearchWidget.getState();
+// { query, results, filters, loading }
+
+// Снять обработчики, убрать DOM
+SearchWidget.destroy();
+
+// Ручной трекинг (обычно вызывается виджетом автоматически)
+SearchWidget.trackConversion({ orderId, products, total });
+SearchWidget.trackAddToCart({ productId, quantity }); // только аналитика, не POSTит в cartCallbackUrl
+```
+
+**Публичного `SearchWidget.suggest(prefix)` не существует** — подсказки по вводу обрабатываются внутренним (не экспортированным) методом `fetchSuggestions`. Нет и `SearchWidget.refresh()`, и свойства `SearchWidget.config` для чтения текущего конфига — используйте `getState()`.
+
+Есть также `SearchWidget.addToCart(product, quantity, buttonEl)` — то, что реально дёргает кнопка "В корзину" в новом виде результатов (POST в `cartCallbackUrl` + вызов `trackAddToCart`). Технически вызываем снаружи, но требует ссылку на DOM-кнопку для визуальной обратной связи (успех/ошибка) — не рассчитан как чистый публичный API, только как обработчик встроенной кнопки.
+
+### События
+
+```javascript
+SearchWidget.on('search', ({ query, results }) => {});
+SearchWidget.on('suggest', ({ prefix, suggestions }) => {});
+SearchWidget.on('click', ({ productId, position, query }) => {});
+SearchWidget.on('addToCart', (data) => {});
+SearchWidget.on('init', ({ config }) => {});
+SearchWidget.on('error', ({ error, context }) => {});   // context: 'search' | 'suggest'
+
+SearchWidget.off('search', handler);
+```
+
+Нет событий `filter` и `sort` — фильтрация/сортировка на стороне виджета не реализована (см. выше про мёртвые опции `showFilters`/`showSorting`).
+
+---
+
+## Аналитика
+
+Клик по товару и конверсии трекаются через `POST /api/v1/track/click` (клики) и внутренний вызов `api.trackEvent(...)`, который бьёт в `POST /api/v1/analytics/event` — но этот эндпоинт **игнорирует тело запроса** (см. [api.md](api.md)), так что реально в аналитике считаются только клики (`track/click`), не события `search`/`conversion`/`add_to_cart` от виджета.
+
+```javascript
+SearchWidget.trackConversion({
+  orderId: 'ORDER-123',
+  products: [{ id: 'SKU-12345', quantity: 1, price: 12990 }],
+  total: 22970,
 });
 ```
 
@@ -98,389 +167,19 @@ SearchWidget.init({
 
 ## Кастомизация внешнего вида
 
-### CSS переменные
+CSS-классы в `embed.js` — с префиксом `search-widget-` (`.search-widget-suggestions`, `.search-widget-result-card`, `.search-widget-facet-card`, `.search-widget-category-select` и т.п.), а не `sp-*`/`.sw-*` из более старых версий документации. Каждый добавляемый в DOM тег `<style id="search-widget-styles">` идемпотентен — несколько виджетов на одной странице делят один инжектнутый стиль.
 
-```css
-:root {
-  /* Цвета */
-  --search-primary-color: #007bff;
-  --search-text-color: #333;
-  --search-background: #fff;
-  --search-border-color: #ddd;
-  --search-highlight-color: #fff3cd;
-  
-  /* Размеры */
-  --search-border-radius: 8px;
-  --search-font-size: 14px;
-  --search-input-height: 44px;
-  
-  /* Тени */
-  --search-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-```
-
-### Переопределение стилей
-
-```css
-/* Контейнер подсказок */
-.search-widget-suggestions {
-  max-height: 400px;
-  border-radius: var(--search-border-radius);
-}
-
-/* Элемент подсказки */
-.search-widget-suggestion-item {
-  padding: 12px 16px;
-}
-
-.search-widget-suggestion-item:hover {
-  background: var(--search-highlight-color);
-}
-
-/* Товар в подсказках */
-.search-widget-product {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.search-widget-product-image {
-  width: 50px;
-  height: 50px;
-  object-fit: contain;
-}
-
-.search-widget-product-price {
-  font-weight: bold;
-  color: var(--search-primary-color);
-}
-
-/* Подсветка совпадений */
-.search-widget-highlight {
-  background: var(--search-highlight-color);
-  font-weight: bold;
-}
-```
-
----
-
-## Шаблоны (Templates)
-
-### Кастомный шаблон подсказки
-
-```javascript
-SearchWidget.init({
-  apiKey: 'sk_live_xxx',
-  selector: '#search-input',
-  
-  templates: {
-    // Шаблон подсказки запроса
-    querySuggestion: (suggestion) => `
-      <div class="suggestion-query">
-        <svg class="icon">...</svg>
-        <span>${suggestion.highlight}</span>
-        <span class="count">${suggestion.count}</span>
-      </div>
-    `,
-    
-    // Шаблон категории
-    categorySuggestion: (category) => `
-      <div class="suggestion-category">
-        <span>в категории</span>
-        <a href="${category.url}">${category.name}</a>
-      </div>
-    `,
-    
-    // Шаблон товара в подсказках
-    productSuggestion: (product) => `
-      <a href="${product.url}" class="suggestion-product">
-        <img src="${product.image}" alt="${product.name}">
-        <div class="info">
-          <div class="name">${product.name}</div>
-          <div class="price">${formatPrice(product.price)}</div>
-        </div>
-      </a>
-    `,
-    
-    // Шаблон карточки товара в результатах
-    productCard: (product) => `
-      <div class="product-card" data-id="${product.id}">
-        <a href="${product.url}">
-          <img src="${product.image}" alt="${product.name}">
-          <h3>${product.highlight?.name || product.name}</h3>
-          <div class="price">
-            ${product.old_price ? `<span class="old">${formatPrice(product.old_price)}</span>` : ''}
-            <span class="current">${formatPrice(product.price)}</span>
-          </div>
-          ${product.in_stock ? '<span class="in-stock">В наличии</span>' : '<span class="out-of-stock">Нет в наличии</span>'}
-        </a>
-        <button class="add-to-cart" onclick="addToCart('${product.id}')">
-          В корзину
-        </button>
-      </div>
-    `,
-    
-    // Шаблон пустых результатов
-    noResults: (query) => `
-      <div class="no-results">
-        <h3>По запросу "${query}" ничего не найдено</h3>
-        <p>Попробуйте изменить запрос или посмотрите популярные товары</p>
-      </div>
-    `,
-  }
-});
-```
-
----
-
-## События (Events)
-
-### Подписка на события
-
-```javascript
-SearchWidget.on('search', (event) => {
-  console.log('Поиск:', event.query);
-  console.log('Результатов:', event.results.total);
-});
-
-SearchWidget.on('suggest', (event) => {
-  console.log('Подсказки для:', event.prefix);
-});
-
-SearchWidget.on('click', (event) => {
-  console.log('Клик по товару:', event.product.id);
-  console.log('Позиция в выдаче:', event.position);
-});
-
-SearchWidget.on('addToCart', (event) => {
-  console.log('Добавлено в корзину:', event.product.id);
-});
-
-// Отписка
-const handler = (event) => { ... };
-SearchWidget.on('search', handler);
-SearchWidget.off('search', handler);
-```
-
-### Список событий
-
-| Событие | Описание | Данные |
-|---------|----------|--------|
-| `init` | Виджет инициализирован | `{ config }` |
-| `search` | Выполнен поиск | `{ query, results }` |
-| `suggest` | Получены подсказки | `{ prefix, suggestions }` |
-| `click` | Клик по товару | `{ product, position, query }` |
-| `addToCart` | Добавление в корзину | `{ product }` |
-| `filter` | Применён фильтр | `{ filters }` |
-| `sort` | Изменена сортировка | `{ sort }` |
-| `error` | Ошибка | `{ error, context }` |
-
----
-
-## API виджета
-
-### Методы
-
-```javascript
-// Выполнить поиск программно
-SearchWidget.search('кроссовки nike');
-
-// Получить подсказки
-SearchWidget.suggest('крос').then(suggestions => {
-  console.log(suggestions);
-});
-
-// Очистить поиск
-SearchWidget.clear();
-
-// Закрыть подсказки
-SearchWidget.closeSuggestions();
-
-// Обновить конфигурацию
-SearchWidget.setConfig({
-  results: { limit: 30 }
-});
-
-// Получить текущее состояние
-const state = SearchWidget.getState();
-// { query: 'кроссовки', results: [...], filters: {...} }
-
-// Уничтожить виджет
-SearchWidget.destroy();
-```
-
----
-
-## Отслеживание конверсий
-
-### Отправка события покупки
-
-```javascript
-// При оформлении заказа
-SearchWidget.trackConversion({
-  orderId: 'ORDER-123',
-  products: [
-    { id: 'SKU-12345', quantity: 1, price: 12990 },
-    { id: 'SKU-67890', quantity: 2, price: 4990 },
-  ],
-  total: 22970,
-  searchQuery: 'кроссовки nike', // Если покупка из поиска
-});
-```
-
-### Отслеживание добавления в корзину
-
-```javascript
-// При добавлении товара в корзину
-document.querySelectorAll('.add-to-cart-btn').forEach(btn => {
-  btn.addEventListener('click', (e) => {
-    const productId = e.target.dataset.productId;
-    
-    SearchWidget.trackAddToCart({
-      productId: productId,
-      searchQuery: SearchWidget.getState().query,
-    });
-  });
-});
-```
-
----
-
-## Интеграция с существующим поиском
-
-### Режим "только подсказки"
-
-```javascript
-SearchWidget.init({
-  apiKey: 'sk_live_xxx',
-  selector: '#search-input',
-  
-  // Отключаем встроенную страницу результатов
-  results: {
-    enabled: false,
-  },
-  
-  // При поиске редиректим на вашу страницу
-  onSearch: (query) => {
-    window.location.href = `/search?q=${encodeURIComponent(query)}`;
-  },
-});
-```
-
-### Использование на странице результатов
-
-```javascript
-// На странице /search
-SearchWidget.init({
-  apiKey: 'sk_live_xxx',
-  selector: '#search-input',
-  resultsSelector: '#results-container',
-  
-  // Считываем запрос из URL
-  initialQuery: new URLSearchParams(location.search).get('q'),
-  
-  // Обновляем URL при поиске
-  onSearch: (query) => {
-    history.pushState(null, '', `/search?q=${encodeURIComponent(query)}`);
-  },
-});
-```
-
----
-
-## Примеры интеграции
-
-### React
-
-```jsx
-import { useEffect, useRef } from 'react';
-
-function SearchBox() {
-  const inputRef = useRef(null);
-  
-  useEffect(() => {
-    // Загружаем скрипт виджета
-    const script = document.createElement('script');
-    script.src = 'https://cdn.search-service.com/widget.js';
-    script.onload = () => {
-      window.SearchWidget.init({
-        apiKey: 'sk_live_xxx',
-        selector: inputRef.current,
-      });
-    };
-    document.body.appendChild(script);
-    
-    return () => {
-      window.SearchWidget?.destroy();
-    };
-  }, []);
-  
-  return <input ref={inputRef} type="text" placeholder="Поиск..." />;
-}
-```
-
-### Vue
-
-```vue
-<template>
-  <input ref="searchInput" type="text" placeholder="Поиск..." />
-</template>
-
-<script>
-export default {
-  mounted() {
-    this.loadWidget();
-  },
-  
-  beforeUnmount() {
-    window.SearchWidget?.destroy();
-  },
-  
-  methods: {
-    loadWidget() {
-      const script = document.createElement('script');
-      script.src = 'https://cdn.search-service.com/widget.js';
-      script.onload = () => {
-        window.SearchWidget.init({
-          apiKey: 'sk_live_xxx',
-          selector: this.$refs.searchInput,
-        });
-      };
-      document.body.appendChild(script);
-    }
-  }
-}
-</script>
-```
+`injectStyles: false` в конфиге реально отключает вставку стилей (`initWidget()` вызывает `injectStyles()` только если `config.injectStyles !== false`) — подключайте свой CSS с теми же классами, если нужен полный контроль.
 
 ---
 
 ## Troubleshooting
 
-### Виджет не отображается
+### Виджет не отображается / подсказки не приходят
+1. Проверьте, что `apiKey` в конфиге совпадает с ключом проекта в личном кабинете (вкладка "Виджет" → "Код для сайта").
+2. Убедитесь, что фид загружен и `GET /api/v1/projects/{id}/index-stats` (с API-ключом) показывает `products_in_redis > 0`.
+3. Проверьте консоль — виджет логирует `[SearchWidget] ...` на каждом шаге инициализации и при ошибках сети (`console.error`/`console.warn`).
+4. `minChars` по умолчанию 2 — короче не запросит подсказки.
 
-1. Проверьте, что скрипт загружен
-2. Проверьте правильность селектора
-3. Убедитесь, что элемент существует в DOM до инициализации
-4. Проверьте консоль на наличие ошибок
-
-### Подсказки не появляются
-
-1. Проверьте API ключ
-2. Убедитесь, что фид успешно загружен
-3. Проверьте `minChars` (по умолчанию 2)
-4. Проверьте сетевые запросы в DevTools
-
-### Конфликт стилей
-
-```javascript
-SearchWidget.init({
-  apiKey: 'sk_live_xxx',
-  selector: '#search-input',
-  
-  // Отключаем встроенные стили
-  injectStyles: false,
-});
-```
-
-Затем подключите свои стили или модифицированные стили виджета.
+### Стили конфликтуют с сайтом
+Отключить встроенные стили нельзя (см. выше) — переопределяйте `.search-widget-*` классы напрямую с более высокой специфичностью или `!important`.
