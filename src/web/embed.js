@@ -2469,7 +2469,7 @@
           background: var(--search-primary-color);
           color: #fff;
           border: none;
-          border-radius: var(--search-radius-sm);
+          border-radius: 10px;
           cursor: pointer;
           font-size: 12px;
           font-weight: 600;

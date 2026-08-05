@@ -392,6 +392,26 @@
                     </div>
                 </div>
 
+                <!-- Cart Callback Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">🛒 Корзина</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-group">
+                            <label class="form-label">URL для добавления в корзину (callback)</label>
+                            <input type="text" class="form-input" id="projectCartCallbackUrl" placeholder="https://your-shop.com/api/cart/add" oninput="markCartSettingsChanged()">
+                            <p class="form-hint">Виджет отправит POST-запрос вида {productId, quantity, product} на этот адрес при клике "В корзину". Ваш сервер должен ответить с заголовком Access-Control-Allow-Origin, иначе виджет не сможет показать успех/ошибку добавления.</p>
+                        </div>
+                        <div class="form-actions">
+                            <button class="btn btn-primary" id="saveCartSettingsBtn" onclick="saveCartSettings()" disabled>
+                                Сохранить настройки
+                            </button>
+                            <span class="form-hint" id="cartSettingsStatus"></span>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Synonyms Card -->
                 <div class="card">
                     <div class="card-header">
@@ -784,12 +804,6 @@
                         <div class="form-group">
                             <label class="form-label">Placeholder</label>
                             <input type="text" class="form-input" id="widgetPlaceholder" value="Поиск товаров..." oninput="updateWidgetPreview()">
-                        </div>
-
-                        <div class="form-group">
-                            <label class="form-label">URL для добавления в корзину (callback)</label>
-                            <input type="text" class="form-input" id="widgetCartCallbackUrl" placeholder="https://your-shop.com/api/cart/add">
-                            <p class="form-hint">Виджет отправит POST-запрос вида {productId, quantity, product} на этот адрес при клике "В корзину". Ваш сервер должен ответить с заголовком Access-Control-Allow-Origin, иначе виджет не сможет показать успех/ошибку добавления.</p>
                         </div>
 
                         <div class="form-group">

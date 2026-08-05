@@ -426,10 +426,13 @@ async function openProjectDetail(projectId) {
     
     // Load feed status
     await loadProjectFeedStatus();
-    
+
     // Load search settings
     await loadSearchSettings();
-    
+
+    // Load cart callback settings
+    await loadCartSettings();
+
     // Load synonyms
     await loadSynonyms();
     
@@ -685,12 +688,87 @@ async function saveSearchSettings() {
         searchSettingsChanged = false;
         statusEl.textContent = '✓ Сохранено';
         showToast('Настройки поиска сохранены', 'success');
-        
+
         // Update local project data
         currentProject.search_settings = settings;
-        
+
     } catch (err) {
         console.error('Error saving search settings:', err);
+        saveBtn.disabled = false;
+        statusEl.textContent = 'Ошибка сохранения';
+        showToast('Ошибка сохранения настроек', 'error');
+    }
+}
+
+// ==================== CART CALLBACK ====================
+let cartSettingsChanged = false;
+
+async function loadCartSettings() {
+    if (!currentProject) return;
+
+    const input = document.getElementById('projectCartCallbackUrl');
+    const saveBtn = document.getElementById('saveCartSettingsBtn');
+    const statusEl = document.getElementById('cartSettingsStatus');
+
+    if (!input) return;
+
+    cartSettingsChanged = false;
+    saveBtn.disabled = true;
+    statusEl.textContent = '';
+
+    try {
+        let settings = await fetchAPI(`/api/v1/projects/${currentProject.id}/widget`);
+        if (typeof settings === 'string') {
+            try { settings = JSON.parse(settings); } catch (e) { settings = {}; }
+        }
+        input.value = settings.cartCallbackUrl || '';
+    } catch (err) {
+        console.log('No widget settings yet:', err);
+        input.value = '';
+    }
+}
+
+function markCartSettingsChanged() {
+    cartSettingsChanged = true;
+    document.getElementById('saveCartSettingsBtn').disabled = false;
+    document.getElementById('cartSettingsStatus').textContent = 'Есть несохранённые изменения';
+}
+
+async function saveCartSettings() {
+    if (!currentProject) return;
+
+    const input = document.getElementById('projectCartCallbackUrl');
+    const saveBtn = document.getElementById('saveCartSettingsBtn');
+    const statusEl = document.getElementById('cartSettingsStatus');
+
+    saveBtn.disabled = true;
+    statusEl.textContent = 'Сохранение...';
+
+    try {
+        // PUT /widget делает полную замену - подгружаем текущие настройки (цвета,
+        // шрифт и т.д. из вкладки "Настройка виджета"), чтобы их не затереть
+        let settings = await fetchAPI(`/api/v1/projects/${currentProject.id}/widget`);
+        if (typeof settings === 'string') {
+            try { settings = JSON.parse(settings); } catch (e) { settings = {}; }
+        }
+        settings.cartCallbackUrl = input.value.trim();
+
+        await fetchAPI(`/api/v1/projects/${currentProject.id}/widget`, {
+            method: 'PUT',
+            body: JSON.stringify(settings)
+        });
+
+        cartSettingsChanged = false;
+        statusEl.textContent = '✓ Сохранено';
+        showToast('Настройки корзины сохранены', 'success');
+
+        const project = projects.find(p => p.id === currentProject.id);
+        if (project) {
+            project.widget_settings = settings;
+        }
+
+    } catch (err) {
+        console.error('Error saving cart settings:', err);
         saveBtn.disabled = false;
         statusEl.textContent = 'Ошибка сохранения';
         showToast('Ошибка сохранения настроек', 'error');
@@ -1634,7 +1712,6 @@ function loadWidgetSettings() {
     document.getElementById('widgetBorderRadius').value = settings.borderRadius || 10;
     document.getElementById('widgetFontSize').value = settings.fontSize || 15;
     document.getElementById('widgetPlaceholder').value = settings.placeholder || 'Поиск товаров...';
-    document.getElementById('widgetCartCallbackUrl').value = settings.cartCallbackUrl || '';
     document.getElementById('widgetShowButton').checked = settings.showButton !== false;
     document.getElementById('widgetShowImages').checked = settings.showImages !== false;
     
@@ -1693,7 +1770,16 @@ function syncColorInput(inputId) {
 async function saveWidgetSettings() {
     const projectId = document.getElementById('widgetProjectSelect').value;
     if (!projectId) return;
-    
+
+    // cartCallbackUrl настраивается на странице проекта (saveCartSettings), не здесь.
+    // PUT /widget делает полную замену, поэтому сохраняем текущее значение как есть,
+    // иначе сохранение внешнего вида отсюда стёрло бы уже настроенный колбэк корзины
+    const project = projects.find(p => p.id === projectId);
+    let existingSettings = project?.widget_settings || {};
+    if (typeof existingSettings === 'string') {
+        try { existingSettings = JSON.parse(existingSettings); } catch (e) { existingSettings = {}; }
+    }
+
     const settings = {
         primaryColor: document.getElementById('widgetPrimaryColor').value,
         textColor: document.getElementById('widgetTextColor').value,
@@ -1702,11 +1788,11 @@ async function saveWidgetSettings() {
         borderRadius: parseInt(document.getElementById('widgetBorderRadius').value),
         fontSize: parseInt(document.getElementById('widgetFontSize').value),
         placeholder: document.getElementById('widgetPlaceholder').value,
-        cartCallbackUrl: document.getElementById('widgetCartCallbackUrl').value.trim(),
+        cartCallbackUrl: existingSettings.cartCallbackUrl || '',
         showButton: document.getElementById('widgetShowButton').checked,
         showImages: document.getElementById('widgetShowImages').checked
     };
-    
+
     try {
         await fetchAPI(`/api/v1/projects/${projectId}/widget`, {
             method: 'PUT',
@@ -1714,13 +1800,12 @@ async function saveWidgetSettings() {
         });
         
         showToast('Настройки сохранены', 'success');
-        
+
         // Update local cache
-        const project = projects.find(p => p.id === projectId);
         if (project) {
             project.widget_settings = settings;
         }
-        
+
     } catch (err) {
         showToast('Ошибка сохранения настроек', 'error');
     }
