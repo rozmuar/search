@@ -257,14 +257,14 @@
         left: 0;
         right: 0;
         background: var(--search-background, #fff);
-        border: 1px solid var(--search-border-color, #ddd);
+        border: 1px solid var(--search-border-color, #e5e7eb);
         border-radius: var(--search-border-radius, 8px);
-        box-shadow: var(--search-shadow, 0 4px 12px rgba(0,0,0,0.15));
+        box-shadow: var(--search-shadow-md, 0 8px 24px -4px rgba(16,24,40,0.12));
         z-index: ${this.widget.config.zIndex};
-        max-height: 400px;
+        max-height: 420px;
         overflow-y: auto;
         display: none;
-        margin-top: 4px;
+        margin-top: 8px;
       `;
       this.widget.inputWrapper.appendChild(this.element);
     }
@@ -477,6 +477,12 @@
           if (serverConfig.placeholder) this.config.placeholder = serverConfig.placeholder;
           if (serverConfig.theme) this.config.theme = serverConfig.theme;
           if (serverConfig.primaryColor) this.config.primaryColor = serverConfig.primaryColor;
+          // textColor/bgColor/borderColor/fontSize сохранялись дашбордом, но раньше
+          // виджет их вообще не читал - настройки цвета из ЛК не доходили до сайта
+          if (serverConfig.textColor) this.config.textColor = serverConfig.textColor;
+          if (serverConfig.bgColor) this.config.bgColor = serverConfig.bgColor;
+          if (serverConfig.borderColor) this.config.borderColor = serverConfig.borderColor;
+          if (serverConfig.fontSize) this.config.fontSize = serverConfig.fontSize;
           if (serverConfig.borderRadius !== undefined) this.config.borderRadius = serverConfig.borderRadius;
           if (serverConfig.showImages !== undefined) this.config.showImages = serverConfig.showImages;
           if (serverConfig.showPrices !== undefined) this.config.showPrices = serverConfig.showPrices;
@@ -981,6 +987,8 @@
       if (!sidebar) return;
       const state = this.popupState;
 
+      // Порядок в сайдбаре: сортировка -> Цена (всегда первая и раскрыта) ->
+      // Категория и остальные свойства (params.*), свёрнутые по умолчанию
       let html = `
         <div class="search-widget-facet-group">
           <label class="search-widget-facet-title">Сортировать по</label>
@@ -991,21 +999,6 @@
           </select>
         </div>
       `;
-
-      if (facets.categories && facets.categories.length) {
-        const selected = state.filters.category || [];
-        html += `
-          <div class="search-widget-facet-group">
-            <div class="search-widget-facet-title">Категория</div>
-            ${facets.categories.map(c => `
-              <label class="search-widget-facet-checkbox-row">
-                <input type="checkbox" data-facet="category" value="${escapeHtml(c.value)}" ${selected.includes(c.value) ? 'checked' : ''}>
-                <span>${escapeHtml(c.value)} <em>${c.count}</em></span>
-              </label>
-            `).join('')}
-          </div>
-        `;
-      }
 
       if (facets.price) {
         const min = facets.price.min ?? 0;
@@ -1025,20 +1018,35 @@
         `;
       }
 
+      if (facets.categories && facets.categories.length) {
+        const selected = state.filters.category || [];
+        html += `
+          <details class="search-widget-facet-group">
+            <summary class="search-widget-facet-title">Категория</summary>
+            ${facets.categories.map(c => `
+              <label class="search-widget-facet-checkbox-row">
+                <input type="checkbox" data-facet="category" value="${escapeHtml(c.value)}" ${selected.includes(c.value) ? 'checked' : ''}>
+                <span>${escapeHtml(c.value)} <em>${c.count}</em></span>
+              </label>
+            `).join('')}
+          </details>
+        `;
+      }
+
       if (facets.params) {
         for (const [name, values] of Object.entries(facets.params)) {
           if (!values || !values.length) continue;
           const selected = (state.filters.params || {})[name] || [];
           html += `
-            <div class="search-widget-facet-group">
-              <div class="search-widget-facet-title">${escapeHtml(name)}</div>
+            <details class="search-widget-facet-group">
+              <summary class="search-widget-facet-title">${escapeHtml(name)}</summary>
               ${values.map(v => `
                 <label class="search-widget-facet-checkbox-row">
                   <input type="checkbox" data-facet="params.${escapeHtml(name)}" value="${escapeHtml(v.value)}" ${selected.includes(v.value) ? 'checked' : ''}>
                   <span>${escapeHtml(v.value)} <em>${v.count}</em></span>
                 </label>
               `).join('')}
-            </div>
+            </details>
           `;
         }
       }
@@ -1503,79 +1511,119 @@
     injectStyles() {
       if (document.getElementById('search-widget-styles')) return;
 
-      // Получаем настройки из конфига
+      // Получаем настройки из конфига (заданы в ЛК на вкладке "Виджет")
       const primaryColor = this.config.primaryColor || '#007bff';
       const borderRadius = this.config.borderRadius !== undefined ? this.config.borderRadius + 'px' : '8px';
+      const textColor = this.config.textColor || '#111827';
+      const bgColor = this.config.bgColor || '#ffffff';
+      const borderColor = this.config.borderColor || '#e5e7eb';
+      const fontSize = this.config.fontSize ? this.config.fontSize + 'px' : '14px';
 
       const styles = document.createElement('style');
       styles.id = 'search-widget-styles';
       styles.textContent = `
         :root {
           --search-primary-color: ${primaryColor};
-          --search-text-color: #333;
-          --search-background: #fff;
-          --search-border-color: #ddd;
-          --search-highlight-color: #fff3cd;
+          --search-text-color: ${textColor};
+          /* Вторичные/третичные оттенки текста, поверхности и усиленный бордер
+             выводятся из textColor/bgColor через color-mix - палитра остаётся
+             согласованной для любых цветов, заданных в ЛК (в т.ч. тёмная тема),
+             а не только для дефолтных светлых */
+          --search-text-secondary: color-mix(in srgb, ${textColor} 62%, ${bgColor});
+          --search-text-tertiary: color-mix(in srgb, ${textColor} 42%, ${bgColor});
+          --search-background: ${bgColor};
+          --search-surface: color-mix(in srgb, ${textColor} 4%, ${bgColor});
+          --search-surface-hover: color-mix(in srgb, ${textColor} 7%, ${bgColor});
+          --search-border-color: ${borderColor};
+          --search-border-color-strong: color-mix(in srgb, ${textColor} 22%, ${bgColor});
+          --search-highlight-color: #fef3c7;
+          --search-success-color: #059669;
+          --search-danger-color: #dc2626;
           --search-border-radius: ${borderRadius};
-          --search-font-size: 14px;
-          --search-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+          --search-radius-sm: calc(var(--search-border-radius) * 0.65);
+          --search-font-size: ${fontSize};
+          --search-shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.06);
+          --search-shadow-sm: 0 2px 8px rgba(16, 24, 40, 0.08);
+          --search-shadow-md: 0 8px 24px -4px rgba(16, 24, 40, 0.12), 0 2px 6px -2px rgba(16, 24, 40, 0.06);
+          --search-shadow-lg: 0 24px 48px -12px rgba(16, 24, 40, 0.28), 0 4px 12px rgba(16, 24, 40, 0.08);
+          --search-shadow: var(--search-shadow-sm);
+        }
+
+        .search-widget-wrapper * {
+          box-sizing: border-box;
         }
 
         .search-widget-wrapper {
           position: relative;
           display: flex;
           align-items: stretch;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
           font-size: var(--search-font-size);
+          -webkit-font-smoothing: antialiased;
+          color: var(--search-text-color);
         }
 
         .search-widget-input {
           flex: 1;
           min-width: 0;
-          padding: 12px 16px;
-          border: 1px solid var(--search-border-color);
+          padding: 13px 16px;
+          border: 1.5px solid var(--search-border-color);
           border-radius: var(--search-border-radius);
           border-top-left-radius: 0;
           border-bottom-left-radius: 0;
           font-size: var(--search-font-size);
+          font-family: inherit;
+          color: var(--search-text-color);
+          background: var(--search-background);
           outline: none;
-          transition: border-color 0.2s;
+          transition: border-color 0.15s ease, box-shadow 0.15s ease;
           box-sizing: border-box;
+        }
+
+        .search-widget-input::placeholder {
+          color: var(--search-text-tertiary);
         }
 
         .search-widget-input:focus {
           border-color: var(--search-primary-color);
+          box-shadow: 0 0 0 3px color-mix(in srgb, var(--search-primary-color) 15%, transparent);
         }
 
         .search-widget-wrapper.has-button .search-widget-input {
-          padding-right: 50px;
+          padding-right: 54px;
         }
 
         .search-widget-button {
           position: absolute;
-          right: 4px;
+          right: 6px;
           top: 50%;
           transform: translateY(-50%);
-          width: 40px;
-          height: 40px;
+          width: 38px;
+          height: 38px;
           background: var(--search-primary-color);
           border: none;
-          border-radius: calc(var(--search-border-radius) - 2px);
+          border-radius: var(--search-radius-sm);
           cursor: pointer;
           display: flex;
           align-items: center;
           justify-content: center;
           color: white;
-          transition: background-color 0.2s;
+          box-shadow: var(--search-shadow-xs);
+          transition: filter 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
         }
 
         .search-widget-button:hover {
-          filter: brightness(1.1);
+          filter: brightness(1.08);
+          box-shadow: var(--search-shadow-sm);
+        }
+
+        .search-widget-button:active {
+          transform: translateY(-50%) scale(0.94);
         }
 
         .search-widget-button svg {
-          width: 20px;
-          height: 20px;
+          width: 18px;
+          height: 18px;
         }
 
         .search-widget-suggestions {
@@ -1583,7 +1631,7 @@
         }
 
         .search-widget-suggestions-section {
-          padding: 8px 0;
+          padding: 6px 0;
           border-bottom: 1px solid var(--search-border-color);
         }
 
@@ -1592,9 +1640,11 @@
         }
 
         .search-widget-section-title {
-          padding: 4px 16px;
-          font-size: 12px;
-          color: #666;
+          padding: 8px 16px 4px;
+          font-size: 11px;
+          font-weight: 600;
+          letter-spacing: 0.04em;
+          color: var(--search-text-tertiary);
           text-transform: uppercase;
         }
 
@@ -1602,33 +1652,38 @@
           display: flex;
           align-items: center;
           padding: 10px 16px;
+          margin: 1px 6px;
+          border-radius: var(--search-radius-sm);
           cursor: pointer;
-          transition: background 0.1s;
+          transition: background-color 0.1s ease;
           text-decoration: none;
           color: var(--search-text-color);
         }
 
         .search-widget-suggestion-item:hover,
         .search-widget-suggestion-item.search-widget-selected {
-          background: #f5f5f5;
+          background: var(--search-surface-hover);
         }
 
         .search-widget-icon {
           margin-right: 12px;
-          color: #999;
+          color: var(--search-text-tertiary);
           flex-shrink: 0;
         }
 
         .search-widget-count {
           margin-left: auto;
-          color: #999;
+          color: var(--search-text-tertiary);
           font-size: 12px;
+          padding-left: 8px;
         }
 
         .search-widget-suggestion-item em {
           font-style: normal;
-          font-weight: bold;
+          font-weight: 700;
           background: var(--search-highlight-color);
+          border-radius: 3px;
+          padding: 0 2px;
         }
 
         .search-widget-product {
@@ -1640,7 +1695,9 @@
           height: 50px;
           object-fit: contain;
           margin-right: 12px;
-          border-radius: 4px;
+          border-radius: var(--search-radius-sm);
+          border: 1px solid var(--search-border-color);
+          background: var(--search-surface);
           flex-shrink: 0;
         }
 
@@ -1662,12 +1719,12 @@
 
         .search-widget-old-price {
           text-decoration: line-through;
-          color: #999;
+          color: var(--search-text-tertiary);
           margin-right: 8px;
         }
 
         .search-widget-current-price {
-          font-weight: bold;
+          font-weight: 700;
           color: var(--search-primary-color);
         }
 
@@ -1677,7 +1734,7 @@
 
         .search-widget-results-header {
           margin-bottom: 16px;
-          color: #666;
+          color: var(--search-text-secondary);
         }
 
         .search-widget-results-grid {
@@ -1690,11 +1747,13 @@
           border: 1px solid var(--search-border-color);
           border-radius: var(--search-border-radius);
           overflow: hidden;
-          transition: box-shadow 0.2s;
+          transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
         }
 
         .search-widget-result-card:hover {
-          box-shadow: var(--search-shadow);
+          box-shadow: var(--search-shadow-md);
+          border-color: transparent;
+          transform: translateY(-2px);
         }
 
         .search-widget-result-card a {
@@ -1707,11 +1766,11 @@
           width: 100%;
           height: 200px;
           object-fit: contain;
-          background: #f9f9f9;
+          background: var(--search-surface);
         }
 
         .search-widget-result-info {
-          padding: 12px;
+          padding: 14px;
         }
 
         .search-widget-result-info h3 {
@@ -1724,16 +1783,17 @@
         .search-widget-result-info h3 em {
           font-style: normal;
           background: var(--search-highlight-color);
+          border-radius: 3px;
         }
 
         .search-widget-result-price .old {
           text-decoration: line-through;
-          color: #999;
+          color: var(--search-text-tertiary);
           margin-right: 8px;
         }
 
         .search-widget-result-price .current {
-          font-weight: bold;
+          font-weight: 700;
           color: var(--search-primary-color);
         }
 
@@ -1741,24 +1801,28 @@
           display: inline-block;
           margin-top: 8px;
           font-size: 12px;
-          color: #28a745;
+          font-weight: 500;
+          color: var(--search-success-color);
         }
 
         .search-widget-out-of-stock {
           display: inline-block;
           margin-top: 8px;
           font-size: 12px;
-          color: #dc3545;
+          font-weight: 500;
+          color: var(--search-danger-color);
         }
 
         .search-widget-no-results {
           text-align: center;
-          padding: 40px 20px;
-          color: #666;
+          padding: 48px 20px;
+          color: var(--search-text-secondary);
         }
 
         .search-widget-no-results h3 {
           margin: 0 0 8px;
+          font-size: 15px;
+          font-weight: 600;
           color: var(--search-text-color);
         }
 
@@ -1769,9 +1833,11 @@
 
         .search-widget-results-dropdown .search-widget-results-header {
           padding: 12px 16px;
-          font-size: 13px;
-          color: #666;
-          background: #f9f9f9;
+          font-size: 12px;
+          font-weight: 600;
+          letter-spacing: 0.02em;
+          color: var(--search-text-tertiary);
+          background: var(--search-surface);
           border-bottom: 1px solid var(--search-border-color);
         }
 
@@ -1785,12 +1851,12 @@
           padding: 12px 16px;
           text-decoration: none;
           color: var(--search-text-color);
-          border-bottom: 1px solid #f0f0f0;
-          transition: background 0.1s;
+          border-bottom: 1px solid var(--search-border-color);
+          transition: background-color 0.1s ease;
         }
 
         .search-widget-product-card:hover {
-          background: #f5f5f5;
+          background: var(--search-surface-hover);
         }
 
         .search-widget-product-card:last-child {
@@ -1798,17 +1864,20 @@
         }
 
         .search-widget-product-card.out-of-stock {
-          opacity: 0.6;
+          opacity: 0.55;
         }
 
         .search-widget-product-card .search-widget-product-image {
-          width: 60px;
-          height: 60px;
+          width: 56px;
+          height: 56px;
           margin-right: 12px;
           flex-shrink: 0;
           display: flex;
           align-items: center;
           justify-content: center;
+          border-radius: var(--search-radius-sm);
+          border: 1px solid var(--search-border-color);
+          background: var(--search-surface);
         }
 
         .search-widget-product-card .search-widget-product-image img {
@@ -1830,6 +1899,7 @@
           -webkit-line-clamp: 2;
           -webkit-box-orient: vertical;
           overflow: hidden;
+          line-height: 1.35;
         }
 
         .search-widget-product-card .search-widget-product-price {
@@ -1838,26 +1908,27 @@
 
         .search-widget-product-card .old-price {
           text-decoration: line-through;
-          color: #999;
+          color: var(--search-text-tertiary);
           margin-right: 8px;
           font-size: 12px;
         }
 
         .search-widget-product-card .current-price {
-          font-weight: bold;
+          font-weight: 700;
           color: var(--search-primary-color);
         }
 
         .search-widget-product-card .search-widget-out-of-stock {
           font-size: 11px;
-          color: #dc3545;
+          font-weight: 500;
+          color: var(--search-danger-color);
           margin-top: 2px;
         }
 
         /* Show all button */
         .search-widget-show-all {
-          padding: 12px 16px;
-          background: #f9f9f9;
+          padding: 14px 16px;
+          background: var(--search-surface);
           border-top: 1px solid var(--search-border-color);
         }
 
@@ -1869,13 +1940,19 @@
           border: none;
           border-radius: var(--search-border-radius);
           font-size: 14px;
-          font-weight: 500;
+          font-weight: 600;
           cursor: pointer;
-          transition: background 0.2s;
+          box-shadow: var(--search-shadow-xs);
+          transition: filter 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
         }
 
         .search-widget-show-all-btn:hover {
-          background: #0056b3;
+          filter: brightness(1.08);
+          box-shadow: var(--search-shadow-sm);
+        }
+
+        .search-widget-show-all-btn:active {
+          transform: scale(0.98);
         }
 
         /* Popup overlay */
@@ -1885,7 +1962,9 @@
           left: 0;
           right: 0;
           bottom: 0;
-          background: rgba(0, 0, 0, 0.6);
+          background: rgba(17, 24, 39, 0.55);
+          backdrop-filter: blur(3px);
+          -webkit-backdrop-filter: blur(3px);
           z-index: 10000;
           display: flex;
           align-items: center;
@@ -1894,78 +1973,103 @@
         }
 
         .search-widget-popup {
-          background: #fff;
-          border-radius: 12px;
+          background: var(--search-background);
+          border-radius: 16px;
           width: 100%;
           max-width: 900px;
           max-height: 90vh;
           display: flex;
           flex-direction: column;
-          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+          box-shadow: var(--search-shadow-lg);
         }
 
         .search-widget-popup-faceted {
-          max-width: 1100px;
+          max-width: 1120px;
         }
 
         .search-widget-popup-header {
           display: flex;
           align-items: center;
-          padding: 16px 20px;
+          padding: 18px 24px;
           border-bottom: 1px solid var(--search-border-color);
           flex-shrink: 0;
         }
 
         .search-widget-popup-header h3 {
           margin: 0;
-          font-size: 18px;
+          font-size: 17px;
+          font-weight: 600;
+          letter-spacing: -0.01em;
           flex: 1;
         }
 
         .search-widget-popup-count {
-          color: #666;
-          font-size: 14px;
-          margin-right: 16px;
+          color: var(--search-text-secondary);
+          font-size: 13px;
+          margin-right: 20px;
         }
 
         .search-widget-popup-close {
           background: none;
           border: none;
-          font-size: 28px;
+          width: 32px;
+          height: 32px;
+          border-radius: var(--search-radius-sm);
+          font-size: 22px;
           cursor: pointer;
-          color: #999;
+          color: var(--search-text-tertiary);
           padding: 0;
           line-height: 1;
-          transition: color 0.2s;
+          transition: color 0.15s ease, background-color 0.15s ease;
         }
 
         .search-widget-popup-close:hover {
-          color: #333;
+          background: var(--search-surface-hover);
+          color: var(--search-text-color);
         }
 
         .search-widget-popup-body {
           flex: 1;
           overflow: hidden;
           display: flex;
-          gap: 20px;
-          padding: 20px;
+          gap: 28px;
+          padding: 24px;
         }
 
         .search-widget-facets-sidebar {
-          width: 220px;
+          width: 224px;
           flex-shrink: 0;
           overflow-y: auto;
+          padding-right: 4px;
         }
 
         .search-widget-results-main {
           flex: 1;
           overflow-y: auto;
           min-width: 0;
+          padding-right: 4px;
+        }
+
+        /* Тонкий скроллбар вместо системного - в модалке системный выглядит грубо */
+        .search-widget-facets-sidebar::-webkit-scrollbar,
+        .search-widget-results-main::-webkit-scrollbar {
+          width: 6px;
+        }
+
+        .search-widget-facets-sidebar::-webkit-scrollbar-thumb,
+        .search-widget-results-main::-webkit-scrollbar-thumb {
+          background: var(--search-border-color-strong);
+          border-radius: 3px;
+        }
+
+        .search-widget-facets-sidebar::-webkit-scrollbar-track,
+        .search-widget-results-main::-webkit-scrollbar-track {
+          background: transparent;
         }
 
         .search-widget-facet-group {
-          margin-bottom: 20px;
-          padding-bottom: 16px;
+          margin-bottom: 22px;
+          padding-bottom: 18px;
           border-bottom: 1px solid var(--search-border-color);
         }
 
@@ -1976,36 +2080,122 @@
         .search-widget-facet-title {
           display: block;
           font-weight: 600;
-          font-size: 13px;
-          margin-bottom: 8px;
+          font-size: 12.5px;
+          letter-spacing: 0.01em;
+          margin-bottom: 10px;
           color: var(--search-text-color);
+          cursor: default;
         }
 
-        .search-widget-sort-select,
-        .search-widget-category-select {
+        /* Категория и params.* сворачиваются по умолчанию (details/summary),
+           Цена и сортировка - обычные div'ы, всегда развёрнуты */
+        details.search-widget-facet-group {
+          margin-bottom: 12px;
+          padding-bottom: 12px;
+        }
+
+        details.search-widget-facet-group summary.search-widget-facet-title {
+          cursor: pointer;
+          margin-bottom: 0;
+          list-style: none;
+        }
+
+        details.search-widget-facet-group summary.search-widget-facet-title::-webkit-details-marker {
+          display: none;
+        }
+
+        details.search-widget-facet-group summary.search-widget-facet-title::before {
+          content: '▸';
+          display: inline-block;
+          width: 14px;
+          color: var(--search-text-tertiary);
+        }
+
+        details.search-widget-facet-group[open] summary.search-widget-facet-title::before {
+          content: '▾';
+        }
+
+        details.search-widget-facet-group[open] summary.search-widget-facet-title {
+          margin-bottom: 8px;
+        }
+
+        .search-widget-sort-select {
           width: 100%;
-          padding: 8px 10px;
-          border: 1px solid var(--search-border-color);
-          border-radius: 6px;
+          padding: 9px 10px;
+          border: 1.5px solid var(--search-border-color);
+          border-radius: var(--search-radius-sm);
           font-size: 13px;
-          background: #fff;
+          font-family: inherit;
+          color: var(--search-text-color);
+          background: var(--search-background);
+          cursor: pointer;
+          transition: border-color 0.15s ease;
         }
 
+        .search-widget-sort-select:focus {
+          border-color: var(--search-primary-color);
+          outline: none;
+        }
+
+        /* Дропдаун категорий в самой строке поиска - высота/шрифт/скругление
+           должны совпадать с полем ввода, чтобы не выглядеть как отдельный
+           рассинхронизированный элемент */
         .search-widget-category-select {
-          width: auto;
           flex-shrink: 0;
+          width: auto;
+          max-width: 130px;
+          padding: 13px 26px 13px 15px;
+          border: 1.5px solid var(--search-border-color);
           border-right: none;
+          border-radius: var(--search-border-radius);
           border-top-right-radius: 0;
           border-bottom-right-radius: 0;
+          font-size: var(--search-font-size);
+          font-family: inherit;
+          color: var(--search-text-secondary);
+          background: var(--search-surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239ca3af' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 10px center;
+          appearance: none;
+          -webkit-appearance: none;
+          box-sizing: border-box;
+          cursor: pointer;
+          outline: none;
+          transition: border-color 0.15s ease, background-color 0.15s ease;
+          text-overflow: ellipsis;
+        }
+
+        .search-widget-category-select:hover {
+          background-color: var(--search-surface-hover);
+        }
+
+        .search-widget-category-select:focus {
+          border-color: var(--search-primary-color);
+          color: var(--search-text-color);
+          position: relative;
+          z-index: 1;
+        }
+
+        /* Аккуратные нативные чекбоксы вместо дефолтных браузерных */
+        .search-widget-facet-checkbox-row input[type="checkbox"] {
+          accent-color: var(--search-primary-color);
+          width: 15px;
+          height: 15px;
+          cursor: pointer;
         }
 
         .search-widget-facet-checkbox-row {
           display: flex;
           align-items: center;
-          gap: 8px;
-          padding: 4px 0;
+          gap: 9px;
+          padding: 5px 4px;
+          margin: 0 -4px;
+          border-radius: var(--search-radius-sm);
           font-size: 13px;
           cursor: pointer;
+          transition: background-color 0.1s ease;
+        }
+
+        .search-widget-facet-checkbox-row:hover {
+          background: var(--search-surface-hover);
         }
 
         .search-widget-facet-checkbox-row input {
@@ -2017,116 +2207,157 @@
           display: flex;
           justify-content: space-between;
           gap: 8px;
+          color: var(--search-text-color);
         }
 
         .search-widget-facet-checkbox-row em {
           font-style: normal;
-          color: #999;
+          color: var(--search-text-tertiary);
+          font-size: 12px;
         }
 
         .search-widget-price-range {
           display: flex;
           align-items: center;
-          gap: 6px;
-          margin-bottom: 8px;
+          gap: 8px;
+          margin-bottom: 10px;
         }
 
         .search-widget-price-range input {
           width: 0;
           flex: 1;
-          padding: 6px 8px;
-          border: 1px solid var(--search-border-color);
-          border-radius: 6px;
+          padding: 7px 9px;
+          border: 1.5px solid var(--search-border-color);
+          border-radius: var(--search-radius-sm);
           font-size: 13px;
+          font-family: inherit;
+          color: var(--search-text-color);
+          transition: border-color 0.15s ease;
+        }
+
+        .search-widget-price-range input:focus {
+          outline: none;
+          border-color: var(--search-primary-color);
+        }
+
+        .search-widget-price-range span {
+          color: var(--search-text-tertiary);
+          flex-shrink: 0;
         }
 
         .search-widget-price-apply {
           width: 100%;
-          padding: 6px;
-          background: var(--search-primary-color);
-          color: #fff;
-          border: none;
-          border-radius: 6px;
+          padding: 8px;
+          background: var(--search-surface);
+          color: var(--search-text-color);
+          border: 1.5px solid var(--search-border-color);
+          border-radius: var(--search-radius-sm);
           cursor: pointer;
           font-size: 13px;
+          font-weight: 500;
+          transition: background-color 0.15s ease, border-color 0.15s ease;
+        }
+
+        .search-widget-price-apply:hover {
+          background: var(--search-surface-hover);
+          border-color: var(--search-border-color-strong);
         }
 
         .search-widget-category-section {
-          margin-bottom: 28px;
+          margin-bottom: 32px;
         }
 
         .search-widget-category-section-header {
           display: flex;
           align-items: baseline;
           gap: 8px;
-          margin-bottom: 12px;
-          padding-bottom: 6px;
-          border-bottom: 2px solid var(--search-text-color);
+          margin-bottom: 14px;
+          padding-bottom: 10px;
+          border-bottom: 1px solid var(--search-border-color);
         }
 
         .search-widget-category-section-header h4 {
           margin: 0;
           font-size: 15px;
+          font-weight: 600;
+          letter-spacing: -0.01em;
         }
 
         .search-widget-category-count {
-          color: #999;
+          color: var(--search-text-tertiary);
           font-size: 13px;
         }
 
         .search-widget-category-grid {
           display: grid;
           grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-          gap: 14px;
+          gap: 16px;
         }
 
         .search-widget-show-category-btn {
-          margin-top: 10px;
+          margin-top: 12px;
           background: none;
           border: none;
           color: var(--search-primary-color);
           font-size: 13px;
+          font-weight: 500;
           cursor: pointer;
           padding: 0;
+        }
+
+        .search-widget-show-category-btn:hover {
+          text-decoration: underline;
         }
 
         .search-widget-category-grid-header {
           display: flex;
           align-items: center;
-          gap: 12px;
-          margin-bottom: 16px;
+          gap: 14px;
+          margin-bottom: 18px;
         }
 
         .search-widget-category-grid-header h4 {
           margin: 0;
           font-size: 16px;
+          font-weight: 600;
+          letter-spacing: -0.01em;
         }
 
         .search-widget-back-btn {
-          background: none;
-          border: 1px solid var(--search-border-color);
-          border-radius: 6px;
-          padding: 6px 10px;
+          background: var(--search-background);
+          border: 1.5px solid var(--search-border-color);
+          border-radius: var(--search-radius-sm);
+          padding: 7px 12px;
+          color: var(--search-text-secondary);
           cursor: pointer;
           font-size: 13px;
+          font-weight: 500;
+          transition: border-color 0.15s ease, background-color 0.15s ease;
+        }
+
+        .search-widget-back-btn:hover {
+          background: var(--search-surface-hover);
+          border-color: var(--search-border-color-strong);
         }
 
         .search-widget-facet-card {
           display: flex;
           flex-direction: column;
-          border: 1px solid #eee;
-          border-radius: 8px;
+          border: 1px solid var(--search-border-color);
+          border-radius: var(--search-radius-sm);
           overflow: hidden;
-          transition: box-shadow 0.2s, transform 0.2s;
+          background: var(--search-background);
+          transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
         }
 
         .search-widget-facet-card:hover {
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-          transform: translateY(-2px);
+          box-shadow: var(--search-shadow-md);
+          border-color: transparent;
+          transform: translateY(-3px);
         }
 
         .search-widget-facet-card.out-of-stock {
-          opacity: 0.6;
+          opacity: 0.55;
         }
 
         .search-widget-facet-card a {
@@ -2139,7 +2370,7 @@
           display: flex;
           align-items: center;
           justify-content: center;
-          background: #f9f9f9;
+          background: var(--search-surface);
           padding: 10px;
         }
 
@@ -2154,18 +2385,18 @@
         }
 
         .search-widget-facet-card-info {
-          padding: 10px 12px;
+          padding: 12px 13px;
         }
 
         .search-widget-facet-card-name {
           font-size: 13px;
           font-weight: 500;
-          margin-bottom: 6px;
+          margin-bottom: 7px;
           display: -webkit-box;
           -webkit-line-clamp: 2;
           -webkit-box-orient: vertical;
           overflow: hidden;
-          line-height: 1.3;
+          line-height: 1.35;
         }
 
         .search-widget-facet-card-price {
@@ -2174,13 +2405,13 @@
 
         .search-widget-facet-card-price .old-price {
           text-decoration: line-through;
-          color: #999;
+          color: var(--search-text-tertiary);
           margin-right: 6px;
           font-size: 12px;
         }
 
         .search-widget-facet-card-price .current-price {
-          font-weight: bold;
+          font-weight: 700;
           color: var(--search-primary-color);
         }
 
@@ -2188,32 +2419,41 @@
           display: flex;
           align-items: center;
           gap: 8px;
-          padding: 0 12px 12px;
+          padding: 0 13px 13px;
         }
 
         .search-widget-qty-stepper {
           display: flex;
           align-items: center;
-          border: 1px solid var(--search-border-color);
-          border-radius: 6px;
+          border: 1.5px solid var(--search-border-color);
+          border-radius: var(--search-radius-sm);
           flex-shrink: 0;
         }
 
         .search-widget-qty-stepper button {
           width: 26px;
-          height: 26px;
+          height: 28px;
           background: none;
           border: none;
+          color: var(--search-text-secondary);
           cursor: pointer;
           font-size: 14px;
           line-height: 1;
+          transition: color 0.15s ease;
+        }
+
+        .search-widget-qty-stepper button:hover {
+          color: var(--search-text-color);
         }
 
         .search-widget-qty-stepper .qty-input {
           width: 30px;
           border: none;
+          background: transparent;
+          color: var(--search-text-color);
           text-align: center;
           font-size: 13px;
+          font-family: inherit;
           -moz-appearance: textfield;
         }
 
@@ -2225,18 +2465,24 @@
 
         .search-widget-add-to-cart-btn {
           flex: 1;
-          padding: 6px 8px;
+          padding: 7px 8px;
           background: var(--search-primary-color);
           color: #fff;
           border: none;
-          border-radius: 6px;
+          border-radius: var(--search-radius-sm);
           cursor: pointer;
           font-size: 12px;
-          transition: background-color 0.2s;
+          font-weight: 600;
+          transition: filter 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
         }
 
         .search-widget-add-to-cart-btn:hover:not(:disabled) {
-          filter: brightness(1.1);
+          filter: brightness(1.08);
+          box-shadow: var(--search-shadow-xs);
+        }
+
+        .search-widget-add-to-cart-btn:active:not(:disabled) {
+          transform: scale(0.97);
         }
 
         .search-widget-add-to-cart-btn:disabled {
@@ -2244,97 +2490,27 @@
         }
 
         .search-widget-add-to-cart-btn.search-widget-cart-success {
-          background: #16a34a;
+          background: var(--search-success-color);
         }
 
         .search-widget-add-to-cart-btn.search-widget-cart-error {
-          background: #dc2626;
+          background: var(--search-danger-color);
         }
 
         .search-widget-popup-loading {
           text-align: center;
-          padding: 40px;
-          color: #666;
-          font-size: 16px;
+          padding: 48px;
+          color: var(--search-text-secondary);
+          font-size: 15px;
         }
 
+        /* Плоская сетка одной категории (renderCategoryGrid) - переиспользует
+           renderCard()/.search-widget-facet-card, отдельного шаблона карточки
+           здесь больше нет (старый .search-widget-popup-card* убран как мёртвый) */
         .search-widget-popup-grid {
           display: grid;
           grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
           gap: 16px;
-        }
-
-        .search-widget-popup-card {
-          display: flex;
-          flex-direction: column;
-          text-decoration: none;
-          color: var(--search-text-color);
-          border: 1px solid #eee;
-          border-radius: 8px;
-          overflow: hidden;
-          transition: box-shadow 0.2s, transform 0.2s;
-        }
-
-        .search-widget-popup-card:hover {
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-          transform: translateY(-2px);
-        }
-
-        .search-widget-popup-card.out-of-stock {
-          opacity: 0.6;
-        }
-
-        .search-widget-popup-card-image {
-          height: 150px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: #f9f9f9;
-          padding: 10px;
-        }
-
-        .search-widget-popup-card-image img {
-          max-width: 100%;
-          max-height: 100%;
-          object-fit: contain;
-        }
-
-        .search-widget-popup-card-info {
-          padding: 12px;
-        }
-
-        .search-widget-popup-card-name {
-          font-size: 13px;
-          font-weight: 500;
-          margin-bottom: 8px;
-          display: -webkit-box;
-          -webkit-line-clamp: 2;
-          -webkit-box-orient: vertical;
-          overflow: hidden;
-          line-height: 1.3;
-        }
-
-        .search-widget-popup-card-price {
-          font-size: 14px;
-        }
-
-        .search-widget-popup-card-price .old-price {
-          text-decoration: line-through;
-          color: #999;
-          margin-right: 6px;
-          font-size: 12px;
-        }
-
-        .search-widget-popup-card-price .current-price {
-          font-weight: bold;
-          color: var(--search-primary-color);
-        }
-
-        /* Pagination */
-        .search-widget-popup-pagination {
-          padding: 16px 20px;
-          border-top: 1px solid var(--search-border-color);
-          flex-shrink: 0;
         }
 
         .search-widget-pagination-buttons {
@@ -2342,23 +2518,26 @@
           justify-content: center;
           align-items: center;
           gap: 4px;
+          margin-top: 24px;
         }
 
         .search-widget-page-btn {
-          min-width: 36px;
-          height: 36px;
-          padding: 0 12px;
-          background: #fff;
-          border: 1px solid #ddd;
-          border-radius: 6px;
+          min-width: 34px;
+          height: 34px;
+          padding: 0 10px;
+          background: var(--search-background);
+          border: 1.5px solid var(--search-border-color);
+          border-radius: var(--search-radius-sm);
+          color: var(--search-text-secondary);
           cursor: pointer;
-          font-size: 14px;
-          transition: all 0.2s;
+          font-size: 13px;
+          font-weight: 500;
+          transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
         }
 
         .search-widget-page-btn:hover:not(:disabled) {
-          background: #f5f5f5;
-          border-color: #ccc;
+          background: var(--search-surface-hover);
+          border-color: var(--search-border-color-strong);
         }
 
         .search-widget-page-btn.active {
@@ -2368,13 +2547,13 @@
         }
 
         .search-widget-page-btn:disabled {
-          opacity: 0.5;
+          opacity: 0.4;
           cursor: not-allowed;
         }
 
         .search-widget-page-dots {
-          padding: 0 8px;
-          color: #999;
+          padding: 0 6px;
+          color: var(--search-text-tertiary);
         }
 
         @media (max-width: 768px) {
@@ -2397,10 +2576,22 @@
             width: 100%;
           }
 
+          /* На узких экранах категория переносится на свою строку целиком,
+             а не сжимается до нечитаемой ширины рядом с полем ввода */
+          .search-widget-wrapper {
+            flex-wrap: wrap;
+          }
+
           .search-widget-category-select {
+            width: 100%;
+            max-width: none;
+            margin-bottom: 6px;
             border-right: 1px solid var(--search-border-color);
-            border-top-right-radius: var(--search-border-radius);
-            border-bottom-right-radius: var(--search-border-radius);
+            border-radius: var(--search-border-radius);
+          }
+
+          .search-widget-input {
+            border-radius: var(--search-border-radius);
           }
         }
       `;

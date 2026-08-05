@@ -139,6 +139,16 @@ class SimpleSearchEngine:
         elif sort == "price_desc":
             filtered_products.sort(key=lambda t: product_cache.get(t[0], {}).get("price") or 0, reverse=True)
 
+        # Товары не в наличии - всегда в конце, независимо от sort. Устойчивая
+        # сортировка поверх уже отсортированного списка не ломает порядок ни
+        # внутри "в наличии", ни внутри "нет в наличии" - только разносит группы.
+        # Работает только когда product_cache реально загружен (filters/facets/
+        # сортировка по цене уже к этому моменту его заполнили); для "голого"
+        # relevance-поиска без фильтров/фасетов (дропдаун при вводе) не грузим
+        # товары второй раз ради этого - там уже есть свой клиентский re-sort.
+        if product_cache:
+            filtered_products.sort(key=lambda t: not product_cache.get(t[0], {}).get("in_stock", True))
+
         # Пагинация
         total = len(filtered_products)
         paginated = filtered_products[offset:offset + limit]

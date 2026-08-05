@@ -84,7 +84,9 @@ SearchWidget.init({
 });
 ```
 
-Настройки, приходящие с сервера (`GET /widget/{apiKey}/config`, из `PUT /projects/{id}/widget` в личном кабинете) и реально применяемые поверх дефолтов: `placeholder`, `theme`, `primaryColor`, `borderRadius`, `showImages`, `showPrices`, `showButton`, `maxResults` (→ `results.limit`), `cartCallbackUrl`. Если запрос конфига падает — виджет тихо продолжает с локальными/дефолтными настройками.
+Настройки, приходящие с сервера (`GET /widget/{apiKey}/config`, из `PUT /projects/{id}/widget` в личном кабинете) и реально применяемые поверх дефолтов: `placeholder`, `theme`, `primaryColor`, `textColor`, `bgColor`, `borderColor`, `fontSize`, `borderRadius`, `showImages`, `showPrices`, `showButton`, `maxResults` (→ `results.limit`), `cartCallbackUrl`. Если запрос конфига падает — виджет тихо продолжает с локальными/дефолтными настройками.
+
+`textColor`/`bgColor` дополнительно определяют производные оттенки (вторичный/третичный текст, поверхность под hover, усиленный бордер) через CSS `color-mix()` — так палитра остаётся согласованной при любых цветах из ЛК, а не только для светлой темы по умолчанию.
 
 ### `cartCallbackUrl` — реальная кнопка "В корзину"
 
