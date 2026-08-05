@@ -566,10 +566,7 @@
         this.searchButton.className = 'search-widget-button';
         this.searchButton.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>';
         this.searchButton.addEventListener('click', () => {
-          const query = this.input.value.trim();
-          if (query.length >= this.config.minChars) {
-            this.search(query);
-          }
+          this.performSearch();
         });
         this.inputWrapper.appendChild(this.searchButton);
         this.inputWrapper.classList.add('has-button');
@@ -722,21 +719,24 @@
       this.search(value);
     }
 
+    // Явная отправка поиска (Enter / клик по кнопке поиска) - в отличие от
+    // ввода-по-мере-печати (handleInput), сразу открывает полный вид
+    // результатов с фасетами, а не dropdown-превью
     async performSearch() {
       const query = this.input.value.trim();
-      
+
       if (!query) return;
 
       this.suggestions.hide();
-      this.state.loading = true;
 
       if (this.config.onSearch) {
         this.config.onSearch(query);
-        this.state.loading = false;
         return;
       }
 
-      await this.search(query);
+      this.state.query = query;
+      this.lastSearchQuery = query;
+      await this.showAllResultsPopup(query);
     }
 
     async search(query, options = {}) {
@@ -875,8 +875,8 @@
       }
     }
 
-    async showAllResultsPopup() {
-      const query = this.lastSearchQuery;
+    async showAllResultsPopup(query) {
+      query = query || this.lastSearchQuery;
       if (!query) return;
 
       this.suggestions.hide();
