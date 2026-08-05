@@ -2,11 +2,19 @@
 Парсер XML фидов товаров (YML формат - Яндекс.Маркет)
 Поддерживает фиды типа lm-shop.ru/feed_search.xml
 """
+import html
 import xml.etree.ElementTree as ET
 from typing import List, Dict, Any, Optional
 import aiohttp
 import asyncio
 from datetime import datetime
+
+
+def _unescape(text: Optional[str]) -> str:
+    """Декодирует HTML-сущности (&quot; и т.п.), которые остаются буквальным
+    текстом, если фид кладёт их внутрь CDATA - XML-парсер сущности внутри
+    CDATA не раскрывает, это распространённая особенность экспорта фидов."""
+    return html.unescape(text) if text else (text or "")
 
 
 class FeedParser:
@@ -45,11 +53,11 @@ class FeedParser:
         shop = root.find(".//shop")
         if shop is not None:
             result["shop"] = {
-                "name": shop.findtext("name", ""),
-                "company": shop.findtext("company", ""),
+                "name": _unescape(shop.findtext("name", "")),
+                "company": _unescape(shop.findtext("company", "")),
                 "url": shop.findtext("url", ""),
             }
-        
+
         # Категории
         categories = root.findall(".//category")
         for cat in categories:
@@ -57,7 +65,7 @@ class FeedParser:
             parent_id = cat.get("parentId")
             result["categories"][cat_id] = {
                 "id": cat_id,
-                "name": cat.text or "",
+                "name": _unescape(cat.text or ""),
                 "parent_id": parent_id
             }
         
@@ -78,12 +86,12 @@ class FeedParser:
             available = offer.get("available", "true").lower() == "true"
             
             # Основные поля
-            name = offer.findtext("name", "")
+            name = _unescape(offer.findtext("name", ""))
             if not name:
                 # Альтернативный формат: typePrefix + vendor + model
-                type_prefix = offer.findtext("typePrefix", "")
-                vendor = offer.findtext("vendor", "")
-                model = offer.findtext("model", "")
+                type_prefix = _unescape(offer.findtext("typePrefix", ""))
+                vendor = _unescape(offer.findtext("vendor", ""))
+                model = _unescape(offer.findtext("model", ""))
                 name = " ".join(filter(None, [type_prefix, vendor, model]))
             
             price_text = offer.findtext("price", "0")
@@ -118,19 +126,19 @@ class FeedParser:
                     pictures.append(pic.text)
             
             # Описание
-            description = offer.findtext("description", "")
-            
+            description = _unescape(offer.findtext("description", ""))
+
             # Vendor / Brand
-            vendor = offer.findtext("vendor", "")
-            
+            vendor = _unescape(offer.findtext("vendor", ""))
+
             # Артикул
-            vendor_code = offer.findtext("vendorCode", "")
-            
+            vendor_code = _unescape(offer.findtext("vendorCode", ""))
+
             # Параметры товара
             params = {}
             for param in offer.findall("param"):
-                param_name = param.get("name", "")
-                param_value = param.text or ""
+                param_name = _unescape(param.get("name", ""))
+                param_value = _unescape(param.text or "")
                 if param_name:
                     params[param_name] = param_value
             
