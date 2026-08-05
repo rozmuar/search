@@ -61,46 +61,30 @@ class SimpleFeedScheduler:
     async def _check_and_update_feeds(self):
         """Проверка и обновление устаревших фидов"""
         from ..core.models import Product
-        
-        # Получаем все проекты
-        project_keys = await self.redis.keys("project:proj_*")
-        
+
+        # Проекты и их feed_url живут в PostgreSQL, а не в Redis - раньше здесь
+        # читался несуществующий Redis-хеш "project:{id}" с полем feed_url, которое
+        # туда никогда не писалось (Redis-хеш project:{id} используется только для
+        # products_count, см. DataStore.save_products), поэтому автообновление
+        # молча пропускало вообще все проекты.
+        try:
+            projects = await self.data_store.get_all_projects()
+        except Exception as e:
+            print(f"[Scheduler] Failed to load projects: {e}")
+            return
+
         now = datetime.utcnow()
         update_threshold = now - timedelta(hours=self.UPDATE_INTERVAL_HOURS)
-        
+
         updated_count = 0
-        
-        for key in project_keys:
+
+        for project in projects:
             try:
-                key_str = key.decode() if isinstance(key, bytes) else key
-                
-                # Пропускаем вложенные ключи (feed, product и т.д.)
-                if ':feed' in key_str or ':product' in key_str or ':analytics' in key_str:
-                    continue
-                
-                project_id = key_str.replace("project:", "")
-                
-                # Получаем данные проекта
-                project_data = await self.redis.hgetall(key_str)
-                if not project_data:
-                    continue
-                
-                # Декодируем
-                project = {}
-                for k, v in project_data.items():
-                    pk = k.decode() if isinstance(k, bytes) else k
-                    pv = v.decode() if isinstance(v, bytes) else v
-                    project[pk] = pv
-                
+                project_id = project["id"]
                 feed_url = project.get("feed_url")
                 if not feed_url:
                     continue
-                
-                # Проверяем включено ли автообновление (по умолчанию включено)
-                auto_update = project.get("auto_update", "true")
-                if auto_update == "false":
-                    continue
-                
+
                 # Проверяем время последнего обновления
                 feed_status = await self.feed_manager.get_feed_status(project_id)
                 

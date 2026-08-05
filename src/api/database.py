@@ -288,6 +288,14 @@ class Database:
                 result.append(project)
             return result
     
+    async def get_all_projects(self) -> List[Dict]:
+        """Все проекты системы с URL фида (для планировщика автообновления)"""
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch('''
+                SELECT id, feed_url FROM projects WHERE feed_url IS NOT NULL AND feed_url != ''
+            ''')
+            return [dict(row) for row in rows]
+
     async def update_project(self, project_id: str, updates: Dict[str, Any]) -> Optional[Dict]:
         """Обновление проекта"""
         # Фильтруем разрешенные поля

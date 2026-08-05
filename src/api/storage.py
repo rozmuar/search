@@ -122,6 +122,10 @@ class DataStore:
     async def get_user_projects(self, user_id: str) -> List[Dict[str, Any]]:
         """Получение всех проектов пользователя"""
         return await db.get_user_projects(user_id)
+
+    async def get_all_projects(self) -> List[Dict[str, Any]]:
+        """Все проекты системы с URL фида (для планировщика автообновления)"""
+        return await db.get_all_projects()
     
     async def update_project(self, project_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Обновление проекта"""
