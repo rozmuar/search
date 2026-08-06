@@ -2471,7 +2471,7 @@
           border: none;
           border-radius: 10px;
           cursor: pointer;
-          font-size: 12px;
+          font-size: 10px;
           font-weight: 600;
           transition: filter 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
         }
