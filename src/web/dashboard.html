@@ -16,53 +16,58 @@
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
             <a href="/" class="sidebar-logo">
-                <div class="logo-icon">🔍</div>
-                <span class="logo-text">SearchPro</span>
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                </div>
+                <div class="sidebar-logo-text">
+                    <span class="logo-text">SearchPro</span>
+                    <span class="logo-subtitle">Поиск и рекомендации</span>
+                </div>
             </a>
         </div>
-        
+
         <nav class="sidebar-nav">
             <div class="nav-section">
                 <div class="nav-section-title">Главное</div>
                 <a class="nav-item active" href="/dashboard/" data-section="dashboard">
-                    <span class="nav-icon">📊</span>
+                    <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg></span>
                     <span>Дашборд</span>
                 </a>
                 <a class="nav-item" href="/dashboard/projects/" data-section="projects">
-                    <span class="nav-icon">📁</span>
+                    <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg></span>
                     <span>Проекты</span>
                 </a>
             </div>
-            
+
             <div class="nav-section">
                 <div class="nav-section-title">Данные</div>
                 <a class="nav-item" href="/dashboard/products/" data-section="products">
-                    <span class="nav-icon">📦</span>
+                    <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg></span>
                     <span>Товары</span>
                 </a>
                 <a class="nav-item" href="/dashboard/analytics/" data-section="analytics">
-                    <span class="nav-icon">📈</span>
+                    <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg></span>
                     <span>Аналитика</span>
                 </a>
             </div>
-            
+
             <div class="nav-section">
                 <div class="nav-section-title">Интеграция</div>
                 <a class="nav-item" href="/dashboard/feed-guide/" data-section="feed-guide">
-                    <span class="nav-icon">📄</span>
+                    <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg></span>
                     <span>Формат фида</span>
                 </a>
                 <a class="nav-item" href="/dashboard/widget/" data-section="widget">
-                    <span class="nav-icon">🎨</span>
+                    <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg></span>
                     <span>Виджет</span>
                 </a>
                 <a class="nav-item" href="/dashboard/embed/" data-section="embed">
-                    <span class="nav-icon">📝</span>
+                    <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg></span>
                     <span>Встраивание</span>
                 </a>
             </div>
         </nav>
-        
+
         <div class="sidebar-footer">
             <div class="sidebar-user" onclick="toggleUserMenu()">
                 <div class="user-avatar" id="userAvatar">U</div>
@@ -70,7 +75,7 @@
                     <div class="user-name" id="userName">Пользователь</div>
                     <div class="user-role">Администратор</div>
                 </div>
-                <span class="user-dropdown-icon">▼</span>
+                <span class="user-dropdown-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></span>
             </div>
         </div>
     </aside>
@@ -80,21 +85,25 @@
         <!-- Header -->
         <header class="header">
             <div class="header-left">
-                <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+                <button class="mobile-menu-btn" onclick="toggleSidebar()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                </button>
                 <h1 class="page-title" id="pageTitle">Дашборд</h1>
             </div>
-            
+
             <div class="header-search">
-                <span class="header-search-icon">🔍</span>
+                <span class="header-search-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg></span>
                 <input type="text" placeholder="Поиск по панели..." id="globalSearch">
             </div>
-            
+
             <div class="header-right">
                 <button class="header-btn" title="Уведомления">
-                    🔔
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
                     <span class="badge" id="notifCount" style="display: none;">0</span>
                 </button>
-                <button class="header-btn" title="Настройки">⚙️</button>
+                <button class="header-btn" title="Настройки">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                </button>
                 <button class="btn-logout" onclick="logout()">Выйти</button>
             </div>
         </header>
@@ -107,25 +116,25 @@
                 <!-- Stats Cards -->
                 <div class="stats-grid">
                     <div class="stat-card gradient-blue">
-                        <div class="stat-card-icon">📁</div>
+                        <div class="stat-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg></div>
                         <div class="stat-card-value" id="statProjects">0</div>
                         <div class="stat-card-label">Проектов</div>
                         <div class="stat-card-change positive">Активные проекты</div>
                     </div>
                     <div class="stat-card gradient-green">
-                        <div class="stat-card-icon">📦</div>
+                        <div class="stat-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg></div>
                         <div class="stat-card-value" id="statProducts">0</div>
                         <div class="stat-card-label">Товаров</div>
                         <div class="stat-card-change positive">Всего в каталоге</div>
                     </div>
                     <div class="stat-card gradient-orange">
-                        <div class="stat-card-icon">🔍</div>
+                        <div class="stat-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg></div>
                         <div class="stat-card-value" id="statSearches">0</div>
                         <div class="stat-card-label">Поисков</div>
                         <div class="stat-card-change positive">За всё время</div>
                     </div>
                     <div class="stat-card gradient-red">
-                        <div class="stat-card-icon">📊</div>
+                        <div class="stat-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg></div>
                         <div class="stat-card-value" id="statCTR">0%</div>
                         <div class="stat-card-label">CTR</div>
                         <div class="stat-card-change positive">Кликабельность</div>
@@ -240,10 +249,12 @@
                     </div>
                     <div class="section-actions">
                         <button class="btn btn-secondary" onclick="editCurrentProject()">
-                            ✏️ Редактировать
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+                            Редактировать
                         </button>
                         <button class="btn btn-danger" onclick="deleteCurrentProject()">
-                            🗑️ Удалить
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                            Удалить
                         </button>
                     </div>
                 </div>
@@ -251,28 +262,28 @@
                 <!-- Project Stats -->
                 <div class="stats-grid stats-grid-4">
                     <div class="stat-card">
-                        <div class="stat-icon blue">📦</div>
+                        <div class="stat-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg></div>
                         <div class="stat-content">
                             <div class="stat-value" id="projectStatProducts">0</div>
                             <div class="stat-label">Товаров</div>
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon green">🔍</div>
+                        <div class="stat-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg></div>
                         <div class="stat-content">
                             <div class="stat-value" id="projectStatSearches">0</div>
                             <div class="stat-label">Поисков</div>
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon orange">📂</div>
+                        <div class="stat-icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg></div>
                         <div class="stat-content">
                             <div class="stat-value" id="projectStatCategories">0</div>
                             <div class="stat-label">Категорий</div>
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon purple">📅</div>
+                        <div class="stat-icon purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></div>
                         <div class="stat-content">
                             <div class="stat-value" id="projectStatUpdated">—</div>
                             <div class="stat-label">Обновлено</div>
@@ -283,7 +294,7 @@
                 <!-- Feed Management Card -->
                 <div class="card">
                     <div class="card-header">
-                        <h3 class="card-title">🔗 Управление фидом</h3>
+                        <h3 class="card-title">Управление фидом</h3>
                         <div class="feed-status-badge" id="projectFeedStatus">
                             <span class="status-dot neutral"></span>
                             <span>Не загружен</span>
@@ -303,7 +314,8 @@
                                     <span class="btn-spinner" style="display: none;">⏳</span>
                                 </button>
                                 <button class="btn btn-secondary" id="projectRefreshFeedBtn" onclick="refreshProjectFeed()" style="display: none;">
-                                    🔄 Обновить
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                                    Обновить
                                 </button>
                             </div>
                         </div>
@@ -345,14 +357,21 @@
                 <!-- API Key Card -->
                 <div class="card">
                     <div class="card-header">
-                        <h3 class="card-title">🔑 API ключ</h3>
+                        <h3 class="card-title">API ключ</h3>
                     </div>
                     <div class="card-body">
                         <div class="api-key-row">
                             <code class="api-key-code" id="projectApiKey">••••••••••••••••</code>
-                            <button class="btn btn-ghost" onclick="toggleApiKeyVisibility()">👁️</button>
-                            <button class="btn btn-ghost" onclick="copyApiKey()">📋</button>
-                            <button class="btn btn-secondary" onclick="regenerateApiKey()">🔄 Сгенерировать новый</button>
+                            <button class="btn btn-ghost" onclick="toggleApiKeyVisibility()" title="Показать/скрыть">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                            </button>
+                            <button class="btn btn-ghost" onclick="copyApiKey()" title="Копировать">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                            </button>
+                            <button class="btn btn-secondary" onclick="regenerateApiKey()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                                Сгенерировать новый
+                            </button>
                         </div>
                         <p class="form-hint">Используйте этот ключ для интеграции виджета на вашем сайте</p>
                     </div>
@@ -361,7 +380,7 @@
                 <!-- Search Settings Card -->
                 <div class="card">
                     <div class="card-header">
-                        <h3 class="card-title">🔍 Настройки поиска</h3>
+                        <h3 class="card-title">Настройки поиска</h3>
                     </div>
                     <div class="card-body">
                         <div class="form-group">
@@ -395,7 +414,7 @@
                 <!-- Cart Callback Card -->
                 <div class="card">
                     <div class="card-header">
-                        <h3 class="card-title">🛒 Корзина</h3>
+                        <h3 class="card-title">Корзина</h3>
                     </div>
                     <div class="card-body">
                         <div class="form-group">
@@ -415,7 +434,7 @@
                 <!-- Recommendations Card -->
                 <div class="card">
                     <div class="card-header">
-                        <h3 class="card-title">🎯 Рекомендации</h3>
+                        <h3 class="card-title">Рекомендации</h3>
                     </div>
                     <div class="card-body">
                         <div class="form-group">
@@ -469,7 +488,7 @@
     category: 'Ноутбуки' // необязательно
   });
 &lt;/script&gt;</code></pre>
-                            <button class="btn btn-ghost" onclick="copyCode('recsEmbedCode')">📋 Скопировать</button>
+                            <button class="btn btn-ghost" onclick="copyCode('recsEmbedCode')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>Скопировать</button>
                         </div>
                     </div>
                 </div>
@@ -477,7 +496,7 @@
                 <!-- Synonyms Card -->
                 <div class="card">
                     <div class="card-header">
-                        <h3 class="card-title">📝 Синонимы для поиска</h3>
+                        <h3 class="card-title">Синонимы для поиска</h3>
                     </div>
                     <div class="card-body">
                         <p class="form-hint" style="margin-bottom: 16px;">Добавьте группы синонимов. Поиск по любому слову из группы найдёт товары со всеми словами группы.</p>
@@ -508,24 +527,24 @@
                 <!-- Quick Actions -->
                 <div class="card">
                     <div class="card-header">
-                        <h3 class="card-title">⚡ Быстрые действия</h3>
+                        <h3 class="card-title">Быстрые действия</h3>
                     </div>
                     <div class="card-body">
                         <div class="quick-actions">
                             <button class="quick-action-btn" onclick="goToProducts()">
-                                <span class="quick-action-icon">📦</span>
+                                <span class="quick-action-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg></span>
                                 <span>Просмотр товаров</span>
                             </button>
                             <button class="quick-action-btn" onclick="goToAnalytics()">
-                                <span class="quick-action-icon">📈</span>
+                                <span class="quick-action-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg></span>
                                 <span>Аналитика</span>
                             </button>
                             <button class="quick-action-btn" onclick="goToWidget()">
-                                <span class="quick-action-icon">🎨</span>
+                                <span class="quick-action-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg></span>
                                 <span>Настроить виджет</span>
                             </button>
                             <button class="quick-action-btn" onclick="goToEmbed()">
-                                <span class="quick-action-icon">📝</span>
+                                <span class="quick-action-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg></span>
                                 <span>Код встраивания</span>
                             </button>
                         </div>
@@ -537,7 +556,7 @@
                     <!-- Stats Card -->
                     <div class="card">
                         <div class="card-header">
-                            <h3 class="card-title">📊 Статистика</h3>
+                            <h3 class="card-title">Статистика</h3>
                             <div class="select-wrapper select-sm">
                                 <select id="projectStatsPeriod" onchange="loadProjectStatistics()">
                                     <option value="7">7 дней</option>
@@ -571,7 +590,7 @@
                     <!-- Popular Queries -->
                     <div class="card">
                         <div class="card-header">
-                            <h3 class="card-title">🔥 Популярные запросы</h3>
+                            <h3 class="card-title">Популярные запросы</h3>
                         </div>
                         <div class="card-body-flush">
                             <div class="compact-list" id="projectPopularQueries">
@@ -584,7 +603,7 @@
                 <!-- Popular Products -->
                 <div class="card">
                     <div class="card-header">
-                        <h3 class="card-title">⭐ Популярные товары</h3>
+                        <h3 class="card-title">Популярные товары</h3>
                     </div>
                     <div class="card-body">
                         <div class="popular-products-grid" id="projectPopularProducts">
@@ -629,7 +648,8 @@
                             Загрузить
                         </button>
                         <button class="btn btn-secondary" onclick="refreshFeed()" id="refreshFeedBtn" style="display: none;">
-                            🔄 Обновить
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                            Обновить
                         </button>
                     </div>
                     
@@ -658,7 +678,7 @@
                     <div class="table-header">
                         <span class="table-title" id="productsCount">0 товаров</span>
                         <div class="table-search">
-                            <span class="table-search-icon">🔍</span>
+                            <span class="table-search-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg></span>
                             <input type="text" id="productsSearch" placeholder="Поиск товаров..." oninput="filterProducts()">
                         </div>
                     </div>
@@ -705,22 +725,22 @@
                 <!-- Analytics Stats -->
                 <div class="stats-grid">
                     <div class="stat-card gradient-purple">
-                        <div class="stat-card-icon">🔍</div>
+                        <div class="stat-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg></div>
                         <div class="stat-card-value" id="analyticsSearches">0</div>
                         <div class="stat-card-label">Поисков</div>
                     </div>
                     <div class="stat-card gradient-blue">
-                        <div class="stat-card-icon">👆</div>
+                        <div class="stat-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"></path><path d="M13 13l6 6"></path></svg></div>
                         <div class="stat-card-value" id="analyticsClicks">0</div>
                         <div class="stat-card-label">Кликов</div>
                     </div>
                     <div class="stat-card gradient-green">
-                        <div class="stat-card-icon">📊</div>
+                        <div class="stat-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="5" x2="5" y2="19"></line><circle cx="6.5" cy="6.5" r="2.5"></circle><circle cx="17.5" cy="17.5" r="2.5"></circle></svg></div>
                         <div class="stat-card-value" id="analyticsCTR">0%</div>
                         <div class="stat-card-label">CTR</div>
                     </div>
                     <div class="stat-card gradient-orange">
-                        <div class="stat-card-icon">⚡</div>
+                        <div class="stat-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg></div>
                         <div class="stat-card-value" id="analyticsAvgTime">0ms</div>
                         <div class="stat-card-label">Ср. время</div>
                     </div>
@@ -890,7 +910,7 @@
                             <div class="preview-widget" id="widgetPreview">
                                 <div class="preview-search-box">
                                     <input type="text" id="previewInput" placeholder="Поиск товаров...">
-                                    <button id="previewButton">🔍</button>
+                                    <button id="previewButton"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg></button>
                                 </div>
                                 <div class="preview-results" id="previewResults">
                                     <div class="preview-result-item">
@@ -942,7 +962,7 @@
                                     <div class="api-key-label">Ваш API ключ</div>
                                     <div class="api-key-value" id="projectApiKey">Выберите проект</div>
                                 </div>
-                                <button class="btn-copy" onclick="copyApiKey()">📋 Копировать</button>
+                                <button class="btn-copy" onclick="copyApiKey()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>Копировать</button>
                             </div>
                         </div>
                     </div>
@@ -963,7 +983,7 @@
                                     <div class="code-block">
                                         <div class="code-block-header">
                                             <span class="code-block-title">HTML</span>
-                                            <button class="btn-copy" onclick="copyCode('step1Code')">📋</button>
+                                            <button class="btn-copy" onclick="copyCode('step1Code')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>
                                         </div>
                                         <pre id="step1Code"><code>&lt;div id="search-widget"&gt;&lt;/div&gt;</code></pre>
                                     </div>
@@ -978,7 +998,7 @@
                                     <div class="code-block">
                                         <div class="code-block-header">
                                             <span class="code-block-title">HTML</span>
-                                            <button class="btn-copy" onclick="copyCode('step2Code')">📋</button>
+                                            <button class="btn-copy" onclick="copyCode('step2Code')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>
                                         </div>
                                         <pre id="step2Code"><code>&lt;script src="<span id="embedScriptUrl">/embed.js</span>"&gt;&lt;/script&gt;</code></pre>
                                     </div>
@@ -993,7 +1013,7 @@
                                     <div class="code-block">
                                         <div class="code-block-header">
                                             <span class="code-block-title">JavaScript</span>
-                                            <button class="btn-copy" onclick="copyCode('step3Code')">📋</button>
+                                            <button class="btn-copy" onclick="copyCode('step3Code')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>
                                         </div>
                                         <pre id="step3Code"><code>&lt;script&gt;
   SearchWidget.init({
@@ -1017,7 +1037,7 @@
                         <div class="code-block">
                             <div class="code-block-header">
                                 <span class="code-block-title">HTML</span>
-                                <button class="btn-copy" onclick="copyCode('fullEmbedCode')">📋 Копировать весь код</button>
+                                <button class="btn-copy" onclick="copyCode('fullEmbedCode')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>Копировать весь код</button>
                             </div>
                             <pre id="fullEmbedCode"><code>&lt;!-- SearchPro Widget --&gt;
 &lt;div id="search-widget"&gt;&lt;/div&gt;
@@ -1067,7 +1087,7 @@
                 <!-- Intro Card -->
                 <div class="card">
                     <div class="card-header">
-                        <h3 class="card-title">📄 Что такое товарный фид?</h3>
+                        <h3 class="card-title">Что такое товарный фид?</h3>
                     </div>
                     <div class="card-body">
                         <p class="guide-intro-text">
@@ -1096,14 +1116,14 @@
                 <!-- Minimum Structure -->
                 <div class="card">
                     <div class="card-header">
-                        <h3 class="card-title">🔹 Минимальная структура фида</h3>
+                        <h3 class="card-title">Минимальная структура фида</h3>
                     </div>
                     <div class="card-body">
                         <p>Ваш фид должен содержать корневой элемент <code>&lt;yml_catalog&gt;</code>, внутри которого находится <code>&lt;shop&gt;</code> с категориями и товарами:</p>
                         <div class="code-block">
                             <div class="code-block-header">
                                 <span class="code-block-title">XML (YML)</span>
-                                <button class="btn-copy" onclick="copyCode('feedStructure')">📋 Копировать</button>
+                                <button class="btn-copy" onclick="copyCode('feedStructure')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>Копировать</button>
                             </div>
                             <pre id="feedStructure"><code>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
 &lt;yml_catalog date="2024-01-15 10:00"&gt;
@@ -1135,14 +1155,14 @@
                 <!-- Product Example -->
                 <div class="card">
                     <div class="card-header">
-                        <h3 class="card-title">🔹 Пример описания товара</h3>
+                        <h3 class="card-title">Пример описания товара</h3>
                     </div>
                     <div class="card-body">
                         <p>Каждый товар описывается в теге <code>&lt;offer&gt;</code>. Вот полный пример с комментариями:</p>
                         <div class="code-block">
                             <div class="code-block-header">
                                 <span class="code-block-title">XML</span>
-                                <button class="btn-copy" onclick="copyCode('offerExample')">📋 Копировать</button>
+                                <button class="btn-copy" onclick="copyCode('offerExample')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>Копировать</button>
                             </div>
                             <pre id="offerExample"><code>&lt;offer id="SKU-12345" available="true"&gt;
   &lt;!-- Обязательные поля --&gt;
@@ -1181,7 +1201,7 @@
                 <!-- Fields Reference -->
                 <div class="card">
                     <div class="card-header">
-                        <h3 class="card-title">🔹 Справочник полей</h3>
+                        <h3 class="card-title">Справочник полей</h3>
                     </div>
                     <div class="card-body">
                         <h4 class="guide-subtitle">Обязательные поля</h4>
@@ -1272,7 +1292,7 @@
                 <!-- Tips -->
                 <div class="card">
                     <div class="card-header">
-                        <h3 class="card-title">🔹 Рекомендации по качеству фида</h3>
+                        <h3 class="card-title">Рекомендации по качеству фида</h3>
                     </div>
                     <div class="card-body">
                         <div class="tips-grid">
@@ -1325,7 +1345,7 @@
                 <!-- CMS Solutions -->
                 <div class="card">
                     <div class="card-header">
-                        <h3 class="card-title">🔹 Готовые решения для популярных CMS</h3>
+                        <h3 class="card-title">Готовые решения для популярных CMS</h3>
                     </div>
                     <div class="card-body">
                         <p>Большинство платформ умеют генерировать YML-фиды автоматически:</p>
@@ -1373,7 +1393,7 @@
                 <!-- Validation -->
                 <div class="card">
                     <div class="card-header">
-                        <h3 class="card-title">🔹 Проверка фида</h3>
+                        <h3 class="card-title">Проверка фида</h3>
                     </div>
                     <div class="card-body">
                         <p>После создания фида рекомендуем проверить его валидность:</p>
@@ -1432,7 +1452,7 @@
     <div class="modal" id="feedGuideModal">
         <div class="modal-content modal-lg">
             <div class="modal-header">
-                <h3 class="modal-title">📄 Как создать фид для SearchPro</h3>
+                <h3 class="modal-title">Как создать фид для SearchPro</h3>
                 <button class="modal-close" onclick="closeFeedGuide()">×</button>
             </div>
             <div class="modal-body feed-guide">
@@ -1442,11 +1462,11 @@
                     умеют генерировать такие фиды автоматически.
                 </p>
 
-                <h4>📋 Минимальная структура фида</h4>
+                <h4>Минимальная структура фида</h4>
                 <div class="code-block">
                     <div class="code-block-header">
                         <span class="code-block-title">XML (YML)</span>
-                        <button class="btn-copy" onclick="copyFeedExample()">📋 Копировать</button>
+                        <button class="btn-copy" onclick="copyFeedExample()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>Копировать</button>
                     </div>
                     <pre id="feedExampleCode"><code>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
 &lt;yml_catalog date="2024-01-01"&gt;
@@ -1477,7 +1497,7 @@
 &lt;/yml_catalog&gt;</code></pre>
                 </div>
 
-                <h4>📌 Обязательные поля товара</h4>
+                <h4>Обязательные поля товара</h4>
                 <table class="guide-table">
                     <thead>
                         <tr>
@@ -1510,7 +1530,7 @@
                     </tbody>
                 </table>
 
-                <h4>📌 Рекомендуемые поля</h4>
+                <h4>Рекомендуемые поля</h4>
                 <table class="guide-table">
                     <thead>
                         <tr>
@@ -1546,7 +1566,7 @@
                     </tbody>
                 </table>
 
-                <h4>💡 Советы</h4>
+                <h4>Советы</h4>
                 <ul class="guide-tips">
                     <li>Размещайте фид на вашем сервере и укажите прямую ссылку</li>
                     <li>Обновляйте фид при изменении каталога (минимум раз в день)</li>
@@ -1555,7 +1575,7 @@
                     <li>Максимальный размер фида: 50 МБ</li>
                 </ul>
 
-                <h4>🔗 Готовые решения для CMS</h4>
+                <h4>Готовые решения для CMS</h4>
                 <div class="cms-links">
                     <a href="https://marketplace.1c-bitrix.ru/solutions/export/" target="_blank" class="cms-link">
                         <span>1С-Битрикс</span>
