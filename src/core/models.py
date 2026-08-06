@@ -104,6 +104,7 @@ class Product:
     in_stock: bool = True
     quantity: Optional[int] = None
     category: Optional[str] = None
+    category_id: Optional[str] = None
     categories: List[str] = field(default_factory=list)
     brand: Optional[str] = None
     vendor_code: Optional[str] = None  # Артикул товара

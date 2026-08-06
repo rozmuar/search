@@ -345,7 +345,12 @@ class SimpleSearchEngine:
             stages[stage] += 1
 
         def matches_category(product: Dict[str, Any]) -> bool:
-            return not category or product.get("category") == category
+            if not category:
+                return True
+            if product.get("category") == category:
+                return True
+            product_category_id = product.get("category_id")
+            return bool(product_category_id) and str(product_category_id) == str(category)
 
         # Этап 1: вручную выбранные - id уже известны, скан не нужен
         if manual_product_ids:

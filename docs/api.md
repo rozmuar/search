@@ -117,7 +117,7 @@
 
 ### `GET /api/v1/recommendations`
 
-`project_id`/`api_key`, `category` (нет — не фильтруется), `limit` (1-50, по умолчанию берётся из `search_settings.recommendations.limit` или 8). Блок "рекомендуемое" для любой страницы сайта клиента — отдельный виджет ([recommendations-widget.md](recommendations-widget.md)), не связан с `/search`.
+`project_id`/`api_key`, `category` (нет — не фильтруется; принимает и название категории, и её `categoryId` из фида — сравнивается и с `product.category`, и с `product.category_id`, срабатывает любое совпадение), `limit` (1-50, по умолчанию берётся из `search_settings.recommendations.limit` или 8). Блок "рекомендуемое" для любой страницы сайта клиента — отдельный виджет ([recommendations-widget.md](recommendations-widget.md)), не связан с `/search`.
 
 ```json
 {

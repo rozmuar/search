@@ -340,6 +340,7 @@ async def background_feed_load(project_id: str, feed_url: str):
                     old_price=float(p.get("old_price") or 0) if p.get("old_price") else None,
                     in_stock=p.get("in_stock", True),
                     category=p.get("category"),
+                    category_id=p.get("category_id"),
                     brand=p.get("brand"),
                     vendor_code=p.get("vendor_code"),
                     params=p.get("params", {}),
@@ -815,7 +816,7 @@ async def get_categories(
 async def get_recommendations(
     project_id: Optional[str] = Query(None),
     api_key: Optional[str] = Query(None),
-    category: Optional[str] = Query(None, description="Раздел сайта (категория товара) - рекомендации фильтруются только этим значением"),
+    category: Optional[str] = Query(None, description="Раздел сайта (категория товара) - рекомендации фильтруются только этим значением. Принимает и название категории, и её id из фида (categoryId)"),
     limit: Optional[int] = Query(None, ge=1, le=50),
     x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ):

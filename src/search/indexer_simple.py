@@ -123,6 +123,7 @@ class SimpleIndexer:
                 "old_price": product.old_price,
                 "in_stock": product.in_stock,
                 "category": product.category,
+                "category_id": getattr(product, 'category_id', None),
                 "brand": product.brand,
                 "vendor_code": getattr(product, 'vendor_code', ''),
                 "params": params

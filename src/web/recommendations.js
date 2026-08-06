@@ -151,12 +151,47 @@
       if (this.config.title) {
         html += `<h3 class="search-recs-title">${escapeHtml(this.config.title)}</h3>`;
       }
-      html += `<div class="search-recs-grid">`;
-      html += items.map(item => this.renderCard(item, { showImages, showPrices })).join('');
-      html += `</div></div>`;
+      html += `
+        <div class="search-recs-slider">
+          <button type="button" class="search-recs-nav-btn search-recs-nav-prev" aria-label="Назад">‹</button>
+          <div class="search-recs-track">
+            ${items.map(item => this.renderCard(item, { showImages, showPrices })).join('')}
+          </div>
+          <button type="button" class="search-recs-nav-btn search-recs-nav-next" aria-label="Вперёд">›</button>
+        </div>
+      `;
+      html += `</div>`;
 
       this.container.innerHTML = html;
       this.bindCardEvents();
+      this.bindSliderNav();
+    }
+
+    // Прокрутка на "страницу" (видимая ширина трека) вместо одной карточки -
+    // на широких экранах стрелка сразу открывает следующую группу товаров
+    bindSliderNav() {
+      const track = this.container.querySelector('.search-recs-track');
+      const prevBtn = this.container.querySelector('.search-recs-nav-prev');
+      const nextBtn = this.container.querySelector('.search-recs-nav-next');
+      if (!track || !prevBtn || !nextBtn) return;
+
+      const scrollByPage = (direction) => {
+        track.scrollBy({ left: direction * track.clientWidth * 0.9, behavior: 'smooth' });
+      };
+      prevBtn.addEventListener('click', () => scrollByPage(-1));
+      nextBtn.addEventListener('click', () => scrollByPage(1));
+
+      const updateNavVisibility = () => {
+        const hasOverflow = track.scrollWidth > track.clientWidth + 1;
+        prevBtn.style.display = hasOverflow ? '' : 'none';
+        nextBtn.style.display = hasOverflow ? '' : 'none';
+        prevBtn.disabled = track.scrollLeft <= 0;
+        nextBtn.disabled = track.scrollLeft + track.clientWidth >= track.scrollWidth - 1;
+      };
+
+      track.addEventListener('scroll', updateNavVisibility, { passive: true });
+      window.addEventListener('resize', updateNavVisibility);
+      updateNavVisibility();
     }
 
     renderCard(product, { showImages, showPrices }) {
@@ -351,15 +386,63 @@
           color: var(--search-recs-text-color);
         }
 
-        .search-recs-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        .search-recs-slider {
+          position: relative;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .search-recs-track {
+          flex: 1;
+          display: flex;
           gap: 16px;
+          overflow-x: auto;
+          scroll-snap-type: x mandatory;
+          scroll-behavior: smooth;
+          padding-bottom: 4px;
+          /* Скроллбар скрыт - навигация через стрелки/свайп, не системный скроллбар */
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+
+        .search-recs-track::-webkit-scrollbar {
+          display: none;
+        }
+
+        .search-recs-nav-btn {
+          flex-shrink: 0;
+          width: 36px;
+          height: 36px;
+          border-radius: 50%;
+          border: 1px solid var(--search-recs-border-color);
+          background: var(--search-recs-background);
+          color: var(--search-recs-text-color);
+          font-size: 20px;
+          line-height: 1;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: box-shadow 0.15s ease, background-color 0.15s ease, opacity 0.15s ease;
+          box-shadow: var(--search-recs-shadow-xs);
+        }
+
+        .search-recs-nav-btn:hover:not(:disabled) {
+          box-shadow: var(--search-recs-shadow-md);
+        }
+
+        .search-recs-nav-btn:disabled {
+          opacity: 0.3;
+          cursor: default;
         }
 
         .search-recs-card {
           display: flex;
           flex-direction: column;
+          flex: 0 0 180px;
+          width: 180px;
+          scroll-snap-align: start;
           border: 1px solid var(--search-recs-border-color);
           border-radius: var(--search-recs-radius-sm);
           overflow: hidden;
