@@ -115,6 +115,20 @@
 }
 ```
 
+### `GET /api/v1/recommendations`
+
+`project_id`/`api_key`, `category` (нет — не фильтруется), `limit` (1-50, по умолчанию берётся из `search_settings.recommendations.limit` или 8). Блок "рекомендуемое" для любой страницы сайта клиента — отдельный виджет ([recommendations-widget.md](recommendations-widget.md)), не связан с `/search`.
+
+```json
+{
+  "items": [ /* тот же формат товара, что в /search */ ],
+  "meta": { "took_ms": 4.2, "project_id": "proj_ab12cd34", "category": "Ноутбуки" },
+  "stages": { "manual": 2, "attribute": 0, "popular": 4, "fallback": 2 }
+}
+```
+
+`stages` — сколько товаров закрыл каждый этап приоритетной цепочки (см. ниже), всегда присутствует, полезно для отладки настроек в ЛК.
+
 ### `GET /api/v1/widget/{api_key}/config`
 
 Публичный конфиг виджета (без авторизации) — то, что сохранено через `PUT /projects/{id}/widget`.
@@ -176,6 +190,8 @@
 | GET | `/projects/{id}/products?limit=&offset=` | список товаров **из дашборд-хранилища** (`project:{id}:product:*`, не из поискового индекса — см. [database.md](database.md)) |
 | GET | `/projects/{id}/index-stats` | диагностика поискового индекса: число товаров/токенов в Redis, примеры токенов. Авторизация по **API-ключу**, не JWT |
 | GET | `/projects/{id}/feed-params` | список полей/`params.*`, найденных в первых 20 товарах — для настройки похожих товаров |
+| GET | `/projects/{id}/field-values?field=` | значения поля (включая `params.`-префикс) со счётчиками, топ-50 по убыванию count — для пикера правил-атрибутов рекомендаций в ЛК |
+| POST | `/projects/{id}/products/by-ids` | `{"ids": [...]}` → `{"items": [...]}`, порядок сохраняется, отсутствующие/битые id пропускаются — используется ЛК, чтобы заново показать название/картинку вручную выбранных для рекомендаций товаров без денормализации в настройках |
 
 ## Аналитика
 
@@ -198,8 +214,10 @@
 | Метод | Путь | Описание |
 |---|---|---|
 | GET/PUT | `/projects/{id}/widget` | тема, цвета, показ картинок/цен, `cartCallbackUrl` и т.д. — произвольный JSON, без строгой схемы на бэкенде |
-| GET/PUT | `/projects/{id}/search-settings` | `relatedProductsFields: string[]`, `relatedProductsLimit`, `boostFields`, `facetFields: string[]` |
+| GET/PUT | `/projects/{id}/search-settings` | `relatedProductsFields: string[]`, `relatedProductsLimit`, `boostFields`, `facetFields: string[]`, `recommendations: {limit, manualProductIds: string[], attributeFilters: {[field]: string[]}}` |
 | GET/PUT | `/projects/{id}/synonyms` | `{"synonyms": [["масло","смазка","oil"], ...]}` — список групп, не пары "слово → синонимы" |
+
+`PUT /search-settings` — полная замена объекта. Как и `facetFields`, ключ `recommendations` пишется/читается ЛК по паттерну "прочитать текущий `search_settings` → точечно проставить/удалить свой ключ → PUT целиком", иначе сохранение затирает конфигурацию, которую пишут другие карточки в тот же JSONB. Если ни вручную выбранных товаров, ни правил по атрибутам не задано, ключ `recommendations` не отправляется вовсе (не пустой объект).
 
 ## Служебное
 

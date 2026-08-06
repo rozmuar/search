@@ -412,6 +412,68 @@
                     </div>
                 </div>
 
+                <!-- Recommendations Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">🎯 Рекомендации</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-group">
+                            <label class="form-label">Товары вручную</label>
+                            <p class="form-hint">Начните вводить название товара и выберите из списка. Такие товары показываются в рекомендациях в первую очередь.</p>
+                            <div style="position: relative;">
+                                <input type="text" class="form-input" id="recsProductSearchInput" placeholder="Поиск товара по названию..." autocomplete="off">
+                                <div id="recsProductSearchResults" class="recs-search-dropdown" style="display: none;"></div>
+                            </div>
+                            <div id="recsManualPicksList" class="synonyms-list" style="margin-top: 12px;"></div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Фильтры по свойствам товара</label>
+                            <p class="form-hint">Если вручную выбранных товаров не хватает до лимита, добираем товарами, подходящими под эти правила (например бренд, цвет).</p>
+                            <div class="form-row" style="display: flex; gap: 8px; align-items: center;">
+                                <div class="select-wrapper" style="flex: 1;">
+                                    <select id="recsFilterFieldSelect" onchange="onRecsFilterFieldChange()">
+                                        <option value="">Выберите свойство...</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div id="recsFilterValuesList" class="checkbox-group" style="margin-top: 8px; display: none;"></div>
+                            <button type="button" class="btn btn-secondary" id="recsAddFilterRuleBtn" onclick="addRecsFilterRule()" style="margin-top: 8px; display: none;">
+                                Добавить правило
+                            </button>
+                            <div id="recsFilterRulesList" class="synonyms-list" style="margin-top: 12px;"></div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Количество рекомендаций</label>
+                            <input type="number" id="recsLimit" class="form-input" value="8" min="1" max="50" onchange="markRecsSettingsChanged()">
+                        </div>
+
+                        <div class="form-actions">
+                            <button class="btn btn-primary" id="saveRecsSettingsBtn" onclick="saveRecommendationsSettings()" disabled>
+                                Сохранить настройки
+                            </button>
+                            <span class="form-hint" id="recsSettingsStatus"></span>
+                        </div>
+
+                        <div class="form-group" style="margin-top: 24px; border-top: 1px solid var(--gray-200); padding-top: 20px;">
+                            <label class="form-label">Код для сайта</label>
+                            <p class="form-hint">Вставьте на любую страницу сайта (обычно - главная). Параметр category необязателен - если указан, рекомендации показываются только из этого раздела (категории товара).</p>
+                            <pre id="recsEmbedCode"><code>&lt;div id="search-recommendations"&gt;&lt;/div&gt;
+&lt;script src="<span id="recsEmbedScriptUrl">/recommendations.js</span>"&gt;&lt;/script&gt;
+&lt;script&gt;
+  SearchRecommendations.init({
+    apiKey: '<span id="recsEmbedApiKey">ВАШ_API_КЛЮЧ</span>',
+    container: '#search-recommendations',
+    category: 'Ноутбуки' // необязательно
+  });
+&lt;/script&gt;</code></pre>
+                            <button class="btn btn-ghost" onclick="copyCode('recsEmbedCode')">📋 Скопировать</button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Synonyms Card -->
                 <div class="card">
                     <div class="card-header">

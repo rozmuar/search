@@ -5,7 +5,7 @@ from fastapi import FastAPI, HTTPException, Query, Depends, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse, Response
 from fastapi.staticfiles import StaticFiles
-from typing import Optional, List, Literal
+from typing import Optional, List, Literal, Dict
 import redis.asyncio as redis
 from contextlib import asynccontextmanager
 from pydantic import BaseModel, EmailStr
@@ -811,6 +811,66 @@ async def get_categories(
     return result
 
 
+@app.get("/api/v1/recommendations")
+async def get_recommendations(
+    project_id: Optional[str] = Query(None),
+    api_key: Optional[str] = Query(None),
+    category: Optional[str] = Query(None, description="Раздел сайта (категория товара) - рекомендации фильтруются только этим значением"),
+    limit: Optional[int] = Query(None, ge=1, le=50),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
+):
+    """Рекомендации для виджета recommendations.js. Приоритетная цепочка:
+    вручную выбранные -> по атрибутам -> популярные по проекту -> просто в наличии,
+    каждый этап отфильтрован по category (если задана). См. docs/recommendations-widget.md"""
+    import time
+    start_time = time.time()
+
+    effective_api_key = x_api_key or api_key
+    actual_project_id = project_id
+    project = None
+
+    if effective_api_key:
+        project = await data_store.get_project_by_api_key(effective_api_key)
+        if project:
+            actual_project_id = project["id"]
+
+    if not actual_project_id:
+        actual_project_id = "demo"
+
+    recs_settings = {}
+    if project:
+        try:
+            search_settings_str = project.get("search_settings", "{}")
+            parsed_settings = json.loads(search_settings_str) if isinstance(search_settings_str, str) else search_settings_str
+            recs_settings = parsed_settings.get("recommendations") or {}
+        except Exception:
+            recs_settings = {}
+
+    actual_limit = limit if limit is not None else recs_settings.get("limit", 8)
+    manual_product_ids = recs_settings.get("manualProductIds") or []
+    attribute_filters = recs_settings.get("attributeFilters") or {}
+
+    result = await search_engine.get_recommendations(
+        project_id=actual_project_id,
+        category=category,
+        limit=actual_limit,
+        manual_product_ids=manual_product_ids,
+        attribute_filters=attribute_filters
+    )
+
+    took_ms = (time.time() - start_time) * 1000
+
+    return {
+        "items": result["items"],
+        "meta": {
+            "took_ms": round(took_ms, 2),
+            "project_id": actual_project_id,
+            "category": category
+        },
+        "stages": result["stages"]
+    }
+
+
 # ============ WIDGET SETTINGS ============
 
 @app.get("/api/v1/projects/{project_id}/widget")
@@ -955,6 +1015,71 @@ async def get_feed_params(project_id: str, user: User = Depends(require_auth)):
     return {"fields": sorted(list(fields))}
 
 
+@app.get("/api/v1/projects/{project_id}/field-values")
+async def get_field_values(
+    project_id: str,
+    field: str = Query(..., description="Имя поля, включая params.-префикс, например params.Цвет"),
+    user: User = Depends(require_auth)
+):
+    """Список значений поля со счётчиками - для пикера правил рекомендаций по атрибутам.
+    Не кэшируется (в отличие от /categories) - дёргается редко, только из ЛК."""
+    project = await data_store.get_project(project_id)
+    if not project or project.get("user_id") != user.id:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    is_params_field = field.startswith("params.")
+    actual_field = field[7:] if is_params_field else field
+
+    value_counts: Dict[str, int] = {}
+
+    keys = await _scan_keys(redis_client, f"products:{project_id}:*")
+    for key in keys:
+        data = await redis_client.get(key)
+        if not data:
+            continue
+        try:
+            product = json.loads(data if isinstance(data, str) else data.decode())
+        except (json.JSONDecodeError, TypeError, UnicodeDecodeError):
+            continue
+
+        if is_params_field:
+            value = product.get("params", {}).get(actual_field)
+        else:
+            value = product.get(field)
+            if not value and "params" in product:
+                value = product.get("params", {}).get(field)
+
+        if value:
+            value_counts[value] = value_counts.get(value, 0) + 1
+
+    values = [
+        {"value": v, "count": c}
+        for v, c in sorted(value_counts.items(), key=lambda x: -x[1])
+    ][:50]
+
+    return {"field": field, "values": values}
+
+
+@app.post("/api/v1/projects/{project_id}/products/by-ids")
+async def get_products_by_ids(
+    project_id: str,
+    data: dict,
+    user: User = Depends(require_auth)
+):
+    """Загрузка товаров по списку id - чтобы ЛК мог заново показать вручную выбранные
+    товары (имя/картинка/цена) при перезагрузке страницы, не храня их дублем в settings."""
+    project = await data_store.get_project(project_id)
+    if not project or project.get("user_id") != user.id:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    ids = data.get("ids") or []
+    if not isinstance(ids, list):
+        raise HTTPException(status_code=400, detail="ids must be a list")
+
+    items = await search_engine.get_by_ids(project_id, ids)
+    return {"items": items}
+
+
 # ============ PUBLIC WIDGET ENDPOINT ============
 
 @app.get("/api/v1/widget/{api_key}/config")
@@ -1003,6 +1128,26 @@ async def get_embed_script():
             }
         )
     
+    raise HTTPException(status_code=404, detail="Widget script not found")
+
+
+@app.get("/api/v1/widget/recommendations.js")
+async def get_recommendations_script():
+    """Отдача скрипта виджета рекомендаций (fallback - обычно отдаётся статикой через nginx)"""
+    script_path = os.path.join(os.path.dirname(__file__), '..', 'web', 'recommendations.js')
+    if not os.path.exists(script_path):
+        script_path = '/app/src/web/recommendations.js'
+
+    if os.path.exists(script_path):
+        return FileResponse(
+            script_path,
+            media_type='application/javascript',
+            headers={
+                'Cache-Control': 'public, max-age=3600',
+                'Access-Control-Allow-Origin': '*'
+            }
+        )
+
     raise HTTPException(status_code=404, detail="Widget script not found")
 
 

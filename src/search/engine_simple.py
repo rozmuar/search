@@ -259,12 +259,178 @@ class SimpleSearchEngine:
                             return matching_products
                 except:
                     continue
-            
+
             if cursor == 0:
                 break
-        
+
         return matching_products
-    
+
+    @staticmethod
+    def _load_product(raw) -> Optional[Dict[str, Any]]:
+        """json.loads + decode одного товара, тихо возвращает None на битых/пустых данных"""
+        if not raw:
+            return None
+        try:
+            return json.loads(raw if isinstance(raw, str) else raw.decode())
+        except (json.JSONDecodeError, TypeError, UnicodeDecodeError):
+            return None
+
+    @staticmethod
+    def _matches_attribute_filters(product: Dict[str, Any], filters: Dict[str, List[str]]) -> bool:
+        """AND между полями, OR внутри значений одного поля. Поддерживает params.-префикс
+        с fallback на top-level (та же логика, что в search_by_field)."""
+        for field, allowed_values in filters.items():
+            is_params_field = field.startswith("params.")
+            actual_field = field[7:] if is_params_field else field
+
+            if is_params_field:
+                product_value = product.get("params", {}).get(actual_field)
+            else:
+                product_value = product.get(field)
+                if not product_value and "params" in product:
+                    product_value = product.get("params", {}).get(field)
+
+            if product_value is None:
+                return False
+
+            product_value_str = str(product_value).lower()
+            if not any(product_value_str == str(v).lower() for v in allowed_values):
+                return False
+
+        return True
+
+    async def get_by_ids(self, project_id: str, ids: List[str]) -> List[Dict[str, Any]]:
+        """Загрузка товаров по списку id, с сохранением порядка ids, пропуском отсутствующих/битых"""
+        if not ids:
+            return []
+
+        keys = [f"products:{project_id}:{pid}" for pid in ids]
+        raw_values = await self.redis.mget(keys)
+
+        items = []
+        for data in raw_values:
+            product = self._load_product(data)
+            if product:
+                items.append(product)
+
+        return items
+
+    async def get_recommendations(
+        self,
+        project_id: str,
+        category: Optional[str] = None,
+        limit: int = 8,
+        manual_product_ids: Optional[List[str]] = None,
+        attribute_filters: Optional[Dict[str, List[str]]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Рекомендации - приоритетная цепочка (каждый этап фильтруется по category, если задана):
+        1. вручную выбранные товары (прямой MGET, без скана)
+        2. товары по атрибутам (SCAN)
+        3. популярные по всему проекту (ZSET analytics:{project_id}:popular_products)
+        4. просто в наличии (fallback; переиспользует SCAN этапа 2, если он выполнялся)
+
+        Возвращает {"items": [...], "stages": {"manual": n, "attribute": n, "popular": n, "fallback": n}}
+        """
+        seen_ids: set = set()
+        items: List[Dict[str, Any]] = []
+        stages = {"manual": 0, "attribute": 0, "popular": 0, "fallback": 0}
+
+        def add(product: Dict[str, Any], stage: str) -> None:
+            pid = product.get("id")
+            if not pid or pid in seen_ids:
+                return
+            seen_ids.add(pid)
+            items.append(product)
+            stages[stage] += 1
+
+        def matches_category(product: Dict[str, Any]) -> bool:
+            return not category or product.get("category") == category
+
+        # Этап 1: вручную выбранные - id уже известны, скан не нужен
+        if manual_product_ids:
+            keys = [f"products:{project_id}:{pid}" for pid in manual_product_ids]
+            raw_values = await self.redis.mget(keys)
+            for data in raw_values:
+                if len(items) >= limit:
+                    break
+                product = self._load_product(data)
+                if product and matches_category(product):
+                    add(product, "manual")
+
+        if len(items) >= limit:
+            return {"items": items[:limit], "stages": stages}
+
+        # Этапы 2 и 4 делят один SCAN, если этап 2 вообще настроен - иначе не сканируем зря
+        fallback_candidates: List[Dict[str, Any]] = []
+        if attribute_filters:
+            cursor = 0
+            pattern = f"products:{project_id}:*"
+            while True:
+                cursor, keys = await self.redis.scan(cursor, match=pattern, count=200)
+                for key in keys:
+                    data = await self.redis.get(key)
+                    product = self._load_product(data)
+                    if not product:
+                        continue
+                    pid = product.get("id")
+                    if not pid or pid in seen_ids or not matches_category(product):
+                        continue
+                    if len(items) < limit and self._matches_attribute_filters(product, attribute_filters):
+                        add(product, "attribute")
+                    elif len(fallback_candidates) < limit and product.get("in_stock", True):
+                        fallback_candidates.append(product)
+                if cursor == 0:
+                    break
+
+        if len(items) >= limit:
+            return {"items": items[:limit], "stages": stages}
+
+        # Этап 3: популярность по всему проекту, фильтруем по категории при показе
+        popular_ids = await self.redis.zrevrange(f"analytics:{project_id}:popular_products", 0, 199)
+        if popular_ids:
+            popular_ids = [pid.decode() if isinstance(pid, bytes) else pid for pid in popular_ids]
+            keys = [f"products:{project_id}:{pid}" for pid in popular_ids]
+            raw_values = await self.redis.mget(keys)
+            for data in raw_values:
+                if len(items) >= limit:
+                    break
+                product = self._load_product(data)
+                if product and matches_category(product):
+                    add(product, "popular")
+
+        if len(items) >= limit:
+            return {"items": items[:limit], "stages": stages}
+
+        # Этап 4: просто в наличии. Если этап 2 уже сканировал каталог - переиспользуем его
+        # кандидатов, иначе сканируем отдельно (но не более одного раза за весь запрос)
+        if fallback_candidates:
+            for product in fallback_candidates:
+                if len(items) >= limit:
+                    break
+                add(product, "fallback")
+        else:
+            cursor = 0
+            pattern = f"products:{project_id}:*"
+            while True:
+                cursor, keys = await self.redis.scan(cursor, match=pattern, count=200)
+                for key in keys:
+                    if len(items) >= limit:
+                        break
+                    data = await self.redis.get(key)
+                    product = self._load_product(data)
+                    if not product:
+                        continue
+                    pid = product.get("id")
+                    if not pid or pid in seen_ids or not matches_category(product):
+                        continue
+                    if product.get("in_stock", True):
+                        add(product, "fallback")
+                if cursor == 0 or len(items) >= limit:
+                    break
+
+        return {"items": items[:limit], "stages": stages}
+
     async def _search_inverted_index(
         self,
         project_id: str,

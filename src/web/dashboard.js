@@ -45,7 +45,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Setup navigation
     setupNavigation();
-    
+
+    // Setup recommendations product search (static DOM elements, one-time listener setup)
+    initRecsProductSearch();
+
     // Load initial data
     await loadProjects();
     loadDashboardStats();
@@ -433,6 +436,9 @@ async function openProjectDetail(projectId) {
     // Load cart callback settings
     await loadCartSettings();
 
+    // Load recommendations settings
+    await loadRecommendationsSettings();
+
     // Load synonyms
     await loadSynonyms();
     
@@ -773,6 +779,312 @@ async function saveCartSettings() {
         statusEl.textContent = 'Ошибка сохранения';
         showToast('Ошибка сохранения настроек', 'error');
     }
+}
+
+// ==================== RECOMMENDATIONS ====================
+let recsManualPicks = [];       // [{id, name, image, price}]
+let recsFilterRules = [];       // [{field, values: []}]
+let recsAvailableFields = [];   // ["brand", "params.Цвет", ...] from /feed-params
+let recsSettingsChanged = false;
+let recsSearchDebounceTimer = null;
+
+async function loadRecommendationsSettings() {
+    if (!currentProject) return;
+    const limitInput = document.getElementById('recsLimit');
+    const saveBtn = document.getElementById('saveRecsSettingsBtn');
+    const statusEl = document.getElementById('recsSettingsStatus');
+    if (!limitInput) return;
+
+    recsSettingsChanged = false;
+    saveBtn.disabled = true;
+    statusEl.textContent = '';
+    recsManualPicks = [];
+    recsFilterRules = [];
+
+    try {
+        let settings = await fetchAPI(`/api/v1/projects/${currentProject.id}/search-settings`);
+        if (typeof settings === 'string') {
+            try { settings = JSON.parse(settings); } catch (e) { settings = {}; }
+        }
+        const recs = settings.recommendations || {};
+        limitInput.value = recs.limit || 8;
+
+        const manualIds = Array.isArray(recs.manualProductIds) ? recs.manualProductIds : [];
+        if (manualIds.length > 0) {
+            try {
+                const data = await fetchAPI(`/api/v1/projects/${currentProject.id}/products/by-ids`, {
+                    method: 'POST',
+                    body: JSON.stringify({ ids: manualIds })
+                });
+                recsManualPicks = data.items || [];
+            } catch (err) {
+                console.error('Error loading manual picks:', err);
+            }
+        }
+
+        const attributeFilters = recs.attributeFilters || {};
+        recsFilterRules = Object.entries(attributeFilters).map(([field, values]) => ({
+            field,
+            values: Array.isArray(values) ? values : [values]
+        }));
+    } catch (err) {
+        console.log('No recommendations settings yet:', err);
+    }
+
+    renderRecsManualPicks();
+    renderRecsFilterRules();
+
+    try {
+        const feedParams = await fetchAPI(`/api/v1/projects/${currentProject.id}/feed-params`);
+        recsAvailableFields = feedParams.fields || [];
+        const select = document.getElementById('recsFilterFieldSelect');
+        if (select) {
+            select.innerHTML = '<option value="">Выберите свойство...</option>' +
+                recsAvailableFields.map(f => `<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join('');
+        }
+    } catch (err) {
+        console.error('Error loading feed params for recommendations:', err);
+    }
+
+    updateRecsEmbedCode();
+}
+
+function markRecsSettingsChanged() {
+    recsSettingsChanged = true;
+    document.getElementById('saveRecsSettingsBtn').disabled = false;
+    document.getElementById('recsSettingsStatus').textContent = 'Есть несохранённые изменения';
+}
+
+// ---- Manual product picks ----
+function renderRecsManualPicks() {
+    const listEl = document.getElementById('recsManualPicksList');
+    if (!listEl) return;
+    if (recsManualPicks.length === 0) {
+        listEl.innerHTML = '<div class="form-hint">Товары не выбраны</div>';
+        return;
+    }
+    listEl.innerHTML = recsManualPicks.map((p, index) => `
+        <div class="synonym-group" data-index="${index}">
+            <div class="synonym-words">
+                <span class="synonym-word">${escapeHtml(p.name || p.id)}${p.price ? ` — ${formatPrice(p.price)} ₽` : ''}</span>
+            </div>
+            <button class="synonym-delete-btn" onclick="removeRecsManualPick(${index})" title="Убрать">✕</button>
+        </div>
+    `).join('');
+}
+
+function addRecsManualPick(product) {
+    if (recsManualPicks.some(p => p.id === product.id)) return;
+    recsManualPicks.push(product);
+    renderRecsManualPicks();
+    markRecsSettingsChanged();
+}
+
+function removeRecsManualPick(index) {
+    recsManualPicks.splice(index, 1);
+    renderRecsManualPicks();
+    markRecsSettingsChanged();
+}
+
+function initRecsProductSearch() {
+    const input = document.getElementById('recsProductSearchInput');
+    const dropdown = document.getElementById('recsProductSearchResults');
+    if (!input || !dropdown) return;
+
+    input.addEventListener('input', () => {
+        clearTimeout(recsSearchDebounceTimer);
+        const query = input.value.trim();
+        if (query.length < 2) {
+            dropdown.style.display = 'none';
+            dropdown.innerHTML = '';
+            return;
+        }
+        recsSearchDebounceTimer = setTimeout(() => searchRecsProducts(query), 250);
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!dropdown.contains(e.target) && e.target !== input) {
+            dropdown.style.display = 'none';
+        }
+    });
+}
+
+async function searchRecsProducts(query) {
+    if (!currentProject || !currentProject.api_key) return;
+    const dropdown = document.getElementById('recsProductSearchResults');
+    if (!dropdown) return;
+
+    try {
+        const params = new URLSearchParams({ q: query, api_key: currentProject.api_key, limit: 8 });
+        const response = await fetch(`${API_BASE}/api/v1/search?${params}`);
+        const data = await response.json();
+        const items = data.items || [];
+
+        if (items.length === 0) {
+            dropdown.innerHTML = '<div class="recs-search-dropdown-item">Ничего не найдено</div>';
+        } else {
+            dropdown.innerHTML = items.map(p => `
+                <div class="recs-search-dropdown-item" data-id="${escapeHtml(p.id)}">
+                    ${p.image ? `<img src="${escapeHtml(p.image)}" alt="">` : ''}
+                    <span>${escapeHtml(p.name || p.id)}</span>
+                    ${p.price ? `<span class="recs-item-price">${formatPrice(p.price)} ₽</span>` : ''}
+                </div>
+            `).join('');
+            dropdown.querySelectorAll('.recs-search-dropdown-item[data-id]').forEach((el, i) => {
+                el.addEventListener('click', () => {
+                    addRecsManualPick(items[i]);
+                    document.getElementById('recsProductSearchInput').value = '';
+                    dropdown.style.display = 'none';
+                    dropdown.innerHTML = '';
+                });
+            });
+        }
+        dropdown.style.display = 'block';
+    } catch (err) {
+        console.error('Error searching products for recommendations:', err);
+    }
+}
+
+// ---- Attribute filter rules ----
+async function onRecsFilterFieldChange() {
+    const select = document.getElementById('recsFilterFieldSelect');
+    const valuesList = document.getElementById('recsFilterValuesList');
+    const addBtn = document.getElementById('recsAddFilterRuleBtn');
+    const field = select.value;
+
+    if (!field || !currentProject) {
+        valuesList.style.display = 'none';
+        addBtn.style.display = 'none';
+        return;
+    }
+
+    valuesList.innerHTML = '<div class="form-hint">Загрузка значений...</div>';
+    valuesList.style.display = 'block';
+
+    try {
+        const data = await fetchAPI(`/api/v1/projects/${currentProject.id}/field-values?field=${encodeURIComponent(field)}`);
+        const values = data.values || [];
+        if (values.length === 0) {
+            valuesList.innerHTML = '<div class="form-hint">Нет значений для этого поля</div>';
+            addBtn.style.display = 'none';
+            return;
+        }
+        valuesList.innerHTML = values.map(v => `
+            <label class="checkbox-item">
+                <input type="checkbox" name="recsFilterValue" value="${escapeHtml(v.value)}">
+                <span>${escapeHtml(v.value)} (${v.count})</span>
+            </label>
+        `).join('');
+        addBtn.style.display = 'inline-flex';
+    } catch (err) {
+        console.error('Error loading field values:', err);
+        valuesList.innerHTML = '<div class="form-hint">Ошибка загрузки значений</div>';
+    }
+}
+
+function addRecsFilterRule() {
+    const fieldSelect = document.getElementById('recsFilterFieldSelect');
+    const field = fieldSelect.value;
+    if (!field) return;
+
+    const checked = document.querySelectorAll('#recsFilterValuesList input[name="recsFilterValue"]:checked');
+    const values = Array.from(checked).map(cb => cb.value);
+    if (values.length === 0) {
+        showToast('Выберите хотя бы одно значение', 'error');
+        return;
+    }
+
+    recsFilterRules = recsFilterRules.filter(r => r.field !== field);
+    recsFilterRules.push({ field, values });
+
+    fieldSelect.value = '';
+    document.getElementById('recsFilterValuesList').style.display = 'none';
+    document.getElementById('recsAddFilterRuleBtn').style.display = 'none';
+
+    renderRecsFilterRules();
+    markRecsSettingsChanged();
+}
+
+function removeRecsFilterRule(index) {
+    recsFilterRules.splice(index, 1);
+    renderRecsFilterRules();
+    markRecsSettingsChanged();
+}
+
+function renderRecsFilterRules() {
+    const listEl = document.getElementById('recsFilterRulesList');
+    if (!listEl) return;
+    if (recsFilterRules.length === 0) {
+        listEl.innerHTML = '<div class="form-hint">Правила не добавлены</div>';
+        return;
+    }
+    listEl.innerHTML = recsFilterRules.map((rule, index) => `
+        <div class="synonym-group" data-index="${index}">
+            <div class="synonym-words">
+                <span class="synonym-word">${escapeHtml(rule.field)}: ${rule.values.map(v => escapeHtml(v)).join(', ')}</span>
+            </div>
+            <button class="synonym-delete-btn" onclick="removeRecsFilterRule(${index})" title="Удалить">✕</button>
+        </div>
+    `).join('');
+}
+
+// ---- Save / embed code ----
+async function saveRecommendationsSettings() {
+    if (!currentProject) return;
+    const limitInput = document.getElementById('recsLimit');
+    const saveBtn = document.getElementById('saveRecsSettingsBtn');
+    const statusEl = document.getElementById('recsSettingsStatus');
+
+    saveBtn.disabled = true;
+    statusEl.textContent = 'Сохранение...';
+
+    try {
+        const manualProductIds = recsManualPicks.map(p => p.id);
+        const attributeFilters = {};
+        recsFilterRules.forEach(r => { attributeFilters[r.field] = r.values; });
+
+        let settings = await fetchAPI(`/api/v1/projects/${currentProject.id}/search-settings`);
+        if (typeof settings === 'string') {
+            try { settings = JSON.parse(settings); } catch (e) { settings = {}; }
+        }
+
+        if (manualProductIds.length > 0 || Object.keys(attributeFilters).length > 0) {
+            settings.recommendations = {
+                limit: parseInt(limitInput.value) || 8,
+                manualProductIds,
+                attributeFilters
+            };
+        } else {
+            delete settings.recommendations;
+        }
+
+        await fetchAPI(`/api/v1/projects/${currentProject.id}/search-settings`, {
+            method: 'PUT',
+            body: JSON.stringify(settings)
+        });
+
+        recsSettingsChanged = false;
+        statusEl.textContent = '✓ Сохранено';
+        showToast('Настройки рекомендаций сохранены', 'success');
+        currentProject.search_settings = settings;
+
+    } catch (err) {
+        console.error('Error saving recommendations settings:', err);
+        saveBtn.disabled = false;
+        statusEl.textContent = 'Ошибка сохранения';
+        showToast('Ошибка сохранения настроек', 'error');
+    }
+}
+
+function updateRecsEmbedCode() {
+    if (!currentProject) return;
+    const baseUrl = window.location.origin;
+    const apiKey = currentProject.api_key || 'ВАШ_API_КЛЮЧ';
+
+    const scriptUrlEl = document.getElementById('recsEmbedScriptUrl');
+    const apiKeyEl = document.getElementById('recsEmbedApiKey');
+    if (scriptUrlEl) scriptUrlEl.textContent = `${baseUrl}/recommendations.js`;
+    if (apiKeyEl) apiKeyEl.textContent = apiKey;
 }
 
 // ==================== SYNONYMS ====================
