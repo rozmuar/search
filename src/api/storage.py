@@ -42,10 +42,11 @@ class DataStore:
                 id=user_id,
                 email=data.email,
                 name=data.name,
+                role=user.get("role", "user"),
                 created_at=str(user["created_at"])
             )
         )
-    
+
     async def login_user(self, data: UserLogin) -> Optional[Token]:
         """Авторизация пользователя"""
         user = await db.get_user_by_email(data.email)
@@ -65,23 +66,35 @@ class DataStore:
                 id=user["id"],
                 email=user["email"],
                 name=user["name"],
+                role=user.get("role", "user"),
                 created_at=str(user["created_at"])
             )
         )
-    
+
     async def get_user(self, user_id: str) -> Optional[User]:
         """Получение пользователя по ID"""
         user = await db.get_user_by_id(user_id)
         if not user:
             return None
-        
+
         return User(
             id=user["id"],
             email=user["email"],
             name=user["name"],
+            role=user.get("role", "user"),
             created_at=str(user["created_at"])
         )
-    
+
+    # ========== ADMIN: USERS ==========
+
+    async def list_all_users(self) -> List[Dict[str, Any]]:
+        """Все пользователи системы (для раздела администрирования)"""
+        return await db.list_all_users()
+
+    async def update_user_role(self, user_id: str, role: str) -> Optional[Dict[str, Any]]:
+        """Назначить/снять роль manager. None - пользователь не найден либо это admin (защищён)"""
+        return await db.update_user_role(user_id, role)
+
     # ========== PROJECTS (PostgreSQL) ==========
     
     async def create_project(self, user_id: str, name: str, domain: str, feed_url: str = "") -> Dict[str, Any]:
@@ -179,7 +192,53 @@ class DataStore:
         await self.redis.set(f"apikey:{new_key}", project_id)
         
         return new_key
-    
+
+    # ========== ADMIN: PROJECTS & BILLING ==========
+
+    async def get_all_projects_admin(self) -> List[Dict[str, Any]]:
+        """Все проекты всех клиентов с владельцем и биллингом (для раздела администрирования)"""
+        return await db.get_all_projects_admin()
+
+    async def update_project_billing(self, project_id: str, status: Optional[str], paid_until) -> Optional[Dict[str, Any]]:
+        """Ручное включение/приостановка проекта и/или дата окончания оплаты. Резолвинг по
+        api_key кэширует в Redis только project_id (см. get_project_by_api_key выше) - сама
+        запись всегда дочитывается из Postgres заново, свежий status подхватится без
+        отдельной инвалидации кэша"""
+        return await db.update_project_billing(project_id, status, paid_until)
+
+    async def get_projects_expiring_soon(self, today) -> List[Dict[str, Any]]:
+        return await db.get_projects_expiring_soon(today)
+
+    async def get_projects_to_suspend(self, today) -> List[Dict[str, Any]]:
+        return await db.get_projects_to_suspend(today)
+
+    async def mark_expiry_reminder_sent(self, project_id: str):
+        await db.mark_expiry_reminder_sent(project_id)
+
+    async def suspend_project(self, project_id: str):
+        await db.suspend_project(project_id)
+
+    # ========== NOTIFICATIONS ==========
+
+    async def notify_admins_and_managers(self, type: str, title: str,
+                                          body: Optional[str] = None, project_id: Optional[str] = None):
+        """Единая точка фан-аута - создаёт запись уведомления каждому admin/manager"""
+        user_ids = await db.get_admin_and_manager_user_ids()
+        for user_id in user_ids:
+            await db.create_notification(user_id, type, title, body, project_id)
+
+    async def list_notifications_for_user(self, user_id: str, limit: int = 20) -> List[Dict[str, Any]]:
+        return await db.list_notifications_for_user(user_id, limit)
+
+    async def count_unread_notifications(self, user_id: str) -> int:
+        return await db.count_unread_notifications(user_id)
+
+    async def mark_notification_read(self, notification_id: int, user_id: str) -> bool:
+        return await db.mark_notification_read(notification_id, user_id)
+
+    async def mark_all_notifications_read(self, user_id: str):
+        await db.mark_all_notifications_read(user_id)
+
     # ========== PRODUCTS (Redis) ==========
     
     async def save_products(self, project_id: str, products: List[Dict]) -> int:

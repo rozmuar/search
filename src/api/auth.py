@@ -29,10 +29,13 @@ class UserLogin(BaseModel):
 
 
 class User(BaseModel):
-    """Модель пользователя"""
+    """Модель пользователя. role не кладётся в JWT - читается заново из БД на каждый
+    запрос через get_current_user, поэтому назначение/снятие роли действует сразу,
+    без повторного логина"""
     id: str
     email: str
     name: str
+    role: str = "user"
     created_at: str
     
 

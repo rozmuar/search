@@ -66,6 +66,14 @@
                     <span>Встраивание</span>
                 </a>
             </div>
+
+            <div class="nav-section" id="navSectionAdmin" style="display: none;">
+                <div class="nav-section-title">Администрирование</div>
+                <a class="nav-item" href="/dashboard/admin/" data-section="admin">
+                    <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg></span>
+                    <span>Администрирование</span>
+                </a>
+            </div>
         </nav>
 
         <div class="sidebar-footer">
@@ -97,10 +105,21 @@
             </div>
 
             <div class="header-right">
-                <button class="header-btn" title="Уведомления">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
-                    <span class="badge" id="notifCount" style="display: none;">0</span>
-                </button>
+                <div class="notif-wrapper">
+                    <button class="header-btn" title="Уведомления" onclick="toggleNotifDropdown()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                        <span class="badge" id="notifCount" style="display: none;">0</span>
+                    </button>
+                    <div class="notif-dropdown" id="notifDropdown" style="display: none;">
+                        <div class="notif-dropdown-header">
+                            <span>Уведомления</span>
+                            <button class="btn-ghost" onclick="markAllNotificationsRead()">Прочитать всё</button>
+                        </div>
+                        <div class="notif-dropdown-list" id="notifDropdownList">
+                            <div class="notif-empty">Пока пусто</div>
+                        </div>
+                    </div>
+                </div>
                 <button class="header-btn" title="Настройки">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
                 </button>
@@ -1403,6 +1422,60 @@
                             <li>Используйте <a href="https://webmaster.yandex.ru/tools/xml-validator/" target="_blank">валидатор Яндекс.Вебмастера</a> для проверки структуры</li>
                             <li>Загрузите фид в SearchPro и проверьте количество распознанных товаров</li>
                         </ol>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== ADMIN SECTION ==================== -->
+            <section class="content-section" id="section-admin">
+                <div class="section-header">
+                    <div>
+                        <h1 class="section-title">Администрирование</h1>
+                        <p class="section-subtitle">Все клиенты, проекты и оплата сервиса</p>
+                    </div>
+                </div>
+
+                <div class="card" style="margin-bottom: 24px;">
+                    <div class="card-header">
+                        <h3 class="card-title">Проекты и оплата</h3>
+                    </div>
+                    <div class="card-body-flush">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Проект</th>
+                                    <th>Владелец</th>
+                                    <th>Статус</th>
+                                    <th>Оплачено до</th>
+                                    <th>Действие</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adminProjectsBody">
+                                <tr><td colspan="5">Загрузка...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Пользователи</h3>
+                    </div>
+                    <div class="card-body-flush">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Email</th>
+                                    <th>Имя</th>
+                                    <th>Роль</th>
+                                    <th>Регистрация</th>
+                                    <th>Действие</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adminUsersBody">
+                                <tr><td colspan="5">Загрузка...</td></tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </section>

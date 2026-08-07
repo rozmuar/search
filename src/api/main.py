@@ -23,6 +23,8 @@ from .storage import DataStore
 from .database import db
 from ..feed.parser import FeedParser, FeedManager
 from ..feed.scheduler import start_feed_scheduler, stop_feed_scheduler
+from ..billing.scheduler import start_billing_scheduler, stop_billing_scheduler
+from . import email_sender
 from ..core.models import Product
 
 # Настройка логирования
@@ -124,18 +126,24 @@ async def lifespan(app: FastAPI):
     # Запуск планировщика автообновления фидов
     feed_scheduler = await start_feed_scheduler(redis_client, feed_manager, data_store, indexer)
 
+    # Запуск планировщика биллинга (напоминание за 7 дней + авто-приостановка просроченных)
+    billing_scheduler = await start_billing_scheduler(
+        data_store, email_sender.send_expiry_warning, email_sender.send_suspension_notice
+    )
+
     # Восстановление товаров из PostgreSQL если Redis пустой - в фоне,
     # чтобы не блокировать старт uvicorn (nginx проксирует на этот порт сразу
     # после запуска контейнера и отдаёт 502, пока порт не забиндлен)
     asyncio.create_task(restore_products_from_backup(indexer))
 
     print("✓ Search service initialized (full version with PostgreSQL)")
-    
+
     yield
-    
-    # Остановка планировщика
+
+    # Остановка планировщиков
     await stop_feed_scheduler()
-    
+    await stop_billing_scheduler()
+
     # Закрытие соединений
     await db.disconnect()
     await redis_client.close()
@@ -179,6 +187,27 @@ async def require_auth(authorization: Optional[str] = Header(None)) -> User:
     if not user:
         raise HTTPException(status_code=401, detail="Unauthorized")
     return user
+
+
+async def require_manager(user: User = Depends(require_auth)) -> User:
+    """Доступ к разделу администрирования - admin и manager"""
+    if user.role not in ("admin", "manager"):
+        raise HTTPException(status_code=403, detail="Forbidden")
+    return user
+
+
+async def require_admin(user: User = Depends(require_auth)) -> User:
+    """Назначение/снятие роли manager - только admin"""
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Forbidden")
+    return user
+
+
+def _check_project_active(project: Optional[dict]):
+    """403 только когда api_key реально разрешился в приостановленный проект - None/отсутствие
+    проекта не трогаем, демо-фолбэк и поведение с невалидным ключом остаются как есть"""
+    if project and project.get("status") == "suspended":
+        raise HTTPException(status_code=403, detail="Project suspended - payment required")
 
 
 # ============ AUTH ENDPOINTS ============
@@ -469,6 +498,78 @@ async def get_analytics(
     return analytics
 
 
+# ============ ADMIN ENDPOINTS ============
+
+class UpdateUserRole(BaseModel):
+    role: Literal["user", "manager"]  # admin нельзя выдать/снять через этот эндпоинт
+
+
+class UpdateProjectBilling(BaseModel):
+    status: Optional[Literal["active", "suspended"]] = None
+    paid_until: Optional[str] = None  # "YYYY-MM-DD" или null - снять дату (оплата не отслеживается)
+
+
+@app.get("/api/v1/admin/users")
+async def admin_list_users(user: User = Depends(require_manager)):
+    """Все зарегистрированные пользователи - для раздела администрирования"""
+    return {"users": await data_store.list_all_users()}
+
+
+@app.put("/api/v1/admin/users/{target_user_id}/role")
+async def admin_update_user_role(
+    target_user_id: str,
+    data: UpdateUserRole,
+    user: User = Depends(require_admin)
+):
+    """Назначить/снять роль manager. Только admin - защищено ещё и в самом SQL (role != 'admin')"""
+    result = await data_store.update_user_role(target_user_id, data.role)
+    if not result:
+        raise HTTPException(status_code=404, detail="User not found")
+    return result
+
+
+@app.get("/api/v1/admin/projects")
+async def admin_list_projects(user: User = Depends(require_manager)):
+    """Все проекты всех клиентов с владельцем и биллингом"""
+    return {"projects": await data_store.get_all_projects_admin()}
+
+
+@app.put("/api/v1/admin/projects/{project_id}/billing")
+async def admin_update_project_billing(
+    project_id: str,
+    data: UpdateProjectBilling,
+    user: User = Depends(require_manager)
+):
+    """Ручное включение/приостановка проекта и/или дата окончания оплаты"""
+    result = await data_store.update_project_billing(project_id, data.status, data.paid_until)
+    if not result:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return result
+
+
+# ============ NOTIFICATIONS ============
+
+@app.get("/api/v1/notifications")
+async def get_notifications(user: User = Depends(require_auth)):
+    notifications = await data_store.list_notifications_for_user(user.id)
+    unread_count = await data_store.count_unread_notifications(user.id)
+    return {"notifications": notifications, "unread_count": unread_count}
+
+
+@app.post("/api/v1/notifications/{notification_id}/read")
+async def mark_notification_read(notification_id: int, user: User = Depends(require_auth)):
+    ok = await data_store.mark_notification_read(notification_id, user.id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    return {"success": True}
+
+
+@app.post("/api/v1/notifications/read-all")
+async def mark_all_notifications_read(user: User = Depends(require_auth)):
+    await data_store.mark_all_notifications_read(user.id)
+    return {"success": True}
+
+
 # ============ INDEX DIAGNOSTICS ============
 
 @app.get("/api/v1/projects/{project_id}/index-stats")
@@ -553,10 +654,11 @@ async def search(
         project = await data_store.get_project_by_api_key(effective_api_key)
         if project:
             actual_project_id = project["id"]
-    
+    _check_project_active(project)
+
     if not actual_project_id:
         actual_project_id = "demo"  # Демо проект по умолчанию
-    
+
     # Формируем фильтры: сначала из старых фиксированных query-параметров
     # (для обратной совместимости с уже интегрированными клиентами),
     # затем накладываем расширенный JSON из filters, если передан - он приоритетнее
@@ -714,11 +816,13 @@ async def suggest(
     """Автодополнение запроса"""
     effective_api_key = x_api_key or api_key
     actual_project_id = project_id
+    project = None
     if effective_api_key:
         project = await data_store.get_project_by_api_key(effective_api_key)
         if project:
             actual_project_id = project["id"]
-    
+    _check_project_active(project)
+
     if not actual_project_id:
         actual_project_id = "demo"
     
@@ -744,12 +848,14 @@ async def get_popular_queries(
     """Получение популярных запросов для показа при фокусе на поле поиска"""
     effective_api_key = x_api_key or api_key
     actual_project_id = project_id
-    
+    project = None
+
     if effective_api_key:
         project = await data_store.get_project_by_api_key(effective_api_key)
         if project:
             actual_project_id = project["id"]
-    
+    _check_project_active(project)
+
     if not actual_project_id:
         actual_project_id = "demo"
     
@@ -768,11 +874,13 @@ async def get_categories(
     Кэшируется в Redis на 5 минут, кэш сбрасывается при переиндексации фида."""
     effective_api_key = x_api_key or api_key
     actual_project_id = project_id
+    project = None
 
     if effective_api_key:
         project = await data_store.get_project_by_api_key(effective_api_key)
         if project:
             actual_project_id = project["id"]
+    _check_project_active(project)
 
     if not actual_project_id:
         actual_project_id = "demo"
@@ -834,6 +942,7 @@ async def get_recommendations(
         project = await data_store.get_project_by_api_key(effective_api_key)
         if project:
             actual_project_id = project["id"]
+    _check_project_active(project)
 
     if not actual_project_id:
         actual_project_id = "demo"
@@ -1089,7 +1198,8 @@ async def get_widget_config(api_key: str):
     project = await data_store.get_project_by_api_key(api_key)
     if not project:
         raise HTTPException(status_code=404, detail="Invalid API key")
-    
+    _check_project_active(project)
+
     settings = project.get("widget_settings", "{}")
     logger.info(f"[get_widget_config] Raw settings type: {type(settings)}, value: {settings}")
     
@@ -1169,7 +1279,9 @@ async def track_click(data: ClickTrack):
     if not project:
         print(f"[TRACK_CLICK] Project not found for api_key")
         return {"success": False, "error": "Invalid API key"}
-    
+    if project.get("status") == "suspended":
+        return {"success": False, "error": "Project suspended"}
+
     print(f"[TRACK_CLICK] Project found: {project['id']}, logging click...")
     await data_store.log_click(project["id"], data.product_id, data.query)
     print(f"[TRACK_CLICK] Click logged successfully")

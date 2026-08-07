@@ -8,8 +8,10 @@ let currentUser = null;
 let projects = [];
 let currentProject = null;
 let products = [];
+let productsTotal = 0;
 let productsPage = 1;
 const productsPerPage = 15;
+const PRODUCTS_FETCH_LIMIT = 500; // максимум, который отдаёт /projects/{id}/products (le=500)
 
 // Charts
 let searchChart = null;
@@ -53,7 +55,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadProjects();
     loadDashboardStats();
     initCharts();
-    
+
+    // Notifications - poll every 30s, closes on outside click
+    loadNotifications();
+    setInterval(loadNotifications, 30000);
+    document.addEventListener('click', (e) => {
+        const wrapper = document.querySelector('.notif-wrapper');
+        if (wrapper && !wrapper.contains(e.target)) {
+            document.getElementById('notifDropdown').style.display = 'none';
+        }
+    });
+
     // Handle initial URL
     handleRoute();
 });
@@ -61,13 +73,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 // ==================== USER UI ====================
 function updateUserUI() {
     if (!currentUser) return;
-    
+
     const email = currentUser.email || 'user@example.com';
     const name = email.split('@')[0];
     const initial = name.charAt(0).toUpperCase();
-    
+
     document.getElementById('userName').textContent = name;
     document.getElementById('userAvatar').textContent = initial;
+
+    const navSectionAdmin = document.getElementById('navSectionAdmin');
+    if (navSectionAdmin) {
+        navSectionAdmin.style.display = ['admin', 'manager'].includes(currentUser.role) ? '' : 'none';
+    }
 }
 
 // ==================== NAVIGATION ====================
@@ -144,7 +161,8 @@ function showSection(sectionId) {
         'widget': 'Виджет',
         'embed': 'Встраивание',
         'project-detail': 'Проект',
-        'feed-guide': 'Формат фида'
+        'feed-guide': 'Формат фида',
+        'admin': 'Администрирование'
     };
     document.getElementById('pageTitle').textContent = titles[sectionId] || 'Дашборд';
     
@@ -162,8 +180,11 @@ function showSection(sectionId) {
     } else if (sectionId === 'embed') {
         updateProjectSelect('embedProjectSelect');
         updateEmbedCode();
+    } else if (sectionId === 'admin') {
+        loadAdminProjects();
+        loadAdminUsers();
     }
-    
+
     // Close mobile sidebar
     closeSidebar();
 }
@@ -1706,27 +1727,33 @@ async function loadProjectProducts(projectId) {
             updateFeedStatus('neutral', 'Фид не загружен');
         }
         
-        // Load products
-        const response = await fetchAPI(`/api/v1/projects/${projectId}/products`);
+        // Load products. limit=500 - максимум, который отдаёт бэкенд за раз (le=500);
+        // используем response.total (точный SCARD, не зависит от limit) для счётчиков,
+        // а не products.length - иначе каталог из 200+ товаров всегда показывал бы
+        // ровно дефолтный лимит вместо реального количества
+        const response = await fetchAPI(`/api/v1/projects/${projectId}/products?limit=${PRODUCTS_FETCH_LIMIT}`);
         products = response.products || response || [];
-        
+        productsTotal = typeof response.total === 'number' ? response.total : products.length;
+        productsPage = 1;
+
         if (products.length > 0) {
             document.getElementById('productsTable').style.display = 'block';
             document.getElementById('feedStats').style.display = 'grid';
-            
-            // Update stats (учитываем оба формата: available и in_stock)
+
+            // Категории/наличие считаются по загруженной пачке (до 500 товаров) - для
+            // каталогов больше 500 это будет приближением, не точным значением по всему фиду
             const categories = new Set(products.map(p => p.category || p.category_name).filter(Boolean));
             const inStock = products.filter(p => {
                 if (p.available !== undefined) return p.available;
                 if (p.in_stock !== undefined) return p.in_stock;
                 return true;
             }).length;
-            
-            document.getElementById('feedTotalProducts').textContent = products.length;
+
+            document.getElementById('feedTotalProducts').textContent = productsTotal;
             document.getElementById('feedCategories').textContent = categories.size;
             document.getElementById('feedInStock').textContent = inStock;
             document.getElementById('feedLastUpdate').textContent = 'Сегодня';
-            
+
             renderProducts();
         } else {
             document.getElementById('productsTable').style.display = 'none';
@@ -1774,8 +1801,13 @@ function renderProducts() {
         `;
     }).join('');
     
-    // Update count
-    document.getElementById('productsCount').textContent = `${products.length} товаров`;
+    // Update count. Если загруженная пачка (до PRODUCTS_FETCH_LIMIT) меньше реального
+    // total - каталог больше лимита за один запрос, показываем это явно, а не молча
+    // выдаём кол-во загруженного за общее число товаров
+    const countLabel = products.length < productsTotal
+        ? `${productsTotal} товаров (показано ${products.length})`
+        : `${productsTotal} товаров`;
+    document.getElementById('productsCount').textContent = countLabel;
     
     // Render pagination
     renderPagination();
@@ -2223,6 +2255,201 @@ async function testSearch() {
                 <p class="empty-text">Ошибка поиска</p>
             </div>
         `;
+    }
+}
+
+// ==================== ADMIN ====================
+async function loadAdminProjects() {
+    const tbody = document.getElementById('adminProjectsBody');
+    if (!tbody) return;
+    try {
+        const data = await fetchAPI('/api/v1/admin/projects');
+        renderAdminProjectsList(data.projects || []);
+    } catch (err) {
+        console.error('Error loading admin projects:', err);
+        tbody.innerHTML = '<tr><td colspan="5">Ошибка загрузки</td></tr>';
+    }
+}
+
+function renderAdminProjectsList(projectsList) {
+    const tbody = document.getElementById('adminProjectsBody');
+    if (!tbody) return;
+
+    if (projectsList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5">Проектов пока нет</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = projectsList.map(p => {
+        const isSuspended = p.status === 'suspended';
+        const paidUntilValue = p.paid_until ? p.paid_until : '';
+        return `
+            <tr>
+                <td>
+                    <div class="product-name">${escapeHtml(p.name || p.id)}</div>
+                    <div class="form-hint">${escapeHtml(p.domain || '')}</div>
+                </td>
+                <td>${escapeHtml(p.owner_email || '—')}</td>
+                <td>
+                    <select class="form-select" id="adminStatus_${p.id}" style="width: auto;">
+                        <option value="active" ${!isSuspended ? 'selected' : ''}>Активен</option>
+                        <option value="suspended" ${isSuspended ? 'selected' : ''}>Приостановлен</option>
+                    </select>
+                </td>
+                <td>
+                    <input type="date" class="form-input" id="adminPaidUntil_${p.id}" value="${paidUntilValue}" style="width: auto;">
+                </td>
+                <td>
+                    <button class="btn btn-secondary btn-sm" onclick="saveProjectBilling('${p.id}')">Сохранить</button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+async function saveProjectBilling(projectId) {
+    const statusEl = document.getElementById(`adminStatus_${projectId}`);
+    const paidUntilEl = document.getElementById(`adminPaidUntil_${projectId}`);
+    if (!statusEl || !paidUntilEl) return;
+
+    try {
+        await fetchAPI(`/api/v1/admin/projects/${projectId}/billing`, {
+            method: 'PUT',
+            body: JSON.stringify({
+                status: statusEl.value,
+                paid_until: paidUntilEl.value || null
+            })
+        });
+        showToast('Биллинг проекта обновлён', 'success');
+    } catch (err) {
+        console.error('Error saving project billing:', err);
+        showToast('Ошибка сохранения биллинга', 'error');
+    }
+}
+
+async function loadAdminUsers() {
+    const tbody = document.getElementById('adminUsersBody');
+    if (!tbody) return;
+    try {
+        const data = await fetchAPI('/api/v1/admin/users');
+        renderAdminUsersList(data.users || []);
+    } catch (err) {
+        console.error('Error loading admin users:', err);
+        tbody.innerHTML = '<tr><td colspan="5">Ошибка загрузки</td></tr>';
+    }
+}
+
+const ROLE_LABELS = { admin: 'Admin', manager: 'Менеджер', user: 'Пользователь' };
+const ROLE_BADGE_CLASS = { admin: 'badge-info', manager: 'badge-warning', user: 'badge-neutral' };
+
+function renderAdminUsersList(usersList) {
+    const tbody = document.getElementById('adminUsersBody');
+    if (!tbody) return;
+
+    if (usersList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5">Пользователей пока нет</td></tr>';
+        return;
+    }
+
+    const isAdmin = currentUser && currentUser.role === 'admin';
+
+    tbody.innerHTML = usersList.map(u => {
+        const roleLabel = ROLE_LABELS[u.role] || u.role;
+        const badgeClass = ROLE_BADGE_CLASS[u.role] || 'badge-neutral';
+        const registered = u.created_at ? new Date(u.created_at).toLocaleDateString('ru-RU') : '—';
+
+        let actionHtml = '—';
+        if (isAdmin && u.role !== 'admin') {
+            actionHtml = u.role === 'manager'
+                ? `<button class="btn btn-secondary btn-sm" onclick="updateUserRole('${u.id}', 'user')">Снять права</button>`
+                : `<button class="btn btn-secondary btn-sm" onclick="updateUserRole('${u.id}', 'manager')">Назначить менеджером</button>`;
+        }
+
+        return `
+            <tr>
+                <td>${escapeHtml(u.email)}</td>
+                <td>${escapeHtml(u.name || '—')}</td>
+                <td><span class="badge ${badgeClass}">${escapeHtml(roleLabel)}</span></td>
+                <td>${registered}</td>
+                <td>${actionHtml}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+async function updateUserRole(userId, role) {
+    try {
+        await fetchAPI(`/api/v1/admin/users/${userId}/role`, {
+            method: 'PUT',
+            body: JSON.stringify({ role })
+        });
+        showToast('Роль обновлена', 'success');
+        loadAdminUsers();
+    } catch (err) {
+        console.error('Error updating user role:', err);
+        showToast('Ошибка изменения роли', 'error');
+    }
+}
+
+// ==================== NOTIFICATIONS ====================
+async function loadNotifications() {
+    try {
+        const data = await fetchAPI('/api/v1/notifications');
+        updateNotifBadge(data.unread_count || 0);
+        renderNotifDropdown(data.notifications || []);
+    } catch (err) {
+        console.error('Error loading notifications:', err);
+    }
+}
+
+function updateNotifBadge(count) {
+    const badge = document.getElementById('notifCount');
+    if (!badge) return;
+    badge.textContent = count;
+    badge.style.display = count > 0 ? 'flex' : 'none';
+}
+
+function renderNotifDropdown(notifications) {
+    const list = document.getElementById('notifDropdownList');
+    if (!list) return;
+
+    if (notifications.length === 0) {
+        list.innerHTML = '<div class="notif-empty">Пока пусто</div>';
+        return;
+    }
+
+    list.innerHTML = notifications.map(n => `
+        <div class="notif-item ${n.is_read ? '' : 'unread'}" onclick="markNotificationRead(${n.id})">
+            <div class="notif-item-dot"></div>
+            <div class="notif-item-body">
+                <div class="notif-item-title">${escapeHtml(n.title)}</div>
+                <div class="notif-item-time">${new Date(n.created_at).toLocaleString('ru-RU')}</div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function toggleNotifDropdown() {
+    const dropdown = document.getElementById('notifDropdown');
+    if (!dropdown) return;
+    dropdown.style.display = dropdown.style.display === 'none' ? 'flex' : 'none';
+}
+
+async function markNotificationRead(notificationId) {
+    try {
+        await fetchAPI(`/api/v1/notifications/${notificationId}/read`, { method: 'POST' });
+        loadNotifications();
+    } catch (err) {
+        console.error('Error marking notification read:', err);
+    }
+}
+
+async function markAllNotificationsRead() {
+    try {
+        await fetchAPI('/api/v1/notifications/read-all', { method: 'POST' });
+        loadNotifications();
+    } catch (err) {
+        console.error('Error marking all notifications read:', err);
     }
 }
 

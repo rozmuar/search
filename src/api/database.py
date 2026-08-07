@@ -81,15 +81,77 @@ class Database:
             
             # Миграция: добавляем synonyms если не существует
             await conn.execute('''
-                DO $$ 
-                BEGIN 
-                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
                                    WHERE table_name='projects' AND column_name='synonyms') THEN
                         ALTER TABLE projects ADD COLUMN synonyms JSONB DEFAULT '[]';
                     END IF;
                 END $$;
             ''')
-            
+
+            # Миграция: роль пользователя (user/manager/admin) - раньше ролей не было вообще
+            await conn.execute('''
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                   WHERE table_name='users' AND column_name='role') THEN
+                        ALTER TABLE users ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'user';
+                    END IF;
+                END $$;
+            ''')
+
+            # Бутстрап первого admin - срабатывает только пока admin вообще нет в системе,
+            # поэтому безопасно гонять на каждом старте: ручное переназначение роли позже
+            # никогда не перезатирается
+            await conn.execute('''
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM users WHERE role = 'admin') THEN
+                        UPDATE users SET role = 'admin'
+                        WHERE id = (SELECT id FROM users ORDER BY created_at ASC, id ASC LIMIT 1);
+                    END IF;
+                END $$;
+            ''')
+
+            # Миграция: биллинг проекта - дата окончания оплаты + флаг "напоминание отправлено"
+            # (сбрасывается при любом редактировании биллинга, чтобы новый период снова получил
+            # своё напоминание за 7 дней). projects.status уже существует (DEFAULT 'active') -
+            # переиспользуем под 'active'/'suspended', новая колонка для него не нужна.
+            await conn.execute('''
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                   WHERE table_name='projects' AND column_name='paid_until') THEN
+                        ALTER TABLE projects ADD COLUMN paid_until DATE;
+                    END IF;
+                END $$;
+            ''')
+            await conn.execute('''
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                   WHERE table_name='projects' AND column_name='expiry_reminder_sent_at') THEN
+                        ALTER TABLE projects ADD COLUMN expiry_reminder_sent_at TIMESTAMP;
+                    END IF;
+                END $$;
+            ''')
+
+            # Уведомления для admin/manager (билинг: напоминание за 7 дней, авто-приостановка)
+            await conn.execute('''
+                CREATE TABLE IF NOT EXISTS notifications (
+                    id SERIAL PRIMARY KEY,
+                    user_id VARCHAR(32) REFERENCES users(id) ON DELETE CASCADE,
+                    type VARCHAR(50) NOT NULL,
+                    title VARCHAR(255) NOT NULL,
+                    body TEXT,
+                    project_id VARCHAR(32) REFERENCES projects(id) ON DELETE SET NULL,
+                    is_read BOOLEAN DEFAULT FALSE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE INDEX IF NOT EXISTS idx_notifications_user_unread ON notifications(user_id, is_read);
+            ''')
+
             # Таблица для хранения товаров (бэкап из Redis)
             await conn.execute('''
                 CREATE TABLE IF NOT EXISTS products (
@@ -182,20 +244,42 @@ class Database:
         """Получить пользователя по email"""
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow('''
-                SELECT id, email, name, password_hash, created_at
+                SELECT id, email, name, password_hash, role, created_at
                 FROM users WHERE email = $1
             ''', email)
             return dict(row) if row else None
-    
+
     async def get_user_by_id(self, user_id: str) -> Optional[Dict]:
         """Получить пользователя по ID"""
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow('''
-                SELECT id, email, name, created_at
+                SELECT id, email, name, role, created_at
                 FROM users WHERE id = $1
             ''', user_id)
             return dict(row) if row else None
-    
+
+    # ========== ADMIN: USERS ==========
+
+    async def list_all_users(self) -> List[Dict]:
+        """Все пользователи системы (для раздела администрирования)"""
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch('''
+                SELECT id, email, name, role, created_at
+                FROM users ORDER BY created_at DESC
+            ''')
+            return [dict(row) for row in rows]
+
+    async def update_user_role(self, user_id: str, role: str) -> Optional[Dict]:
+        """Назначить/снять роль manager. role != 'admin' в WHERE - единственная защита
+        от понижения/подмены роли admin через этот путь (не нулевые строки = не тронуто)"""
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow('''
+                UPDATE users SET role = $1
+                WHERE id = $2 AND role != 'admin'
+                RETURNING id, email, name, role, created_at
+            ''', role, user_id)
+            return dict(row) if row else None
+
     # ========== PROJECTS ==========
     
     async def create_project(self, project_id: str, user_id: str, name: str, 
@@ -361,7 +445,131 @@ class Database:
             await conn.execute('''
                 UPDATE projects SET products_count = $1 WHERE id = $2
             ''', count, project_id)
-    
+
+    # ========== ADMIN: PROJECTS & BILLING ==========
+
+    async def get_all_projects_admin(self) -> List[Dict]:
+        """Все проекты всех клиентов с владельцем и биллингом (для раздела администрирования).
+        Не путать с get_all_projects() выше - тот отдаёт только id/feed_url для планировщика фидов."""
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch('''
+                SELECT p.id, p.user_id, p.name, p.domain, p.feed_url, p.status,
+                       p.paid_until, p.products_count, p.created_at,
+                       u.email AS owner_email, u.name AS owner_name,
+                       a.key AS api_key
+                FROM projects p
+                JOIN users u ON u.id = p.user_id
+                LEFT JOIN api_keys a ON a.project_id = p.id
+                ORDER BY p.created_at DESC
+            ''')
+            return [dict(row) for row in rows]
+
+    async def update_project_billing(self, project_id: str, status: Optional[str], paid_until) -> Optional[Dict]:
+        """Ручное управление админом: включить/приостановить проект и/или задать дату
+        окончания оплаты. expiry_reminder_sent_at сбрасывается всегда - любое редактирование
+        биллинга (например продление paid_until) должно снова дать право на напоминание за 7 дней.
+        paid_until приходит из API строкой "YYYY-MM-DD" (или None) - asyncpg для DATE-колонки
+        не парсит строки сам, нужен настоящий date."""
+        if isinstance(paid_until, str):
+            paid_until = datetime.strptime(paid_until, "%Y-%m-%d").date()
+
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow('''
+                UPDATE projects
+                SET status = COALESCE($1, status),
+                    paid_until = $2,
+                    expiry_reminder_sent_at = NULL
+                WHERE id = $3
+                RETURNING id, name, status, paid_until
+            ''', status, paid_until, project_id)
+            return dict(row) if row else None
+
+    async def get_projects_expiring_soon(self, today) -> List[Dict]:
+        """Активные проекты с paid_until в ближайшие 7 дней, кому ещё не отправляли
+        напоминание. Диапазон (BETWEEN), а не точное совпадение даты - переживает простой
+        планировщика/деплой и не пропустит напоминание, если проверка не попала ровно на день N-7."""
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch('''
+                SELECT p.id, p.name, p.domain, p.paid_until, u.email AS owner_email
+                FROM projects p
+                JOIN users u ON u.id = p.user_id
+                WHERE p.status = 'active'
+                  AND p.paid_until IS NOT NULL
+                  AND p.paid_until BETWEEN $1 AND $1 + 7
+                  AND p.expiry_reminder_sent_at IS NULL
+            ''', today)
+            return [dict(row) for row in rows]
+
+    async def get_projects_to_suspend(self, today) -> List[Dict]:
+        """Активные проекты, у которых paid_until уже прошла - подлежат авто-приостановке"""
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch('''
+                SELECT p.id, p.name, p.domain, p.paid_until, u.email AS owner_email
+                FROM projects p
+                JOIN users u ON u.id = p.user_id
+                WHERE p.status = 'active'
+                  AND p.paid_until IS NOT NULL
+                  AND p.paid_until < $1
+            ''', today)
+            return [dict(row) for row in rows]
+
+    async def mark_expiry_reminder_sent(self, project_id: str):
+        async with self.pool.acquire() as conn:
+            await conn.execute('''
+                UPDATE projects SET expiry_reminder_sent_at = CURRENT_TIMESTAMP WHERE id = $1
+            ''', project_id)
+
+    async def suspend_project(self, project_id: str):
+        async with self.pool.acquire() as conn:
+            await conn.execute('''
+                UPDATE projects SET status = 'suspended' WHERE id = $1
+            ''', project_id)
+
+    # ========== NOTIFICATIONS ==========
+
+    async def get_admin_and_manager_user_ids(self) -> List[str]:
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch('''
+                SELECT id FROM users WHERE role IN ('admin', 'manager')
+            ''')
+            return [row["id"] for row in rows]
+
+    async def create_notification(self, user_id: str, type: str, title: str,
+                                   body: Optional[str] = None, project_id: Optional[str] = None):
+        async with self.pool.acquire() as conn:
+            await conn.execute('''
+                INSERT INTO notifications (user_id, type, title, body, project_id)
+                VALUES ($1, $2, $3, $4, $5)
+            ''', user_id, type, title, body, project_id)
+
+    async def list_notifications_for_user(self, user_id: str, limit: int = 20) -> List[Dict]:
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch('''
+                SELECT id, type, title, body, project_id, is_read, created_at
+                FROM notifications WHERE user_id = $1
+                ORDER BY created_at DESC LIMIT $2
+            ''', user_id, limit)
+            return [dict(row) for row in rows]
+
+    async def count_unread_notifications(self, user_id: str) -> int:
+        async with self.pool.acquire() as conn:
+            return await conn.fetchval('''
+                SELECT COUNT(*) FROM notifications WHERE user_id = $1 AND is_read = FALSE
+            ''', user_id)
+
+    async def mark_notification_read(self, notification_id: int, user_id: str) -> bool:
+        async with self.pool.acquire() as conn:
+            result = await conn.execute('''
+                UPDATE notifications SET is_read = TRUE WHERE id = $1 AND user_id = $2
+            ''', notification_id, user_id)
+            return result == "UPDATE 1"
+
+    async def mark_all_notifications_read(self, user_id: str):
+        async with self.pool.acquire() as conn:
+            await conn.execute('''
+                UPDATE notifications SET is_read = TRUE WHERE user_id = $1 AND is_read = FALSE
+            ''', user_id)
+
     # ========== PRODUCTS BACKUP ==========
     
     async def save_products_backup(self, project_id: str, products: List[Dict]) -> int:
