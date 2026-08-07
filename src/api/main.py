@@ -285,7 +285,8 @@ async def update_project(project_id: str, data: ProjectUpdate, user: User = Depe
     project = await data_store.get_project(project_id)
     if not project or project.get("user_id") != user.id:
         raise HTTPException(status_code=404, detail="Project not found")
-    
+    _check_project_active(project)
+
     updates = {k: v for k, v in data.dict().items() if v is not None}
     updated = await data_store.update_project(project_id, updates)
     return updated
@@ -422,7 +423,8 @@ async def load_feed(
     project = await data_store.get_project(project_id)
     if not project or project.get("user_id") != user.id:
         raise HTTPException(status_code=404, detail="Project not found")
-    
+    _check_project_active(project)
+
     # Проверяем, не идёт ли уже загрузка
     if project_id in feed_loading_tasks:
         return {"success": True, "status": "already_loading", "message": "Загрузка уже идёт"}
@@ -1003,7 +1005,8 @@ async def update_widget_settings(project_id: str, settings: dict, user: User = D
     project = await data_store.get_project(project_id)
     if not project or project.get("user_id") != user.id:
         raise HTTPException(status_code=404, detail="Project not found")
-    
+    _check_project_active(project)
+
     await data_store.update_project(project_id, {"widget_settings": settings})
     return settings
 
@@ -1040,7 +1043,8 @@ async def update_search_settings(project_id: str, settings: dict, user: User = D
     project = await data_store.get_project(project_id)
     if not project or project.get("user_id") != user.id:
         raise HTTPException(status_code=404, detail="Project not found")
-    
+    _check_project_active(project)
+
     await data_store.update_project(project_id, {"search_settings": settings})
     return settings
 
@@ -1079,7 +1083,8 @@ async def update_synonyms(project_id: str, data: dict, user: User = Depends(requ
     project = await data_store.get_project(project_id)
     if not project or project.get("user_id") != user.id:
         raise HTTPException(status_code=404, detail="Project not found")
-    
+    _check_project_active(project)
+
     synonyms = data.get("synonyms", [])
     
     # Сохраняем в PostgreSQL

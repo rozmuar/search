@@ -1017,6 +1017,33 @@ body {
     margin-bottom: 24px;
 }
 
+.billing-banner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 18px;
+    border-radius: var(--radius-lg);
+    font-size: 0.9125rem;
+    font-weight: 500;
+    margin-bottom: 24px;
+}
+
+.billing-banner svg {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+}
+
+.billing-banner.warning {
+    background: var(--warning-tint);
+    color: #92400E;
+}
+
+.billing-banner.danger {
+    background: var(--danger-tint);
+    color: #991B1B;
+}
+
 .section-title {
     font-size: 1.5rem;
     font-weight: 700;

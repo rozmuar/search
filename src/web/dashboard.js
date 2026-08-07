@@ -407,6 +407,49 @@ async function deleteProject(projectId) {
 // ==================== PROJECT DETAIL ====================
 let apiKeyVisible = false;
 
+// Показывает дату окончания оплаты и баннер (приостановлен / скоро закончится) на
+// странице проекта. Реальная блокировка изменений - на бэкенде (403 у suspended
+// проекта), здесь только информирование, чтобы клиент понимал, что происходит.
+function renderBillingBanner(project) {
+    const paidUntilEl = document.getElementById('projectDetailPaidUntil');
+    const bannerEl = document.getElementById('billingBanner');
+    const bannerTextEl = document.getElementById('billingBannerText');
+
+    if (project.paid_until) {
+        const formatted = new Date(project.paid_until).toLocaleDateString('ru-RU', { timeZone: 'UTC' });
+        paidUntilEl.textContent = `Оплачено до: ${formatted}`;
+        paidUntilEl.style.display = '';
+    } else {
+        paidUntilEl.style.display = 'none';
+    }
+
+    if (project.status === 'suspended') {
+        bannerEl.className = 'billing-banner danger';
+        bannerTextEl.textContent = 'Проект приостановлен — оплата не поступила. Изменение настроек недоступно, поиск на сайте отключён. Свяжитесь с поддержкой для возобновления работы.';
+        bannerEl.style.display = 'flex';
+        return;
+    }
+
+    if (project.paid_until) {
+        const msPerDay = 24 * 60 * 60 * 1000;
+        const today = new Date(new Date().toISOString().slice(0, 10));
+        const paidUntilDate = new Date(project.paid_until);
+        const daysLeft = Math.round((paidUntilDate - today) / msPerDay);
+
+        if (daysLeft <= 7) {
+            const formatted = paidUntilDate.toLocaleDateString('ru-RU', { timeZone: 'UTC' });
+            bannerEl.className = 'billing-banner warning';
+            bannerTextEl.textContent = daysLeft >= 0
+                ? `Оплата заканчивается ${formatted} (осталось ${daysLeft} дн.). Продлите оплату, чтобы поиск не отключился.`
+                : `Оплата закончилась ${formatted}. Проект скоро будет приостановлен.`;
+            bannerEl.style.display = 'flex';
+            return;
+        }
+    }
+
+    bannerEl.style.display = 'none';
+}
+
 async function openProjectDetail(projectId) {
     // If called from click, update URL
     const expectedPath = `/dashboard/project/${projectId}/`;
@@ -426,7 +469,8 @@ async function openProjectDetail(projectId) {
     // Update UI
     document.getElementById('projectDetailName').textContent = project.name;
     document.getElementById('projectDetailDomain').textContent = project.domain || 'Домен не указан';
-    
+    renderBillingBanner(project);
+
     // Stats
     document.getElementById('projectStatProducts').textContent = project.products_count || 0;
     document.getElementById('projectStatSearches').textContent = project.searches_count || 0;

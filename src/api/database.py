@@ -325,7 +325,7 @@ class Database:
         """Получить проект по ID"""
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow('''
-                SELECT p.id, p.user_id, p.name, p.domain, p.feed_url, p.status,
+                SELECT p.id, p.user_id, p.name, p.domain, p.feed_url, p.status, p.paid_until,
                        p.products_count, p.widget_settings, p.search_settings, p.synonyms, p.created_at, a.key as api_key
                 FROM projects p
                 LEFT JOIN api_keys a ON a.project_id = p.id
@@ -357,7 +357,7 @@ class Database:
         """Получить все проекты пользователя"""
         async with self.pool.acquire() as conn:
             rows = await conn.fetch('''
-                SELECT p.id, p.user_id, p.name, p.domain, p.feed_url, p.status,
+                SELECT p.id, p.user_id, p.name, p.domain, p.feed_url, p.status, p.paid_until,
                        p.products_count, p.widget_settings, p.search_settings, p.created_at, a.key as api_key
                 FROM projects p
                 LEFT JOIN api_keys a ON a.project_id = p.id
