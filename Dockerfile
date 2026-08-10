@@ -2,12 +2,15 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Установка системных зависимостей
+# Установка системных зависимостей.
+# fonts-dejavu-core - шрифт с поддержкой кириллицы для reportlab (счета на оплату) -
+# у встроенных PDF-шрифтов reportlab (Helvetica и т.д.) кириллицы нет вообще.
 RUN apt-get update && apt-get install -y \
     gcc \
     nginx \
     supervisor \
     openssl \
+    fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
 # Создание директорий для SSL и certbot
@@ -34,6 +37,9 @@ RUN mkdir -p /app/scripts
 
 # Проверка что PyJWT установлен
 RUN python -c "import jwt; print('PyJWT OK')"
+
+# Проверка что шрифт для кириллицы в PDF-счетах на месте
+RUN test -f /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf && echo "DejaVu font OK"
 
 # Проверка что приложение импортируется
 RUN python -c "from src.api.main import app; print('App import OK')"

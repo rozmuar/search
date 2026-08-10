@@ -183,6 +183,7 @@ function showSection(sectionId) {
     } else if (sectionId === 'admin') {
         loadAdminProjects();
         loadAdminUsers();
+        loadPaymentRequisites();
     }
 
     // Close mobile sidebar
@@ -463,9 +464,21 @@ async function openProjectDetail(projectId) {
         navigateTo('projects');
         return;
     }
-    
+
+    // Подтягиваем свежие status/paid_until с сервера - планировщик биллинга мог
+    // приостановить проект в фоне уже после того, как список проектов был загружен
+    // (или пока эта вкладка дашборда просто была открыта). Без этого баннер мог бы
+    // показывать "скоро закончится", когда бэкенд уже реально блокирует поиск.
+    // Object.assign, а не замена ссылки - тот же объект остаётся в массиве projects.
+    try {
+        const fresh = await fetchAPI(`/api/v1/projects/${projectId}`);
+        Object.assign(project, fresh);
+    } catch (err) {
+        console.error('Error refreshing project before showing detail:', err);
+    }
+
     currentProject = project;
-    
+
     // Update UI
     document.getElementById('projectDetailName').textContent = project.name;
     document.getElementById('projectDetailDomain').textContent = project.domain || 'Домен не указан';
@@ -2303,15 +2316,18 @@ async function testSearch() {
 }
 
 // ==================== ADMIN ====================
+let adminProjectsCache = [];
+
 async function loadAdminProjects() {
     const tbody = document.getElementById('adminProjectsBody');
     if (!tbody) return;
     try {
         const data = await fetchAPI('/api/v1/admin/projects');
-        renderAdminProjectsList(data.projects || []);
+        adminProjectsCache = data.projects || [];
+        renderAdminProjectsList(adminProjectsCache);
     } catch (err) {
         console.error('Error loading admin projects:', err);
-        tbody.innerHTML = '<tr><td colspan="5">Ошибка загрузки</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7">Ошибка загрузки</td></tr>';
     }
 }
 
@@ -2320,7 +2336,7 @@ function renderAdminProjectsList(projectsList) {
     if (!tbody) return;
 
     if (projectsList.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5">Проектов пока нет</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7">Проектов пока нет</td></tr>';
         return;
     }
 
@@ -2344,7 +2360,14 @@ function renderAdminProjectsList(projectsList) {
                     <input type="date" class="form-input" id="adminPaidUntil_${p.id}" value="${paidUntilValue}" style="width: auto;">
                 </td>
                 <td>
+                    <input type="text" class="form-input" id="adminPayerCompany_${p.id}" value="${escapeHtml(p.payer_company_name || '')}" placeholder="ООО «Клиент»" style="width: auto;">
+                </td>
+                <td>
+                    <input type="text" class="form-input" id="adminPayerInn_${p.id}" value="${escapeHtml(p.payer_inn || '')}" placeholder="ИНН" style="width: 110px;">
+                </td>
+                <td style="white-space: nowrap;">
                     <button class="btn btn-secondary btn-sm" onclick="saveProjectBilling('${p.id}')">Сохранить</button>
+                    <button class="btn btn-primary btn-sm" onclick="openInvoiceModal('${p.id}')">Выставить счёт</button>
                 </td>
             </tr>
         `;
@@ -2354,6 +2377,8 @@ function renderAdminProjectsList(projectsList) {
 async function saveProjectBilling(projectId) {
     const statusEl = document.getElementById(`adminStatus_${projectId}`);
     const paidUntilEl = document.getElementById(`adminPaidUntil_${projectId}`);
+    const payerCompanyEl = document.getElementById(`adminPayerCompany_${projectId}`);
+    const payerInnEl = document.getElementById(`adminPayerInn_${projectId}`);
     if (!statusEl || !paidUntilEl) return;
 
     try {
@@ -2361,13 +2386,133 @@ async function saveProjectBilling(projectId) {
             method: 'PUT',
             body: JSON.stringify({
                 status: statusEl.value,
-                paid_until: paidUntilEl.value || null
+                paid_until: paidUntilEl.value || null,
+                payer_company_name: payerCompanyEl ? (payerCompanyEl.value || null) : null,
+                payer_inn: payerInnEl ? (payerInnEl.value || null) : null
             })
         });
         showToast('Биллинг проекта обновлён', 'success');
     } catch (err) {
         console.error('Error saving project billing:', err);
         showToast('Ошибка сохранения биллинга', 'error');
+    }
+}
+
+// ---- Payment requisites ----
+const REQUISITES_FIELD_IDS = {
+    company_name: 'reqCompanyName',
+    inn: 'reqInn',
+    kpp: 'reqKpp',
+    legal_address: 'reqLegalAddress',
+    checking_account: 'reqCheckingAccount',
+    bank_name: 'reqBankName',
+    bik: 'reqBik',
+    correspondent_account: 'reqCorrespondentAccount'
+};
+
+async function loadPaymentRequisites() {
+    try {
+        const data = await fetchAPI('/api/v1/admin/payment-requisites');
+        for (const [field, elementId] of Object.entries(REQUISITES_FIELD_IDS)) {
+            const el = document.getElementById(elementId);
+            if (el) el.value = data[field] || '';
+        }
+    } catch (err) {
+        console.error('Error loading payment requisites:', err);
+    }
+}
+
+async function savePaymentRequisites() {
+    const statusEl = document.getElementById('reqSaveStatus');
+    const payload = {};
+    for (const [field, elementId] of Object.entries(REQUISITES_FIELD_IDS)) {
+        const el = document.getElementById(elementId);
+        payload[field] = el ? (el.value || null) : null;
+    }
+
+    try {
+        await fetchAPI('/api/v1/admin/payment-requisites', {
+            method: 'PUT',
+            body: JSON.stringify(payload)
+        });
+        if (statusEl) statusEl.textContent = '✓ Сохранено';
+        showToast('Реквизиты сохранены', 'success');
+    } catch (err) {
+        console.error('Error saving payment requisites:', err);
+        showToast('Ошибка сохранения реквизитов', 'error');
+    }
+}
+
+// ---- Invoice generation ----
+let invoiceModalProjectId = null;
+
+function openInvoiceModal(projectId) {
+    const project = adminProjectsCache.find(p => p.id === projectId);
+    invoiceModalProjectId = projectId;
+    document.getElementById('invoiceModalProjectName').textContent = project
+        ? `Проект: ${project.name} (${project.owner_email || ''})`
+        : '';
+    document.getElementById('invoiceAmount').value = '';
+    document.getElementById('invoiceModal').classList.add('active');
+}
+
+function closeInvoiceModal() {
+    document.getElementById('invoiceModal').classList.remove('active');
+    invoiceModalProjectId = null;
+}
+
+async function generateInvoice() {
+    if (!invoiceModalProjectId) return;
+    const amountEl = document.getElementById('invoiceAmount');
+    const amount = parseFloat(amountEl.value);
+    if (!amount || amount <= 0) {
+        showToast('Введите сумму счёта', 'error');
+        return;
+    }
+
+    const btn = document.getElementById('invoiceGenerateBtn');
+    btn.disabled = true;
+    btn.textContent = 'Формирование...';
+
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE}/api/v1/admin/projects/${invoiceModalProjectId}/invoice`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ amount })
+        });
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.detail || 'Не удалось сформировать счёт');
+        }
+
+        // PDF приходит бинарём, не JSON - скачиваем как файл через blob-ссылку
+        const blob = await response.blob();
+        const disposition = response.headers.get('Content-Disposition') || '';
+        const filenameMatch = disposition.match(/filename="?([^"]+)"?/);
+        const filename = filenameMatch ? filenameMatch[1] : 'invoice.pdf';
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+
+        showToast('Счёт сформирован', 'success');
+        closeInvoiceModal();
+    } catch (err) {
+        console.error('Error generating invoice:', err);
+        showToast(err.message || 'Ошибка формирования счёта', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Сформировать PDF';
     }
 }
 

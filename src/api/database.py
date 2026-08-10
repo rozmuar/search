@@ -152,6 +152,55 @@ class Database:
                 CREATE INDEX IF NOT EXISTS idx_notifications_user_unread ON notifications(user_id, is_read);
             ''')
 
+            # Данные компании-плательщика (клиента) для печати на счёте - вводятся
+            # админом в разделе администрирования вместе со статусом/датой оплаты
+            await conn.execute('''
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                   WHERE table_name='projects' AND column_name='payer_company_name') THEN
+                        ALTER TABLE projects ADD COLUMN payer_company_name VARCHAR(255);
+                    END IF;
+                END $$;
+            ''')
+            await conn.execute('''
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                   WHERE table_name='projects' AND column_name='payer_inn') THEN
+                        ALTER TABLE projects ADD COLUMN payer_inn VARCHAR(20);
+                    END IF;
+                END $$;
+            ''')
+
+            # Реквизиты поставщика (SearchPro) для счетов - одна строка на всю систему,
+            # id зафиксирован на 1 (singleton), редактируется в администрировании
+            await conn.execute('''
+                CREATE TABLE IF NOT EXISTS payment_requisites (
+                    id SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+                    company_name VARCHAR(255),
+                    inn VARCHAR(20),
+                    kpp VARCHAR(20),
+                    checking_account VARCHAR(34),
+                    bank_name VARCHAR(255),
+                    bik VARCHAR(20),
+                    correspondent_account VARCHAR(34),
+                    legal_address VARCHAR(500),
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            ''')
+
+            # Выставленные счета - только для сквозной нумерации и учёта (id и есть номер
+            # счёта), отдельного экрана истории счетов пока нет
+            await conn.execute('''
+                CREATE TABLE IF NOT EXISTS invoices (
+                    id SERIAL PRIMARY KEY,
+                    project_id VARCHAR(32) REFERENCES projects(id) ON DELETE CASCADE,
+                    amount NUMERIC(12, 2) NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            ''')
+
             # Таблица для хранения товаров (бэкап из Redis)
             await conn.execute('''
                 CREATE TABLE IF NOT EXISTS products (
@@ -326,6 +375,7 @@ class Database:
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow('''
                 SELECT p.id, p.user_id, p.name, p.domain, p.feed_url, p.status, p.paid_until,
+                       p.payer_company_name, p.payer_inn,
                        p.products_count, p.widget_settings, p.search_settings, p.synonyms, p.created_at, a.key as api_key
                 FROM projects p
                 LEFT JOIN api_keys a ON a.project_id = p.id
@@ -454,7 +504,8 @@ class Database:
         async with self.pool.acquire() as conn:
             rows = await conn.fetch('''
                 SELECT p.id, p.user_id, p.name, p.domain, p.feed_url, p.status,
-                       p.paid_until, p.products_count, p.created_at,
+                       p.paid_until, p.payer_company_name, p.payer_inn,
+                       p.products_count, p.created_at,
                        u.email AS owner_email, u.name AS owner_name,
                        a.key AS api_key
                 FROM projects p
@@ -464,12 +515,14 @@ class Database:
             ''')
             return [dict(row) for row in rows]
 
-    async def update_project_billing(self, project_id: str, status: Optional[str], paid_until) -> Optional[Dict]:
-        """Ручное управление админом: включить/приостановить проект и/или задать дату
-        окончания оплаты. expiry_reminder_sent_at сбрасывается всегда - любое редактирование
-        биллинга (например продление paid_until) должно снова дать право на напоминание за 7 дней.
-        paid_until приходит из API строкой "YYYY-MM-DD" (или None) - asyncpg для DATE-колонки
-        не парсит строки сам, нужен настоящий date."""
+    async def update_project_billing(self, project_id: str, status: Optional[str], paid_until,
+                                      payer_company_name: Optional[str] = None,
+                                      payer_inn: Optional[str] = None) -> Optional[Dict]:
+        """Ручное управление админом: включить/приостановить проект, задать дату окончания
+        оплаты и данные компании-плательщика для счетов. expiry_reminder_sent_at сбрасывается
+        всегда - любое редактирование биллинга (например продление paid_until) должно снова
+        дать право на напоминание за 7 дней. paid_until приходит из API строкой "YYYY-MM-DD"
+        (или None) - asyncpg для DATE-колонки не парсит строки сам, нужен настоящий date."""
         if isinstance(paid_until, str):
             paid_until = datetime.strptime(paid_until, "%Y-%m-%d").date()
 
@@ -478,10 +531,12 @@ class Database:
                 UPDATE projects
                 SET status = COALESCE($1, status),
                     paid_until = $2,
+                    payer_company_name = $3,
+                    payer_inn = $4,
                     expiry_reminder_sent_at = NULL
-                WHERE id = $3
-                RETURNING id, name, status, paid_until
-            ''', status, paid_until, project_id)
+                WHERE id = $5
+                RETURNING id, name, status, paid_until, payer_company_name, payer_inn
+            ''', status, paid_until, payer_company_name, payer_inn, project_id)
             return dict(row) if row else None
 
     async def get_projects_expiring_soon(self, today) -> List[Dict]:
@@ -524,6 +579,41 @@ class Database:
             await conn.execute('''
                 UPDATE projects SET status = 'suspended' WHERE id = $1
             ''', project_id)
+
+    # ========== PAYMENT REQUISITES & INVOICES ==========
+
+    async def get_payment_requisites(self) -> Optional[Dict]:
+        """Реквизиты поставщика (SearchPro) для счетов - singleton, None если ещё не заполнены"""
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow('SELECT * FROM payment_requisites WHERE id = 1')
+            return dict(row) if row else None
+
+    async def save_payment_requisites(self, fields: Dict[str, Any]) -> Dict:
+        """Upsert реквизитов поставщика (одна строка на всю систему)"""
+        columns = ['company_name', 'inn', 'kpp', 'checking_account', 'bank_name', 'bik',
+                   'correspondent_account', 'legal_address']
+        values = [fields.get(c) for c in columns]
+
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(f'''
+                INSERT INTO payment_requisites (id, {", ".join(columns)}, updated_at)
+                VALUES (1, {", ".join(f"${i+1}" for i in range(len(columns)))}, CURRENT_TIMESTAMP)
+                ON CONFLICT (id) DO UPDATE SET
+                    {", ".join(f"{c} = EXCLUDED.{c}" for c in columns)},
+                    updated_at = CURRENT_TIMESTAMP
+                RETURNING *
+            ''', *values)
+            return dict(row)
+
+    async def create_invoice(self, project_id: str, amount) -> Dict:
+        """Регистрирует выставленный счёт - id служит номером счёта (сквозная нумерация)"""
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow('''
+                INSERT INTO invoices (project_id, amount)
+                VALUES ($1, $2)
+                RETURNING id, project_id, amount, created_at
+            ''', project_id, amount)
+            return dict(row)
 
     # ========== NOTIFICATIONS ==========
 

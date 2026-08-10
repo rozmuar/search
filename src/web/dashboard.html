@@ -1444,6 +1444,53 @@
 
                 <div class="card" style="margin-bottom: 24px;">
                     <div class="card-header">
+                        <h3 class="card-title">Реквизиты для оплаты</h3>
+                    </div>
+                    <div class="card-body">
+                        <p class="form-hint" style="margin-bottom: 16px;">Реквизиты поставщика (SearchPro) — печатаются на счетах на оплату. Одна запись на всю систему.</p>
+                        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                            <div class="form-group">
+                                <label class="form-label">Название компании</label>
+                                <input type="text" class="form-input" id="reqCompanyName" placeholder="ООО «СёрчПро»">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">ИНН</label>
+                                <input type="text" class="form-input" id="reqInn" placeholder="7701234567">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">КПП</label>
+                                <input type="text" class="form-input" id="reqKpp" placeholder="770101001">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Юридический адрес</label>
+                                <input type="text" class="form-input" id="reqLegalAddress" placeholder="г. Москва, ул. Примерная, д. 1">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Расчётный счёт</label>
+                                <input type="text" class="form-input" id="reqCheckingAccount" placeholder="40702810900000012345">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Банк</label>
+                                <input type="text" class="form-input" id="reqBankName" placeholder="ПАО «Сбербанк»">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">БИК</label>
+                                <input type="text" class="form-input" id="reqBik" placeholder="044525225">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Корр. счёт</label>
+                                <input type="text" class="form-input" id="reqCorrespondentAccount" placeholder="30101810400000000225">
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button class="btn btn-primary" onclick="savePaymentRequisites()">Сохранить реквизиты</button>
+                            <span class="form-hint" id="reqSaveStatus"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card" style="margin-bottom: 24px;">
+                    <div class="card-header">
                         <h3 class="card-title">Проекты и оплата</h3>
                     </div>
                     <div class="card-body-flush">
@@ -1454,11 +1501,13 @@
                                     <th>Владелец</th>
                                     <th>Статус</th>
                                     <th>Оплачено до</th>
+                                    <th>Компания клиента</th>
+                                    <th>ИНН клиента</th>
                                     <th>Действие</th>
                                 </tr>
                             </thead>
                             <tbody id="adminProjectsBody">
-                                <tr><td colspan="5">Загрузка...</td></tr>
+                                <tr><td colspan="7">Загрузка...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -1518,6 +1567,27 @@
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeCreateProjectModal()">Отмена</button>
                 <button class="btn btn-primary" id="projectSubmitBtn" onclick="createProject()">Создать</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Generate Invoice Modal -->
+    <div class="modal" id="invoiceModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Счёт на оплату</h3>
+                <button class="modal-close" onclick="closeInvoiceModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <p class="form-hint" id="invoiceModalProjectName" style="margin-bottom: 12px;"></p>
+                <div class="form-group">
+                    <label class="form-label">Сумма счёта, ₽ *</label>
+                    <input type="number" class="form-input" id="invoiceAmount" min="1" step="0.01" placeholder="5000">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeInvoiceModal()">Отмена</button>
+                <button class="btn btn-primary" id="invoiceGenerateBtn" onclick="generateInvoice()">Сформировать PDF</button>
             </div>
         </div>
     </div>

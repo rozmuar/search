@@ -25,6 +25,7 @@ from ..feed.parser import FeedParser, FeedManager
 from ..feed.scheduler import start_feed_scheduler, stop_feed_scheduler
 from ..billing.scheduler import start_billing_scheduler, stop_billing_scheduler
 from . import email_sender
+from . import invoice_pdf
 from ..core.models import Product
 
 # Настройка логирования
@@ -509,6 +510,24 @@ class UpdateUserRole(BaseModel):
 class UpdateProjectBilling(BaseModel):
     status: Optional[Literal["active", "suspended"]] = None
     paid_until: Optional[str] = None  # "YYYY-MM-DD" или null - снять дату (оплата не отслеживается)
+    payer_company_name: Optional[str] = None  # компания клиента - для печати на счёте
+    payer_inn: Optional[str] = None
+
+
+class PaymentRequisites(BaseModel):
+    """Реквизиты поставщика (SearchPro) для печати на счетах - одна запись на всю систему"""
+    company_name: Optional[str] = None
+    inn: Optional[str] = None
+    kpp: Optional[str] = None
+    checking_account: Optional[str] = None
+    bank_name: Optional[str] = None
+    bik: Optional[str] = None
+    correspondent_account: Optional[str] = None
+    legal_address: Optional[str] = None
+
+
+class GenerateInvoiceRequest(BaseModel):
+    amount: float
 
 
 @app.get("/api/v1/admin/users")
@@ -542,11 +561,68 @@ async def admin_update_project_billing(
     data: UpdateProjectBilling,
     user: User = Depends(require_manager)
 ):
-    """Ручное включение/приостановка проекта и/или дата окончания оплаты"""
-    result = await data_store.update_project_billing(project_id, data.status, data.paid_until)
+    """Ручное включение/приостановка проекта, дата окончания оплаты и данные плательщика"""
+    result = await data_store.update_project_billing(
+        project_id, data.status, data.paid_until, data.payer_company_name, data.payer_inn
+    )
     if not result:
         raise HTTPException(status_code=404, detail="Project not found")
     return result
+
+
+@app.get("/api/v1/admin/payment-requisites")
+async def admin_get_payment_requisites(user: User = Depends(require_manager)):
+    """Реквизиты поставщика (SearchPro) для счетов - пустой объект, если ещё не заполнены"""
+    requisites = await data_store.get_payment_requisites()
+    return requisites or {}
+
+
+@app.put("/api/v1/admin/payment-requisites")
+async def admin_save_payment_requisites(
+    data: PaymentRequisites,
+    user: User = Depends(require_manager)
+):
+    """Сохранение реквизитов поставщика - одна запись на всю систему"""
+    return await data_store.save_payment_requisites(data.dict())
+
+
+@app.post("/api/v1/admin/projects/{project_id}/invoice")
+async def admin_generate_invoice(
+    project_id: str,
+    data: GenerateInvoiceRequest,
+    user: User = Depends(require_manager)
+):
+    """Генерирует PDF счёт на оплату для проекта. Сумму задаёт админ вручную -
+    единого тарифа в системе нет (оплата по безналу, суммы у клиентов разные)."""
+    project = await data_store.get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    requisites = await data_store.get_payment_requisites()
+    if not requisites or not requisites.get("company_name"):
+        raise HTTPException(
+            status_code=400,
+            detail="Заполните реквизиты поставщика в администрировании перед выставлением счёта"
+        )
+
+    if data.amount <= 0:
+        raise HTTPException(status_code=400, detail="Сумма счёта должна быть больше нуля")
+
+    invoice = await data_store.create_invoice(project_id, data.amount)
+
+    pdf_bytes = invoice_pdf.generate_invoice_pdf(
+        invoice_id=invoice["id"],
+        invoice_date=invoice["created_at"].date(),
+        project=project,
+        requisites=requisites,
+        amount=data.amount
+    )
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="invoice_{invoice["id"]}.pdf"'}
+    )
 
 
 # ============ NOTIFICATIONS ============

@@ -199,12 +199,14 @@ class DataStore:
         """Все проекты всех клиентов с владельцем и биллингом (для раздела администрирования)"""
         return await db.get_all_projects_admin()
 
-    async def update_project_billing(self, project_id: str, status: Optional[str], paid_until) -> Optional[Dict[str, Any]]:
-        """Ручное включение/приостановка проекта и/или дата окончания оплаты. Резолвинг по
-        api_key кэширует в Redis только project_id (см. get_project_by_api_key выше) - сама
-        запись всегда дочитывается из Postgres заново, свежий status подхватится без
-        отдельной инвалидации кэша"""
-        return await db.update_project_billing(project_id, status, paid_until)
+    async def update_project_billing(self, project_id: str, status: Optional[str], paid_until,
+                                      payer_company_name: Optional[str] = None,
+                                      payer_inn: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Ручное включение/приостановка проекта, дата окончания оплаты и данные
+        компании-плательщика. Резолвинг по api_key кэширует в Redis только project_id
+        (см. get_project_by_api_key выше) - сама запись всегда дочитывается из Postgres
+        заново, свежий status подхватится без отдельной инвалидации кэша"""
+        return await db.update_project_billing(project_id, status, paid_until, payer_company_name, payer_inn)
 
     async def get_projects_expiring_soon(self, today) -> List[Dict[str, Any]]:
         return await db.get_projects_expiring_soon(today)
@@ -217,6 +219,17 @@ class DataStore:
 
     async def suspend_project(self, project_id: str):
         await db.suspend_project(project_id)
+
+    # ========== PAYMENT REQUISITES & INVOICES ==========
+
+    async def get_payment_requisites(self) -> Optional[Dict[str, Any]]:
+        return await db.get_payment_requisites()
+
+    async def save_payment_requisites(self, fields: Dict[str, Any]) -> Dict[str, Any]:
+        return await db.save_payment_requisites(fields)
+
+    async def create_invoice(self, project_id: str, amount) -> Dict[str, Any]:
+        return await db.create_invoice(project_id, amount)
 
     # ========== NOTIFICATIONS ==========
 

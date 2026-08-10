@@ -23,6 +23,9 @@ email-validator>=2.1.0
 lxml>=5.0.0
 xmltodict>=0.13.0
 
+# PDF (счета на оплату)
+reportlab>=4.0.0
+
 # Text processing (легкие библиотеки)
 pymorphy3>=1.3.0  # Морфология русского языка
 nltk>=3.8.1  # Токенизация и стемминг
