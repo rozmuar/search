@@ -1311,15 +1311,22 @@ async def get_embed_script():
         embed_path = '/app/src/web/embed.js'
     
     if os.path.exists(embed_path):
+        # no-cache, не max-age: этот скрипт вставляют напрямую на сайты клиентов
+        # (<script src=".../embed.js">), они никогда не смогут добавить cache-busting
+        # параметр сами - max-age держал бы у них старую версию виджета до часа после
+        # каждого деплоя. no-cache не выключает кэш, а требует ревалидацию на каждый
+        # запрос; FileResponse сам проставляет ETag/Last-Modified и проверяет
+        # If-None-Match, так что при неизменившемся файле это дешёвый 304, не полная
+        # перезагрузка.
         return FileResponse(
             embed_path,
             media_type='application/javascript',
             headers={
-                'Cache-Control': 'public, max-age=3600',
+                'Cache-Control': 'no-cache',
                 'Access-Control-Allow-Origin': '*'
             }
         )
-    
+
     raise HTTPException(status_code=404, detail="Widget script not found")
 
 
@@ -1335,7 +1342,7 @@ async def get_recommendations_script():
             script_path,
             media_type='application/javascript',
             headers={
-                'Cache-Control': 'public, max-age=3600',
+                'Cache-Control': 'no-cache',
                 'Access-Control-Allow-Origin': '*'
             }
         )
