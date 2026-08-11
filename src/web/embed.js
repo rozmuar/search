@@ -907,18 +907,18 @@
         <div class="search-widget-popup search-widget-popup-faceted">
           <div class="search-widget-popup-header">
             <h3>Результаты поиска: "${escapeHtml(query)}"</h3>
-            <span class="search-widget-popup-count" id="search-popup-count">Загрузка...</span>
+            <span class="search-widget-popup-count" id="sw-results-count">Загрузка...</span>
             <button class="search-widget-popup-close">&times;</button>
           </div>
           <div class="search-widget-popup-body">
-            <button type="button" class="search-widget-mobile-filter-toggle" id="search-popup-filter-toggle">
+            <button type="button" class="search-widget-mobile-filter-toggle" id="sw-filter-toggle">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"></path></svg>
               <span>Фильтры</span>
             </button>
-            <aside class="search-widget-facets-sidebar" id="search-popup-sidebar"></aside>
+            <aside class="search-widget-facets-sidebar" id="sw-facets-panel"></aside>
             <main class="search-widget-results-main">
               <div class="search-widget-popup-loading">Загрузка товаров...</div>
-              <div id="search-popup-main-content"></div>
+              <div id="sw-results-panel"></div>
             </main>
           </div>
         </div>
@@ -949,8 +949,8 @@
       // до результатов и создаёт впечатление "результатов нет". Класс держится
       // на самом <aside>, поэтому переживает переотрисовку renderFacetsSidebar
       // (та трогает только innerHTML, не classList хоста).
-      const filterToggle = popup.querySelector('#search-popup-filter-toggle');
-      const sidebarEl = popup.querySelector('#search-popup-sidebar');
+      const filterToggle = popup.querySelector('#sw-filter-toggle');
+      const sidebarEl = popup.querySelector('#sw-facets-panel');
       filterToggle?.addEventListener('click', () => {
         const isOpen = sidebarEl.classList.toggle('mobile-open');
         filterToggle.classList.toggle('active', isOpen);
@@ -987,7 +987,7 @@
         this.popupItemsById = {};
         (data.items || []).forEach(item => { this.popupItemsById[item.id] = item; });
 
-        const countEl = this.popupEl.querySelector('#search-popup-count');
+        const countEl = this.popupEl.querySelector('#sw-results-count');
         if (countEl) countEl.textContent = `Найдено: ${data.total || 0} товаров`;
 
         if (loadingEl) loadingEl.remove();
@@ -1002,7 +1002,7 @@
     }
 
     renderFacetsSidebar(facets) {
-      const sidebar = this.popupEl?.querySelector('#search-popup-sidebar');
+      const sidebar = this.popupEl?.querySelector('#sw-facets-panel');
       if (!sidebar) return;
       const state = this.popupState;
 
@@ -1116,7 +1116,7 @@
     }
 
     renderPopupMain(data) {
-      const container = this.popupEl?.querySelector('#search-popup-main-content');
+      const container = this.popupEl?.querySelector('#sw-results-panel');
       if (!container) return;
 
       const items = data.items || data.products || [];
