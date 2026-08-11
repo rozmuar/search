@@ -2646,22 +2646,44 @@
             order: 3;
           }
 
-          /* На узких экранах категория переносится на свою строку целиком,
-             а не сжимается до нечитаемой ширины рядом с полем ввода */
-          .search-widget-wrapper {
-            flex-wrap: wrap;
+          /* Степпер +/- и кнопка "В корзину" рядом были слишком тесными на
+             узких карточках - степпер остаётся компактным в своей строке
+             (align-items: flex-start вместо stretch по умолчанию для column),
+             кнопка переносится под него на всю ширину */
+          .search-widget-cart-row {
+            flex-direction: column;
+            align-items: flex-start;
           }
 
-          .search-widget-category-select {
+          .search-widget-add-to-cart-btn {
             width: 100%;
-            max-width: none;
-            margin-bottom: 6px;
-            border-right: 1px solid var(--search-border-color);
-            border-radius: var(--search-border-radius);
           }
 
-          .search-widget-input {
-            border-radius: var(--search-border-radius);
+          /* Дропдаун категории и поле ввода остаются в одну строку - раньше
+             категория переносилась на отдельную строку целиком, из-за чего
+             поле ввода оказывалось ниже и строка поиска на телефоне выглядела
+             как два отдельных блока. Свёрнут до 20% ширины (только стрелка +
+             начало названия), при фокусе/тапе разворачивается поверх строки
+             через position:absolute, чтобы не толкать соседние элементы. */
+          .search-widget-category-select {
+            flex-shrink: 0;
+            width: 20%;
+            max-width: 20%;
+            padding-left: 10px;
+            padding-right: 22px;
+            transition: none;
+          }
+
+          .search-widget-category-select:focus {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            max-width: 100%;
+            height: 100%;
+            z-index: 5;
+            padding-left: 15px;
+            border-right: 1.5px solid var(--search-border-color);
           }
         }
       `;
