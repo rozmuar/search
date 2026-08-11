@@ -487,6 +487,7 @@
           if (serverConfig.showImages !== undefined) this.config.showImages = serverConfig.showImages;
           if (serverConfig.showPrices !== undefined) this.config.showPrices = serverConfig.showPrices;
           if (serverConfig.showButton !== undefined) this.config.showButton = serverConfig.showButton;
+          if (serverConfig.showCartButton !== undefined) this.config.showCartButton = serverConfig.showCartButton;
           if (serverConfig.maxResults) this.config.results.limit = serverConfig.maxResults;
           if (serverConfig.cartCallbackUrl) this.config.cartCallbackUrl = serverConfig.cartCallbackUrl;
         }
@@ -910,6 +911,10 @@
             <button class="search-widget-popup-close">&times;</button>
           </div>
           <div class="search-widget-popup-body">
+            <button type="button" class="search-widget-mobile-filter-toggle" id="search-popup-filter-toggle">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"></path></svg>
+              <span>Фильтры</span>
+            </button>
             <aside class="search-widget-facets-sidebar" id="search-popup-sidebar"></aside>
             <main class="search-widget-results-main">
               <div class="search-widget-popup-loading">Загрузка товаров...</div>
@@ -938,6 +943,20 @@
         if (e.target === popup) closePopup();
       });
       document.addEventListener('keydown', escHandler);
+
+      // Мобильный тумблер фильтров - сайдбар на узких экранах свёрнут по
+      // умолчанию (см. @media max-width:768px), иначе он занимает весь экран
+      // до результатов и создаёт впечатление "результатов нет". Класс держится
+      // на самом <aside>, поэтому переживает переотрисовку renderFacetsSidebar
+      // (та трогает только innerHTML, не classList хоста).
+      const filterToggle = popup.querySelector('#search-popup-filter-toggle');
+      const sidebarEl = popup.querySelector('#search-popup-sidebar');
+      filterToggle?.addEventListener('click', () => {
+        const isOpen = sidebarEl.classList.toggle('mobile-open');
+        filterToggle.classList.toggle('active', isOpen);
+        const label = filterToggle.querySelector('span');
+        if (label) label.textContent = isOpen ? 'Скрыть фильтры' : 'Фильтры';
+      });
 
       await this.refreshPopupResults();
     }
@@ -1217,6 +1236,7 @@
     renderCard(product, opts = {}) {
       const showImages = this.config.showImages !== false;
       const showPrices = this.config.showPrices !== false;
+      const showCartButton = this.config.showCartButton !== false;
       const price = product.price ? formatPrice(product.price, this.config.currency) : '';
       const oldPrice = product.old_price ? formatPrice(product.old_price, this.config.currency) : '';
       const inStock = product.in_stock !== false;
@@ -1237,7 +1257,7 @@
               ${!inStock ? '<div class="search-widget-out-of-stock">Нет в наличии</div>' : ''}
             </div>
           </a>
-          ${inStock ? `
+          ${inStock && showCartButton ? `
             <div class="search-widget-cart-row">
               <div class="search-widget-qty-stepper">
                 <button type="button" class="qty-minus">−</button>
@@ -2043,6 +2063,33 @@
           padding-right: 4px;
         }
 
+        /* Кнопка "Фильтры" - раскрывает сайдбар фильтров на мобильном (см. @media
+           max-width:768px ниже). На десктопе сайдбар всегда открыт, кнопка не нужна. */
+        .search-widget-mobile-filter-toggle {
+          display: none;
+          align-items: center;
+          gap: 8px;
+          padding: 10px 14px;
+          border: 1.5px solid var(--search-border-color);
+          border-radius: var(--search-border-radius);
+          background: var(--search-background);
+          color: var(--search-text-color);
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          flex-shrink: 0;
+        }
+
+        .search-widget-mobile-filter-toggle svg {
+          width: 16px;
+          height: 16px;
+        }
+
+        .search-widget-mobile-filter-toggle.active {
+          border-color: var(--search-primary-color);
+          color: var(--search-primary-color);
+        }
+
         .search-widget-results-main {
           flex: 1;
           overflow-y: auto;
@@ -2572,8 +2619,31 @@
             overflow-y: auto;
           }
 
+          .search-widget-mobile-filter-toggle {
+            display: inline-flex;
+            margin-bottom: 4px;
+          }
+
+          /* Свёрнут по умолчанию - иначе список фильтров (сортировка, цена,
+             категория, params.*) занимает весь экран выше результатов, и
+             результаты приходится долго проскраливать, чтобы вообще их увидеть */
           .search-widget-facets-sidebar {
+            display: none;
             width: 100%;
+            overflow-y: visible;
+            max-height: none;
+            order: 2;
+          }
+
+          .search-widget-facets-sidebar.mobile-open {
+            display: block;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--search-border-color);
+            margin-bottom: 16px;
+          }
+
+          .search-widget-results-main {
+            order: 3;
           }
 
           /* На узких экранах категория переносится на свою строку целиком,

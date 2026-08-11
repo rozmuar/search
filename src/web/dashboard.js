@@ -2115,7 +2115,8 @@ function loadWidgetSettings() {
     document.getElementById('widgetPlaceholder').value = settings.placeholder || 'Поиск товаров...';
     document.getElementById('widgetShowButton').checked = settings.showButton !== false;
     document.getElementById('widgetShowImages').checked = settings.showImages !== false;
-    
+    document.getElementById('widgetShowCartButton').checked = settings.showCartButton !== false;
+
     updateWidgetPreview();
 }
 
@@ -2191,7 +2192,8 @@ async function saveWidgetSettings() {
         placeholder: document.getElementById('widgetPlaceholder').value,
         cartCallbackUrl: existingSettings.cartCallbackUrl || '',
         showButton: document.getElementById('widgetShowButton').checked,
-        showImages: document.getElementById('widgetShowImages').checked
+        showImages: document.getElementById('widgetShowImages').checked,
+        showCartButton: document.getElementById('widgetShowCartButton').checked
     };
 
     try {

@@ -113,6 +113,7 @@
       if (serverConfig.borderRadius !== undefined) this.config.borderRadius = serverConfig.borderRadius;
       if (serverConfig.showImages !== undefined) this.config.showImages = serverConfig.showImages;
       if (serverConfig.showPrices !== undefined) this.config.showPrices = serverConfig.showPrices;
+      if (serverConfig.showCartButton !== undefined) this.config.showCartButton = serverConfig.showCartButton;
       if (serverConfig.cartCallbackUrl) this.config.cartCallbackUrl = serverConfig.cartCallbackUrl;
     }
 
@@ -146,6 +147,7 @@
       this.container.style.display = '';
       const showImages = this.config.showImages !== false;
       const showPrices = this.config.showPrices !== false;
+      const showCartButton = this.config.showCartButton !== false;
 
       let html = `<div class="search-recs-wrapper">`;
       if (this.config.title) {
@@ -155,7 +157,7 @@
         <div class="search-recs-slider">
           <button type="button" class="search-recs-nav-btn search-recs-nav-prev" aria-label="Назад">‹</button>
           <div class="search-recs-track">
-            ${items.map(item => this.renderCard(item, { showImages, showPrices })).join('')}
+            ${items.map(item => this.renderCard(item, { showImages, showPrices, showCartButton })).join('')}
           </div>
           <button type="button" class="search-recs-nav-btn search-recs-nav-next" aria-label="Вперёд">›</button>
         </div>
@@ -194,7 +196,7 @@
       updateNavVisibility();
     }
 
-    renderCard(product, { showImages, showPrices }) {
+    renderCard(product, { showImages, showPrices, showCartButton }) {
       const price = product.price ? formatPrice(product.price, this.config.currency) : '';
       const oldPrice = product.old_price ? formatPrice(product.old_price, this.config.currency) : '';
       const inStock = product.in_stock !== false;
@@ -214,7 +216,7 @@
               ${!inStock ? '<div class="search-recs-out-of-stock">Нет в наличии</div>' : ''}
             </div>
           </a>
-          ${inStock ? `
+          ${inStock && showCartButton ? `
             <div class="search-recs-cart-row">
               <div class="search-recs-qty-stepper">
                 <button type="button" class="qty-minus">−</button>
