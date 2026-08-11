@@ -2050,6 +2050,13 @@
 
         .search-widget-popup-body {
           flex: 1;
+          /* min-height:0 - flex-элементы по умолчанию min-height:auto, из-за чего
+             при большом контенте (много карточек + много групп фасетов - у каталогов
+             с явными facetFields groups может быть 15+) вложенный flex:1+overflow:hidden
+             внутри контейнера с max-height (не height) вместо скролла мог схлопывать
+             содержимое до нулевой видимой высоты в некоторых браузерах - классический
+             "flexbug #1". popup открывался (шапка видна), а результаты/фасеты - нет. */
+          min-height: 0;
           overflow: hidden;
           display: flex;
           gap: 28px;
@@ -2059,6 +2066,7 @@
         .search-widget-facets-sidebar {
           width: 224px;
           flex-shrink: 0;
+          min-height: 0;
           overflow-y: auto;
           padding-right: 4px;
         }
@@ -2094,6 +2102,7 @@
           flex: 1;
           overflow-y: auto;
           min-width: 0;
+          min-height: 0;
           padding-right: 4px;
         }
 
