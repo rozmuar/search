@@ -554,6 +554,12 @@
       this.categorySelect.innerHTML = '<option value="">Везде</option>';
       this.categorySelect.addEventListener('change', () => {
         const value = this.categorySelect.value;
+        // На мобильном раскрытие на всю ширину раньше держалось только на :focus -
+        // но выбор варианта в нативном пикере сам снимает фокус (закрытие колеса
+        // на iOS и т.п.), и селект тут же схлопывался обратно до того, как
+        // пользователь успевал прочитать выбранную категорию. has-selection
+        // держит раскрытым, пока реально выбрана конкретная категория (не "Везде").
+        this.categorySelect.classList.toggle('search-widget-category-has-selection', !!value);
         if (value) {
           this.state.filters.category = [value];
         } else {
@@ -2674,6 +2680,21 @@
             transition: none;
           }
 
+          /* Выбрана конкретная категория (не "Везде") - раскрываем настолько,
+             чтобы название читалось целиком, но БЕЗ position:absolute: тут
+             строка поиска уже не в фокусе, и абсолютный оверлей на всю ширину
+             навсегда перекрыл бы поле ввода, сделав его некликабельным.
+             Поле ввода просто сжимается по обычной flex-логике (min-width:0
+             в базовом правиле не даёт ему исчезнуть совсем). */
+          .search-widget-category-select.search-widget-category-has-selection {
+            width: auto;
+            max-width: 60%;
+            padding-left: 15px;
+          }
+
+          /* :focus - селект активно открыт (нативный пикер), поле ввода в этот
+             момент всё равно не используется - можно временно перекрыть его
+             целиком, чтобы показать название по максимуму */
           .search-widget-category-select:focus {
             position: absolute;
             left: 0;
