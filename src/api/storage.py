@@ -3,10 +3,13 @@
 PostgreSQL для надежного хранения users/projects
 Redis для кэша, индексов и аналитики
 """
+import asyncio
 import json
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 import secrets
+
+REDIS_BATCH_SIZE = 2000  # команд на один pipeline.execute() - см. save_products/index_products
 
 from .auth import (
     hash_password, verify_password, create_access_token,
@@ -258,24 +261,42 @@ class DataStore:
         """Сохранение товаров проекта"""
         # Обновляем счетчик в PostgreSQL
         await db.update_products_count(project_id, len(products))
-        
-        # Сохраняем каждый товар в Redis
+
+        # json.dumps по всем товарам синхронно в event loop - CPU-bound, для
+        # каталогов в десятки тысяч товаров заметно, выносим в поток
+        pairs = await asyncio.to_thread(
+            lambda: [(f"project:{project_id}:product:{p['id']}", json.dumps(p)) for p in products]
+        )
+
+        # Пишем чанками по REDIS_BATCH_SIZE команд, а не одним гигантским
+        # pipeline.execute() на весь каталог - Redis выполняет команды
+        # однопоточно, и один pipeline на десятки/сотни тысяч команд надолго
+        # занимает его целиком, из-за чего поиск перестаёт отвечать сразу у
+        # ВСЕХ проектов на этом Redis, пока идёт загрузка одного большого фида.
+        # Чанками Redis успевает обслуживать остальных клиентов между батчами.
         pipe = self.redis.pipeline()
-        
-        for product in products:
-            product_key = f"project:{project_id}:product:{product['id']}"
-            pipe.set(product_key, json.dumps(product))
-        
-        # Сохраняем список ID товаров
+        pending = 0
+        for key, value in pairs:
+            pipe.set(key, value)
+            pending += 1
+            if pending >= REDIS_BATCH_SIZE:
+                await pipe.execute()
+                pipe = self.redis.pipeline()
+                pending = 0
+        if pending:
+            await pipe.execute()
+
+        # Список ID товаров - SADD тоже чанками (одна команда с 80k+ элементов
+        # редко проблема сама по себе, но держим единый размер батча для простоты)
         product_ids = [p["id"] for p in products]
-        pipe.delete(f"project:{project_id}:product_ids")
-        if product_ids:
-            pipe.sadd(f"project:{project_id}:product_ids", *product_ids)
-        
+        await self.redis.delete(f"project:{project_id}:product_ids")
+        for i in range(0, len(product_ids), REDIS_BATCH_SIZE):
+            batch = product_ids[i:i + REDIS_BATCH_SIZE]
+            if batch:
+                await self.redis.sadd(f"project:{project_id}:product_ids", *batch)
+
         # Обновляем счетчик
-        pipe.hset(f"project:{project_id}", "products_count", len(products))
-        
-        await pipe.execute()
+        await self.redis.hset(f"project:{project_id}", "products_count", len(products))
         return len(products)
     
     async def get_products(self, project_id: str, limit: int = 100, offset: int = 0) -> List[Dict]:

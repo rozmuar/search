@@ -30,12 +30,37 @@ class SimpleIndexer:
     - Индекс подсказок (для автодополнения)
     """
     
+    BATCH_SIZE = 2000  # команд на один pipeline.execute() - см. index_products
+
     def __init__(self, redis_client, query_processor, ngram_gen, db=None):
         self.redis = redis_client
         self.query_processor = query_processor
         self.ngram_gen = ngram_gen
         self.db = db  # PostgreSQL для бэкапа
-    
+
+    MEMBER_CHUNK = 500  # аргументов на одну SADD/ZADD-команду - см. index_products
+
+    async def _write_in_batches(self, items, apply_fn):
+        """Пишет items в Redis пачками по BATCH_SIZE команд, вместо одного
+        гигантского pipeline на всю коллекцию. apply_fn(pipe, item) сама решает,
+        какую команду добавить (SET/ZADD/SADD - структура отличается по вызову).
+
+        apply_fn отвечает за ОДНУ команду - если у одного ключа (частая n-грамма
+        от числовых артикулов/id, общеупотребимое слово) может быть до десятков
+        тысяч членов, apply_fn обязана сама резать их на куски по MEMBER_CHUNK
+        через несколько вызовов pipe.<cmd>(...) - иначе ОДНА такая команда сама
+        по себе надолго займёт Redis, независимо от чанкования по числу команд."""
+        pipe = self.redis.pipeline()
+        pending = 0
+        for item in items:
+            pending += apply_fn(pipe, item)
+            if pending >= self.BATCH_SIZE:
+                await pipe.execute()
+                pipe = self.redis.pipeline()
+                pending = 0
+        if pending:
+            await pipe.execute()
+
     async def index_products(self, project_id: str, products: List[Product]) -> int:
         """Полная индексация товаров"""
         if not products:
@@ -48,37 +73,66 @@ class SimpleIndexer:
             self._build_index_data, project_id, products
         )
 
-        # Атомарная замена в Redis
-        pipe = self.redis.pipeline()
-
-        # Удаляем старые данные (только товары и индексы, НЕ данные проекта)
+        # Удаляем старые данные (только товары и индексы, НЕ данные проекта) - чанками,
+        # не одним DEL на десятки тысяч ключей разом
         old_product_keys = await _scan_keys(self.redis, f"products:{project_id}:*")
         old_idx_keys = await _scan_keys(self.redis, f"idx:{project_id}:*")
         old_keys = old_product_keys + old_idx_keys
-        if old_keys:
-            pipe.delete(*old_keys)
-        
-        # Сохраняем товары
-        for key, value in products_data.items():
-            pipe.set(key, value)
-        
-        # Сохраняем инвертированный индекс
-        for token, product_scores in inverted_index.items():
+        for i in range(0, len(old_keys), self.BATCH_SIZE):
+            batch = old_keys[i:i + self.BATCH_SIZE]
+            if batch:
+                await self.redis.delete(*batch)
+
+        # Запись новых индексов - чанками по BATCH_SIZE команд на pipeline.execute(),
+        # а не одним гигантским pipeline на весь каталог. Redis выполняет команды
+        # однопоточно: один pipeline на сотни тысяч команд (обычное дело для
+        # каталога в десятки тысяч товаров - там ещё инвертированный индекс,
+        # n-граммы и подсказки) надолго занимает Redis целиком, и поиск
+        # перестаёт отвечать сразу у ВСЕХ проектов на этом Redis, пока идёт
+        # загрузка одного большого фида. Чанками Redis успевает обслуживать
+        # остальных клиентов между батчами.
+        def _set_one(pipe, kv):
+            pipe.set(kv[0], kv[1])
+            return 1
+
+        def _zadd_inverted(pipe, kv):
+            """ZADD инвертированного индекса - для очень частых слов (встречаются
+            в большинстве товаров каталога) mapping может разрастись до десятков
+            тысяч product_id -> режем на несколько ZADD с тем же ключом."""
+            token, scores = kv
             key = f"idx:{project_id}:inv:{token}"
-            pipe.zadd(key, product_scores)
-        
-        # Сохраняем n-gram индекс
-        for ngram, tokens in ngram_index.items():
+            items_list = list(scores.items())
+            if len(items_list) <= self.MEMBER_CHUNK:
+                pipe.zadd(key, scores)
+                return 1
+            n = 0
+            for i in range(0, len(items_list), self.MEMBER_CHUNK):
+                pipe.zadd(key, dict(items_list[i:i + self.MEMBER_CHUNK]))
+                n += 1
+            return n
+
+        def _sadd_ngram(pipe, kv):
+            """SADD n-граммы - короткие n-граммы из числовых артикулов/id могут
+            собрать множество из десятков тысяч токенов -> режем на несколько SADD."""
+            ngram, tokens = kv
             key = f"idx:{project_id}:ngram:{ngram}"
-            if tokens:
-                pipe.sadd(key, *tokens)
-        
-        # Сохраняем индекс подсказок
-        for prefix, count in suggest_index.items():
-            key = f"idx:{project_id}:suggest"
-            pipe.zadd(key, {prefix: count})
-        
-        await pipe.execute()
+            tokens_list = list(tokens)
+            n = 0
+            for i in range(0, len(tokens_list), self.MEMBER_CHUNK):
+                pipe.sadd(key, *tokens_list[i:i + self.MEMBER_CHUNK])
+                n += 1
+            return n
+
+        def _zadd_suggest(pipe, kv):
+            pipe.zadd(f"idx:{project_id}:suggest", {kv[0]: kv[1]})
+            return 1
+
+        await self._write_in_batches(products_data.items(), _set_one)
+        await self._write_in_batches(inverted_index.items(), _zadd_inverted)
+        await self._write_in_batches(
+            (kv for kv in ngram_index.items() if kv[1]), _sadd_ngram
+        )
+        await self._write_in_batches(suggest_index.items(), _zadd_suggest)
 
         # Сбрасываем кэш категорий (см. GET /api/v1/categories) - иначе
         # свежезагруженный фид до 5 минут не отразится в scope-дропдауне виджета
@@ -346,28 +400,47 @@ class SimpleIndexer:
                 self._build_index_only, products
             )
 
-            # Удаляем старые индексы и записываем новые
-            pipe = self.redis.pipeline()
-
+            # Удаляем старые индексы и записываем новые - чанками (см. index_products,
+            # тот же риск надолго занять Redis одним гигантским pipeline/командой)
             old_idx_keys = await _scan_keys(self.redis, f"idx:{project_id}:*")
-            if old_idx_keys:
-                pipe.delete(*old_idx_keys)
-            
-            for token, product_scores in inverted_index.items():
+            for i in range(0, len(old_idx_keys), self.BATCH_SIZE):
+                batch = old_idx_keys[i:i + self.BATCH_SIZE]
+                if batch:
+                    await self.redis.delete(*batch)
+
+            def _zadd_inverted(pipe, kv):
+                token, scores = kv
                 key = f"idx:{project_id}:inv:{token}"
-                pipe.zadd(key, product_scores)
-            
-            for ngram, tokens in ngram_index.items():
+                items_list = list(scores.items())
+                if len(items_list) <= self.MEMBER_CHUNK:
+                    pipe.zadd(key, scores)
+                    return 1
+                n = 0
+                for i in range(0, len(items_list), self.MEMBER_CHUNK):
+                    pipe.zadd(key, dict(items_list[i:i + self.MEMBER_CHUNK]))
+                    n += 1
+                return n
+
+            def _sadd_ngram(pipe, kv):
+                ngram, tokens = kv
                 key = f"idx:{project_id}:ngram:{ngram}"
-                if tokens:
-                    pipe.sadd(key, *tokens)
-            
-            for prefix, count in suggest_index.items():
-                key = f"idx:{project_id}:suggest"
-                pipe.zadd(key, {prefix: count})
-            
-            await pipe.execute()
-            
+                tokens_list = list(tokens)
+                n = 0
+                for i in range(0, len(tokens_list), self.MEMBER_CHUNK):
+                    pipe.sadd(key, *tokens_list[i:i + self.MEMBER_CHUNK])
+                    n += 1
+                return n
+
+            def _zadd_suggest(pipe, kv):
+                pipe.zadd(f"idx:{project_id}:suggest", {kv[0]: kv[1]})
+                return 1
+
+            await self._write_in_batches(inverted_index.items(), _zadd_inverted)
+            await self._write_in_batches(
+                (kv for kv in ngram_index.items() if kv[1]), _sadd_ngram
+            )
+            await self._write_in_batches(suggest_index.items(), _zadd_suggest)
+
             logger.info(f"[Indexer] Rebuilt index for {len(products)} products")
             return len(products)
             
