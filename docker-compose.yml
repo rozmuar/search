@@ -53,6 +53,7 @@ services:
     volumes:
       - ./src:/app/src
       - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot
     depends_on:
       redis:
         condition: service_healthy

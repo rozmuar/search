@@ -76,14 +76,36 @@ docker compose logs -f
 
 ### Без Cloudflare (Let's Encrypt)
 
+Nginx здесь работает не на хосте, а внутри Docker-контейнера `api`
+(см. `Dockerfile`/`nginx.conf`), поэтому плагин `certbot --nginx` не подходит —
+ему нечем управлять на хосте. Вместо него используем webroot-метод: каталог
+`/var/www/certbot` на хосте проброшен volume'ом в контейнер
+(`docker-compose.yml`) и отдаётся контейнерным nginx по пути
+`/.well-known/acme-challenge/`.
+
 ```bash
-# Устанавливаем Certbot
-apt install certbot python3-certbot-nginx -y
+# Устанавливаем Certbot без nginx-плагина
+apt install certbot -y
 
-# Получаем сертификат
-certbot --nginx -d yourdomain.com
+# Каталог для ACME-challenge (тот же, что смонтирован в контейнер)
+mkdir -p /var/www/certbot
 
-# Автообновление
+# Контейнер должен быть уже запущен (docker compose up -d), чтобы отдавать
+# challenge-файлы. Получаем сертификат:
+certbot certonly --webroot -w /var/www/certbot -d yourdomain.com
+
+# certbot renew обновит файлы в /etc/letsencrypt на хосте, но nginx внутри
+# контейнера не подхватит их без reload - хука на "systemctl reload nginx"
+# тут нет и быть не может, т.к. nginx не сервис хоста. Добавляем deploy-hook,
+# который перезагружает nginx внутри контейнера:
+mkdir -p /etc/letsencrypt/renewal-hooks/deploy
+cat > /etc/letsencrypt/renewal-hooks/deploy/reload-docker-nginx.sh <<'EOF'
+#!/bin/sh
+docker compose -f /opt/search/docker-compose.yml exec -T api nginx -s reload
+EOF
+chmod +x /etc/letsencrypt/renewal-hooks/deploy/reload-docker-nginx.sh
+
+# Проверяем, что продление и хук отрабатывают без ошибок
 certbot renew --dry-run
 ```
 

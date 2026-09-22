@@ -144,6 +144,13 @@ curl "http://localhost:8000/api/v1/search?q=iphone&limit=5"
 
 ## 🌐 Настройка для продакшена
 
+> ⚠️ Docker-образ уже содержит свой nginx с SSL (см. `Dockerfile`/`nginx.conf`),
+> и `docker-compose.yml` пробрасывает порты 80/443 контейнера напрямую на
+> хост. Шаги 1-4 ниже (nginx на хосте как reverse proxy) с этим конфликтуют -
+> порты 80/443 будут заняты контейнером. Используйте их только если осознанно
+> отключаете встроенный nginx контейнера. Для типового докер-деплоя переходите
+> сразу к шагу 5, подставив вместо `--nginx` webroot-метод, как описано там.
+
 ### 1. Установка Nginx
 
 ```bash
@@ -214,14 +221,34 @@ sudo systemctl restart nginx
 
 ### 5. Установка SSL (Let's Encrypt)
 
+Nginx, обслуживающий домен, работает внутри Docker-контейнера `api`, поэтому
+плагин `python3-certbot-nginx` не подходит - управлять хостовым nginx ему
+нечем. Используем webroot-метод через каталог `/var/www/certbot`,
+проброшенный volume'ом в контейнер (`docker-compose.yml`), плюс явный
+deploy-hook, перезагружающий nginx внутри контейнера (сам certbot про Docker
+ничего не знает и `systemctl reload nginx` тут не сработает).
+
 ```bash
-# Установка certbot
-sudo apt install certbot python3-certbot-nginx -y
+# Установка certbot без nginx-плагина
+sudo apt install certbot -y
 
-# Получение сертификата
-sudo certbot --nginx -d your-domain.com
+# Каталог для ACME-challenge (тот же, что смонтирован в контейнер)
+sudo mkdir -p /var/www/certbot
 
-# Автообновление сертификата настроится автоматически
+# Контейнер должен быть уже запущен (docker compose up -d)
+sudo certbot certonly --webroot -w /var/www/certbot -d your-domain.com
+
+# Хук на reload nginx внутри контейнера после каждого продления
+sudo mkdir -p /etc/letsencrypt/renewal-hooks/deploy
+sudo tee /etc/letsencrypt/renewal-hooks/deploy/reload-docker-nginx.sh > /dev/null <<'EOF'
+#!/bin/sh
+docker compose -f /path/to/search/docker-compose.yml exec -T api nginx -s reload
+EOF
+sudo chmod +x /etc/letsencrypt/renewal-hooks/deploy/reload-docker-nginx.sh
+# ^ подставьте реальный путь к склонированному репозиторию (см. шаг 2 выше)
+
+# Проверка, что автопродление (systemd-таймер certbot.timer) и хук отрабатывают
+sudo certbot renew --dry-run
 ```
 
 ---
