@@ -768,6 +768,19 @@ class Database:
                               updated_at = CURRENT_TIMESTAMP
             ''', project_id, query, count)
     
+    async def get_popular_queries(self, project_id: str, limit: int = 5) -> List[Dict[str, Any]]:
+        """Самые частые запросы проекта - для подсказок при фокусе на поле поиска.
+        Читаем из Postgres, а не из Redis: zset в Redis переживает только
+        аккуратный рестарт, а не потерю данных при сбое (см. HISTORY.md)."""
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch('''
+                SELECT query, count FROM analytics_popular_queries
+                WHERE project_id = $1
+                ORDER BY count DESC
+                LIMIT $2
+            ''', project_id, limit)
+            return [{"text": row["query"], "count": row["count"]} for row in rows]
+
     async def increment_popular_product(self, project_id: str, product_id: str, clicks: int = 1):
         """Увеличить счётчик кликов по товару"""
         async with self.pool.acquire() as conn:

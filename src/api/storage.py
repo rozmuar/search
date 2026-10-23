@@ -5,9 +5,12 @@ Redis для кэша, индексов и аналитики
 """
 import asyncio
 import json
+import logging
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 import secrets
+
+logger = logging.getLogger(__name__)
 
 REDIS_BATCH_SIZE = 2000  # команд на один pipeline.execute() - см. save_products/index_products
 
@@ -363,30 +366,22 @@ class DataStore:
         
         await pipe.execute()
         
-        # Бэкап в PostgreSQL (асинхронно, не блокируем)
+        # Бэкап в PostgreSQL (асинхронно, не блокируем поиск при сбое БД,
+        # но и не проглатываем ошибку молча - иначе бэкап может месяцами
+        # не работать незаметно, как уже было)
         try:
             await db.increment_daily_queries(project_id, day_key)
             await db.increment_total_queries(project_id)
             if results_count > 0:
                 await db.increment_popular_query(project_id, normalized_query)
         except Exception as e:
-            pass  # Не блокируем если PostgreSQL недоступен
-    
+            logger.error(f"[log_search] PostgreSQL backup failed for project {project_id}: {e}")
+
     async def get_popular_queries(self, project_id: str, limit: int = 5) -> List[Dict[str, Any]]:
-        """Получение популярных запросов для показа при фокусе на поле поиска"""
-        popular = await self.redis.zrevrange(
-            f"analytics:{project_id}:popular_queries",
-            0, limit - 1,
-            withscores=True
-        )
-        
-        result = []
-        for item in popular:
-            query = item[0].decode() if isinstance(item[0], bytes) else item[0]
-            count = int(item[1])
-            result.append({"text": query, "count": count})
-        
-        return result
+        """Получение популярных запросов для показа при фокусе на поле поиска.
+        Источник - PostgreSQL (analytics_popular_queries), а не Redis: это
+        статистика, которая должна переживать рестарт/потерю данных Redis."""
+        return await db.get_popular_queries(project_id, limit)
     
     async def get_analytics(self, project_id: str, days: int = 7) -> Dict[str, Any]:
         """Получение аналитики проекта. days=0 - за всё время"""
