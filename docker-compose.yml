@@ -1,8 +1,16 @@
+x-logging: &default-logging
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
 services:
   # PostgreSQL для хранения пользователей и проектов
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
+    <<: *default-logging
     ports:
       - "5432:5432"
     environment:
@@ -22,6 +30,7 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    <<: *default-logging
     ports:
       - "6379:6379"
     volumes:
@@ -37,6 +46,7 @@ services:
   api:
     build: .
     restart: unless-stopped
+    <<: *default-logging
     ports:
       - "80:80"
       - "443:443"
